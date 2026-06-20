@@ -1,0 +1,281 @@
+'use client'
+
+import { useChat } from '@ai-sdk/react'
+import { useState, useEffect, useRef } from 'react'
+import { DefaultChatTransport } from 'ai'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Send, Bot, User, Loader2 } from 'lucide-react'
+import type { AIResponse, Note } from '@/lib/types'
+
+function genId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
+  })
+}
+
+interface ChatProps {
+  onNoteCreated?: (note: Note) => void
+}
+
+export default function Chat({ onNoteCreated }: ChatProps) {
+  const [input, setInput] = useState('')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  const { messages, sendMessage, status, error } = useChat({
+    transport: new DefaultChatTransport({ api: '/api/chat' }),
+    onFinish: async (event) => {
+      const { message, messages: allMessages, isAbort, isError } = event
+      if (isAbort || isError) return
+
+      const text = message.parts
+        .filter((p) => p.type === 'text')
+        .map((p) => (p as { text: string }).text)
+        .join('')
+
+      const userInputText = allMessages
+        .filter((m) => m.role === 'user')
+        .pop()
+        ?.parts?.filter((p) => p.type === 'text')
+        .map((p) => (p as { text: string }).text)
+        .join('')
+
+      try {
+        const jsonMatch = text.match(/\{[\s\S]*\}/)
+        if (jsonMatch) {
+          const parsed: AIResponse = JSON.parse(jsonMatch[0])
+          if (parsed.isNewEntry && parsed.title !== undefined && parsed.title !== null) {
+            const now = new Date().toISOString()
+            const title = parsed.title || text.slice(0, 50).replace(/[{}"\n]/g, ' ').trim()
+            const note: Note = {
+              id: genId(),
+              content: userInputText || text,
+              title,
+              type: parsed.type,
+              tags: parsed.tags,
+              dueDate: parsed.dueDate,
+              done: false,
+              createdAt: now,
+              updatedAt: now,
+            }
+            const res = await fetch('/api/notes', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(note),
+            })
+            if (res.ok) {
+              const data = await res.json()
+              onNoteCreated?.(data.note)
+              console.log('Note saved:', title)
+            } else {
+              console.error('Failed to save note:', await res.text())
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse AI response:', e)
+      }
+    },
+  })
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [messages])
+
+  function getMessageText(msg: typeof messages[0]): string {
+    return msg.parts
+      .filter((p) => p.type === 'text')
+      .map((p) => (p as { text: string }).text)
+      .join('')
+  }
+
+  function extractAISummary(content: string): string {
+    try {
+      const jsonMatch = content.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        const parsed: AIResponse = JSON.parse(jsonMatch[0])
+        return parsed.summary || content
+      }
+    } catch {
+      // ignore
+    }
+    return content
+  }
+
+  function getTypeFromContent(content: string): string | undefined {
+    try {
+      const m = content.match(/\{[\s\S]*\}/)
+      if (m) return JSON.parse(m[0]).type
+    } catch { /* ignore */ }
+    return undefined
+  }
+
+  function getTypeBadge(type?: string) {
+    if (!type) return null
+    const colors: Record<string, string> = {
+      note: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+      task: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
+      event: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
+    }
+    const labels: Record<string, string> = {
+      note: '笔记',
+      task: '任务',
+      event: '事件',
+    }
+    return (
+      <Badge className={colors[type] || ''} variant="outline">
+        {labels[type] || type}
+      </Badge>
+    )
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (input.trim() && status === 'ready') {
+      sendMessage({ text: input })
+      setInput('')
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      const form = (e.target as HTMLElement).closest('form')
+      if (form) form.requestSubmit()
+    }
+  }
+
+  const isLoading = status === 'streaming' || status === 'submitted'
+
+  return (
+    <div className="flex h-full flex-col">
+      <ScrollArea ref={scrollRef} className="flex-1 p-4">
+        {messages.length === 0 && (
+          <div className="flex h-full items-center justify-center">
+            <div className="max-w-md text-center">
+              <Bot className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+              <h2 className="mb-2 text-lg font-semibold">你好！我是你的 AI 生活助手</h2>
+              <p className="text-sm text-muted-foreground">
+                你可以这样和我对话：
+              </p>
+              <div className="mt-4 space-y-2 text-left text-sm text-muted-foreground">
+                <div className="rounded-lg bg-muted p-3">
+                  "明天下午3点和张三开会讨论项目进度"
+                </div>
+                <div className="rounded-lg bg-muted p-3">
+                  "吃了午饭，花了35块"
+                </div>
+                <div className="rounded-lg bg-muted p-3">
+                  "提醒我今晚8点锻炼"
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="mx-auto max-w-2xl space-y-4">
+          {messages.map((msg, i) => {
+            const isUser = msg.role === 'user'
+            const text = getMessageText(msg)
+
+            if (isUser) {
+              return (
+                <div key={msg.id || i} className="flex justify-end">
+                  <div className="flex max-w-[80%] flex-row-reverse gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                      <User className="h-4 w-4" />
+                    </div>
+                    <Card className="bg-primary p-3 text-primary-foreground">
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed">{text}</p>
+                    </Card>
+                  </div>
+                </div>
+              )
+            }
+
+            const summary = extractAISummary(text)
+            return (
+              <div key={msg.id || i} className="flex justify-start">
+                <div className="flex max-w-[80%] gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                    <Bot className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <Card className="bg-card p-3">
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed">{summary}</p>
+                    </Card>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {getTypeBadge(getTypeFromContent(text))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="flex max-w-[80%] gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                  <Bot className="h-4 w-4" />
+                </div>
+                <Card className="bg-card p-3">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </Card>
+              </div>
+            </div>
+          )}
+          {error && (
+            <div className="flex justify-center">
+              <Card className="bg-destructive/10 p-3 text-sm text-destructive">
+                {error.message || '出错了，请重试'}
+              </Card>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+
+      <div className="border-t p-4">
+        <form
+          onSubmit={handleSubmit}
+          className="mx-auto flex max-w-2xl gap-2"
+        >
+          <Textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => {
+              setInput(e.target.value)
+              const el = e.target
+              el.style.height = 'auto'
+              el.style.height = `${Math.min(el.scrollHeight, 200)}px`
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="输入你想记录的内容…"
+            className="min-h-[44px] resize-none"
+            rows={1}
+            disabled={isLoading}
+          />
+          <Button type="submit" size="icon" className="h-[44px] w-[44px] shrink-0" disabled={isLoading || !input.trim()}>
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
+        </form>
+        <p className="mt-1 text-center text-xs text-muted-foreground">
+          Enter 发送 · Shift+Enter 换行
+        </p>
+      </div>
+    </div>
+  )
+}

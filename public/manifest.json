@@ -1,0 +1,17 @@
+{
+  "name": "LifeOS - AI 生活助手",
+  "short_name": "LifeOS",
+  "description": "你的个人 AI 生活助手",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

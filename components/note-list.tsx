@@ -1,0 +1,208 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { format } from 'date-fns'
+import { zhCN } from 'date-fns/locale'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Notebook,
+  CheckSquare,
+  Calendar,
+  Trash2,
+  Check,
+  Undo2,
+  Search,
+  Loader2,
+} from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import type { Note, NoteType } from '@/lib/types'
+import { useAppStore } from '@/store'
+import { cn } from '@/lib/utils'
+
+interface NoteListProps {
+  defaultFilter?: NoteType | 'all'
+}
+
+export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
+  const { notes, setNotes, loading, setLoading, removeNote, updateNote } = useAppStore()
+  const [filterType, setFilterType] = useState<NoteType | 'all'>(defaultFilter)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<Note[] | null>(null)
+
+  useEffect(() => {
+    fetchNotes()
+  }, [])
+
+  async function fetchNotes() {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/notes')
+      const data = await res.json()
+      setNotes(data.notes)
+    } catch (e) {
+      console.error('Failed to fetch notes:', e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    await fetch(`/api/notes/${id}`, { method: 'DELETE' })
+    removeNote(id)
+  }
+
+  async function handleToggleDone(id: string, done: boolean) {
+    await fetch(`/api/notes/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ done: !done }),
+    })
+    updateNote(id, { done: !done })
+  }
+
+  async function handleSearch(q: string) {
+    setSearchQuery(q)
+    if (!q.trim()) {
+      setSearchResults(null)
+      return
+    }
+    const res = await fetch(`/api/notes?q=${encodeURIComponent(q)}`)
+    const data = await res.json()
+    setSearchResults(data.notes)
+  }
+
+  const displayNotes = searchResults ?? notes.filter(
+    (n) => filterType === 'all' || n.type === filterType
+  )
+
+  const typeIcons: Record<string, typeof Notebook> = {
+    note: Notebook,
+    task: CheckSquare,
+    event: Calendar,
+  }
+
+  const typeLabels: Record<string, string> = {
+    note: '笔记',
+    task: '任务',
+    event: '事件',
+    all: '全部',
+  }
+
+  const filters: (NoteType | 'all')[] = ['all', 'note', 'task', 'event']
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="border-b p-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="搜索笔记…"
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="mt-3 flex gap-1">
+          {filters.map((f) => (
+            <Button
+              key={f}
+              variant={filterType === f ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setFilterType(f)}
+              className="text-xs"
+            >
+              {typeLabels[f]}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      <ScrollArea className="flex-1 p-4">
+        {loading ? (
+          <div className="flex h-32 items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : displayNotes.length === 0 ? (
+          <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+            {searchQuery ? '没有找到匹配的记录' : '还没有任何记录，去 AI 对话页面创建吧'}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {displayNotes.map((note) => {
+              const Icon = typeIcons[note.type]
+
+              return (
+                <Card key={note.id} className={cn(note.done && 'opacity-60')}>
+                  <CardHeader className="p-3 pb-0">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <Icon className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-sm font-medium">
+                          {note.title || '无标题'}
+                        </CardTitle>
+                        <Badge variant="outline" className="text-[10px]">
+                          {typeLabels[note.type]}
+                        </Badge>
+                      </div>
+                      <div className="flex gap-1">
+                        {note.type === 'task' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => handleToggleDone(note.id, note.done)}
+                          >
+                            {note.done ? (
+                              <Undo2 className="h-3 w-3" />
+                            ) : (
+                              <Check className="h-3 w-3" />
+                            )}
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-destructive"
+                          onClick={() => handleDelete(note.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-2">
+                    <p className="line-clamp-3 text-sm text-muted-foreground">
+                      {note.content}
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      {note.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {note.tags.map((tag: string) => (
+                            <Badge key={tag} variant="secondary" className="text-[10px]">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                      <span>
+                        {format(new Date(note.createdAt), 'MM/dd HH:mm', { locale: zhCN })}
+                      </span>
+                      {note.dueDate && (
+                        <span className="text-amber-600">
+                          截止: {format(new Date(note.dueDate), 'MM/dd HH:mm', { locale: zhCN })}
+                        </span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+      </ScrollArea>
+    </div>
+  )
+}

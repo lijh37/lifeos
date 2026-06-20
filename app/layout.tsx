@@ -1,0 +1,54 @@
+import type { Metadata } from "next"
+import { Geist, Geist_Mono } from "next/font/google"
+import "./globals.css"
+import { Sidebar, MobileNav } from "@/components/sidebar"
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+})
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+})
+
+export const metadata: Metadata = {
+  title: "LifeOS - AI 生活助手",
+  description: "你的个人 AI 生活助手，记录笔记、管理任务、追踪生活",
+  manifest: "/manifest.json",
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "LifeOS" },
+}
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html
+      lang="zh-CN"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+    >
+      <head>
+        <link rel="apple-touch-icon" href="/icons/icon-512.svg" />
+        <meta name="theme-color" content="#ffffff" />
+      </head>
+      <body className="h-full">
+        <div className="flex h-full">
+          <Sidebar />
+          <main className="flex-1 pb-16 md:pb-0">{children}</main>
+          <MobileNav />
+        </div>
+      </body>
+    </html>
+  )
+}

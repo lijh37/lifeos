@@ -1,0 +1,79 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { Bot, Notebook, CheckSquare, Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+
+const navItems = [
+  { href: '/', label: 'AI 对话', icon: Bot },
+  { href: '/notes', label: '笔记', icon: Notebook },
+  { href: '/tasks', label: '任务', icon: CheckSquare },
+]
+
+export function Sidebar() {
+  const pathname = usePathname()
+
+  return (
+    <aside className="hidden w-56 border-r bg-card p-4 md:flex md:flex-col">
+      <div className="mb-6 flex items-center gap-2">
+        <Bot className="h-6 w-6 text-primary" />
+        <span className="text-lg font-bold">LifeOS</span>
+      </div>
+
+      <nav className="flex flex-col gap-1">
+        {navItems.map((item) => {
+          const isActive = pathname === item.href
+          return (
+            <Link key={item.href} href={item.href}>
+              <Button
+                variant={isActive ? 'secondary' : 'ghost'}
+                className={cn('w-full justify-start gap-3', isActive && 'font-medium')}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </Button>
+            </Link>
+          )
+        })}
+      </nav>
+
+      <div className="mt-auto">
+        <Link href="/">
+          <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground">
+            <Plus className="h-4 w-4" />
+            新建记录
+          </Button>
+        </Link>
+      </div>
+    </aside>
+  )
+}
+
+export function MobileNav() {
+  const pathname = usePathname()
+
+  return (
+    <nav className="fixed bottom-0 left-0 right-0 z-50 flex border-t bg-background md:hidden">
+      {navItems.map((item) => {
+        const isActive = pathname === item.href
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              'flex flex-1 flex-col items-center gap-1 py-2 text-xs',
+              isActive
+                ? 'text-primary'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <item.icon className="h-5 w-5" />
+            {item.label}
+          </Link>
+        )
+      })}
+    </nav>
+  )
+}
