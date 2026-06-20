@@ -6,7 +6,7 @@
 
 ## 当前状态（截至 2026-06-20）
 
-### ✅ 已实现（23 路由，15 页面 + 8 API）
+### ✅ 已实现（24 路由，10 页面 + 11 API）
 
 **核心能力**
 - **AI 对话式记录**：DeepSeek 解析自然语言 → 自动创建笔记/任务/事件/支出/收入/习惯
@@ -14,7 +14,7 @@
 - **收支管理**：AI 自动记账分类（餐饮/交通/购物等），月度汇总 + 分类柱状图
 - **习惯养成**：AI 创建习惯 + 每日打卡 + 连续天数 streak 徽章
 
-**页面（7 个）**
+**页面（10 个）**
 - `/` AI 对话首页（流式聊天，打字动画，超时重试，复制按钮）
 - `/notes` 笔记列表（筛选/搜索/标记完成/删除）
 - `/tasks` 任务列表（默认过滤 task 类型）
@@ -42,6 +42,7 @@
 - **深色模式**：light/dark/system 三态切换（localStorage 持久化）
 - **离线支持**：Service Worker（`/sw.js`）缓存静态资源和 API GET 响应
 - **PWA 安装提示**：监听 `beforeinstallprompt`，弹出安装卡片
+- **通知提醒**：浏览器通知权限请求 + 到期检查（on mount + 每 5 分钟）+ 浏览器推送 + 内联降级提醒
 - **UI 动效**：页面 fadeIn 过渡、列表交错入场、卡片 hover 悬浮、骨架屏加载
 - **导航**：PC 侧栏 + 手机底部 Tab（10 项：对话/笔记/任务/记账/习惯/搜索/日历/标签/统计/设置）
 - **数据导出**：Markdown / JSON / CSV（含 BOM，Excel 中文友好）
@@ -57,7 +58,7 @@
 |---|---|---|
 | P1 | **多端同步部署** | 注册 Turso → `npm run migrate` → 部署 Vercel |
 | P2 | **饮食+锻炼追踪** | 拍照识食物（需 GPT-4o vision API key） |
-| P3 | **迭代优化** | 通知提醒、富文本编辑、附件上传 |
+| P3 | **迭代优化** | 富文本编辑、附件上传 |
 
 ## 技术栈
 
@@ -86,7 +87,7 @@
 ```
 opencode-demo/
 ├── app/
-│   ├── layout.tsx              # 全局布局（侧栏 + 底栏 + PWA 处理 + 页面动效）
+│   ├── layout.tsx              # 全局布局（侧栏 + 底栏 + PWA 处理 + 通知管理器 + 页面动效）
 │   ├── page.tsx                # AI 对话首页（dynamic import Chat）
 │   ├── notes/page.tsx          # 笔记列表
 │   ├── tasks/page.tsx          # 任务列表
@@ -119,6 +120,7 @@ opencode-demo/
 │   ├── theme-toggle.tsx        # 深色模式切换
 │   ├── pwa-handler.tsx         # 离线横幅 + PWA 安装提示
 │   ├── page-animation.tsx      # 页面过渡动画容器
+│   ├── notification-manager.tsx # 通知提醒管理器
 │   └── skeleton-card.tsx       # 骨架屏组件
 ├── lib/
 │   ├── db.ts                   # 数据库操作（双模式 SQLite/Turso，含搜索/标签/统计/清除）
@@ -129,7 +131,7 @@ opencode-demo/
 ├── scripts/
 │   └── migrate-to-turso.ts     # 本地→Turso 数据迁移
 ├── data/
-│   └── schema.sql              # 数据库完整 DDL（6 表 + 索引）
+│   └── schema.sql              # 完整 DDL（6 表 + 索引）
 ├── public/
 │   ├── manifest.json            # PWA 配置（192+512 图标，maskable）
 │   ├── sw.js                    # Service Worker（缓存策略）

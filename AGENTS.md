@@ -48,6 +48,7 @@ components/           # React 组件
   ├── theme-provider.tsx # 主题上下文
   ├── theme-toggle.tsx  # 深色模式切换
   ├── pwa-handler.tsx   # 离线横幅 + PWA 安装提示
+  ├── notification-manager.tsx # 通知提醒（到期检查 + 浏览器推送）
   ├── page-animation.tsx # 页面过渡动效
   └── skeleton-card.tsx  # 骨架屏组件
 lib/                  # 核心逻辑

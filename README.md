@@ -80,12 +80,14 @@ lt --port 3000
 - [x] 离线支持 — Service Worker 缓存 + PWA 安装提示
 - [x] 数据管理 — 设置页：数据清除、备份导出/导入恢复
 - [x] UI 动效 — 页面过渡、骨架屏、交错入场、卡片悬浮
+- [x] 通知提醒 — 到期任务/事件浏览器推送 + 内联提醒卡片
 - [x] 多端自适应 — PC 侧栏导航 + 手机底部 Tab
 
 ### 规划中
 - [ ] 多端同步 — Turso 云端同步 + Vercel 部署
 - [ ] 饮食+锻炼追踪 — 拍照识食物，运动记录
-- [ ] 通知提醒、富文本编辑
+- [ ] 饮食+锻炼追踪 — 拍照识食物，运动记录
+- [ ] 富文本编辑
 
 ## 项目结构
 
@@ -122,6 +124,7 @@ opencode-demo/
 │   ├── theme-provider.tsx    # 主题上下文
 │   ├── theme-toggle.tsx      # 深色模式切换
 │   ├── pwa-handler.tsx       # 离线横幅 + 安装提示
+│   ├── notification-manager.tsx # 通知提醒管理器
 │   ├── page-animation.tsx    # 页面过渡动效
 │   └── skeleton-card.tsx     # 骨架屏
 ├── lib/
