@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { CheckCircle, Circle, Loader2, Plus, Trash2, Trophy } from 'lucide-react'
+import { CheckCircle, Circle, Plus, Trash2, Trophy } from 'lucide-react'
+import { SkeletonCard } from '@/components/skeleton-card'
 import type { Habit } from '@/lib/types'
 
 export default function HabitsPage() {
@@ -100,8 +101,8 @@ export default function HabitsPage() {
 
       <ScrollArea className="flex-1">
         {loading ? (
-          <div className="flex h-32 items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <div className="p-4">
+            <SkeletonCard count={4} />
           </div>
         ) : habits.length === 0 ? (
           <div className="flex h-32 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -109,11 +110,11 @@ export default function HabitsPage() {
             <p>还没有习惯，去 AI 对话或点新建添加</p>
           </div>
         ) : (
-          <div className="space-y-1 p-4">
+          <div className="space-y-1 p-4 animate-stagger">
             {habits.map((habit) => {
               const done = todayMap[habit.id] ?? false
               return (
-                <Card key={habit.id}>
+                <Card key={habit.id} className="card-hover">
                   <CardContent className="flex items-center gap-3 p-3">
                     <button onClick={() => handleToggle(habit.id, today)} className="shrink-0">
                       {done ? (

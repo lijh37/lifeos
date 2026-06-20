@@ -4,7 +4,7 @@ import type { Note, ChatMessage, NoteType, Expense, Habit, HabitCompletion } fro
 
 let client: ReturnType<typeof createClient> | null = null
 
-function getClient() {
+export function getClient() {
   if (client) return client
   const tursoUrl = process.env.TURSO_DATABASE_URL
   const url = tursoUrl || process.env.DATABASE_URL || 'file:./data/life.db'
@@ -339,6 +339,72 @@ export async function searchNotes(query: string): Promise<Note[]> {
   return result.rows.map(rowToNote)
 }
 
+export async function searchExpenses(query: string): Promise<Expense[]> {
+  const term = `%${query}%`
+  const db = getClient()
+  const result = await db.execute({
+    sql: `SELECT * FROM expenses WHERE description LIKE ? OR category LIKE ? ORDER BY created_at DESC`,
+    args: [term, term],
+  })
+  return result.rows.map(rowToExpense)
+}
+
+export async function searchHabits(query: string): Promise<Habit[]> {
+  const term = `%${query}%`
+  const db = getClient()
+  const result = await db.execute({
+    sql: `SELECT * FROM habits WHERE name LIKE ? OR description LIKE ? ORDER BY created_at DESC`,
+    args: [term, term],
+  })
+  return result.rows.map(rowToHabit)
+}
+
+export async function getAllTags(): Promise<{ name: string; count: number }[]> {
+  const db = getClient()
+  const result = await db.execute('SELECT tags FROM notes')
+  const tagCount: Record<string, number> = {}
+  for (const row of result.rows) {
+    const tags = JSON.parse(row.tags as string) as string[]
+    for (const tag of tags) {
+      if (tag) tagCount[tag] = (tagCount[tag] || 0) + 1
+    }
+  }
+  return Object.entries(tagCount)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+}
+
+export async function renameTag(oldName: string, newName: string): Promise<void> {
+  const db = getClient()
+  const result = await db.execute('SELECT id, tags FROM notes')
+  for (const row of result.rows) {
+    const tags = JSON.parse(row.tags as string) as string[]
+    const idx = tags.indexOf(oldName)
+    if (idx !== -1) {
+      tags[idx] = newName
+      await db.execute({
+        sql: 'UPDATE notes SET tags = ? WHERE id = ?',
+        args: [JSON.stringify(tags), row.id],
+      })
+    }
+  }
+}
+
+export async function deleteTag(tagName: string): Promise<void> {
+  const db = getClient()
+  const result = await db.execute('SELECT id, tags FROM notes')
+  for (const row of result.rows) {
+    const tags = JSON.parse(row.tags as string) as string[]
+    const filtered = tags.filter((t: string) => t !== tagName)
+    if (filtered.length !== tags.length) {
+      await db.execute({
+        sql: 'UPDATE notes SET tags = ? WHERE id = ?',
+        args: [JSON.stringify(filtered), row.id],
+      })
+    }
+  }
+}
+
 export async function getNotesCount(): Promise<{ note: number; task: number; event: number }> {
   const db = getClient()
   const result = await db.execute(
@@ -350,6 +416,25 @@ export async function getNotesCount(): Promise<{ note: number; task: number; eve
     counts[t] = row.count as number
   }
   return counts
+}
+
+export async function getExpensesCount(): Promise<number> {
+  const db = getClient()
+  const result = await db.execute('SELECT COUNT(*) as count FROM expenses')
+  return result.rows[0]?.count as number || 0
+}
+
+export async function getHabitsCount(): Promise<number> {
+  const db = getClient()
+  const result = await db.execute('SELECT COUNT(*) as count FROM habits')
+  return result.rows[0]?.count as number || 0
+}
+
+export async function clearTable(table: string): Promise<void> {
+  const db = getClient()
+  const allowed = ['notes', 'expenses', 'habits', 'habit_completions', 'chat_messages']
+  if (!allowed.includes(table)) throw new Error(`Table '${table}' not allowed for clearing`)
+  await db.execute(`DELETE FROM ${table}`)
 }
 
 export async function saveMessage(msg: ChatMessage): Promise<void> {

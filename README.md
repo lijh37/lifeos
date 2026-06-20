@@ -1,6 +1,6 @@
 # LifeOS - AI 生活助手
 
-你的个人 AI 生活助手，支持自然语言记录笔记、管理任务、记账、养成习惯。手机和 PC 均可使用，支持深色模式和数据导出。
+你的个人 AI 生活助手，支持自然语言记录笔记、管理任务、记账、养成习惯。手机和 PC 均可使用，支持深色模式、数据导出和离线访问。
 
 ## 技术栈
 
@@ -72,15 +72,20 @@ lt --port 3000
 - [x] 收支管理 — AI 自动分类记账（餐饮/交通/购物等），月度统计 + 分类柱状图
 - [x] 习惯养成 — AI 创建习惯，每日打卡，连续天数 streak 徽章
 - [x] 日历视图 — 月历网格，彩色圆点标记条目类型，点击查看当日详情
+- [x] 全局搜索 — 跨笔记/收支/习惯全文搜索，防抖 300ms
+- [x] 统计看板 — 数据概览、分类图表、热门标签、动态时间线
+- [x] 标签管理 — 查看/重命名/删除标签
 - [x] 数据导出 — Markdown / JSON / CSV（Excel 中文友好）
 - [x] 深色模式 — light/dark/system 三态切换
-- [x] 多端自适应 — PC 侧栏导航 + 手机底部 Tab + PWA
+- [x] 离线支持 — Service Worker 缓存 + PWA 安装提示
+- [x] 数据管理 — 设置页：数据清除、备份导出/导入恢复
+- [x] UI 动效 — 页面过渡、骨架屏、交错入场、卡片悬浮
+- [x] 多端自适应 — PC 侧栏导航 + 手机底部 Tab
 
 ### 规划中
 - [ ] 多端同步 — Turso 云端同步 + Vercel 部署
-- [ ] 离线支持 — Service Worker 缓存
 - [ ] 饮食+锻炼追踪 — 拍照识食物，运动记录
-- [ ] 统计看板 — 数据可视化概览
+- [ ] 通知提醒、富文本编辑
 
 ## 项目结构
 
@@ -93,12 +98,21 @@ opencode-demo/
 │   ├── expenses/page.tsx     # 记账页面
 │   ├── habits/page.tsx       # 习惯页面
 │   ├── calendar/page.tsx     # 日历视图
+│   ├── search/page.tsx       # 全局搜索
+│   ├── tags/page.tsx         # 标签管理
+│   ├── stats/page.tsx        # 统计看板
+│   ├── settings/page.tsx     # 设置
 │   └── api/
 │       ├── chat/route.ts     # DeepSeek 流式对话
 │       ├── notes/route.ts    # 笔记 CRUD
 │       ├── expenses/route.ts # 收支 CRUD
 │       ├── habits/route.ts   # 习惯 CRUD（含 streaks）
-│       └── export/route.ts   # 导出（MD/JSON/CSV）
+│       ├── export/route.ts   # 导出（MD/JSON/CSV）
+│       ├── search/route.ts   # 跨类型搜索
+│       ├── tags/route.ts     # 标签管理
+│       ├── settings/route.ts # 数据统计 + 清除
+│       ├── import/route.ts   # JSON 备份导入
+│       └── stats/route.ts    # 聚合统计
 ├── components/
 │   ├── ui/                   # shadcn 组件
 │   ├── chat.tsx              # AI 对话组件
@@ -106,11 +120,14 @@ opencode-demo/
 │   ├── sidebar.tsx           # 导航组件（PC 侧栏 + 手机底栏）
 │   ├── export-button.tsx     # 导出按钮
 │   ├── theme-provider.tsx    # 主题上下文
-│   └── theme-toggle.tsx      # 深色模式切换
+│   ├── theme-toggle.tsx      # 深色模式切换
+│   ├── pwa-handler.tsx       # 离线横幅 + 安装提示
+│   ├── page-animation.tsx    # 页面过渡动效
+│   └── skeleton-card.tsx     # 骨架屏
 ├── lib/
 │   ├── db.ts                 # 数据库操作（双模式：SQLite/Turso）
 │   ├── types.ts              # TypeScript 类型
-│   └── prompts.ts            # AI 系统提示词
+│   └── prompts.ts            # AI 系统提示词（6 种输出）
 ├── store/
 │   └── index.ts              # Zustand 状态管理
 ├── scripts/
@@ -119,6 +136,7 @@ opencode-demo/
 │   └── schema.sql            # 数据库完整 DDL
 └── public/
     ├── manifest.json          # PWA 配置
+    ├── sw.js                  # Service Worker
     └── icons/                 # 应用图标
 ```
 
@@ -139,7 +157,7 @@ opencode-demo/
 "提醒我今晚8点锻炼"
 → 创建任务 + 截止时间
 
-"我上周完成了什么"
+"最近一周花了多少钱"
 → 查询历史记录并生成总结
 ```
 
@@ -165,5 +183,5 @@ opencode-demo/
 
 ```bash
 npm run dev    # 开发服务器
-npm run build  # 生产构建（输出到 .next/）
+npm run build  # 生产构建
 ```

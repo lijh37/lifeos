@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Sidebar, MobileNav } from "@/components/sidebar"
+import { PwaHandler } from "@/components/pwa-handler"
+import { PageAnimation } from "@/components/page-animation"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -45,9 +47,12 @@ export default function RootLayout({
       </head>
       <body className="h-full">
         <ThemeProvider>
+          <PwaHandler />
           <div className="flex h-full">
             <Sidebar />
-            <main className="flex-1 pb-16 md:pb-0">{children}</main>
+            <PageAnimation>
+              <main className="flex-1 pb-16 md:pb-0">{children}</main>
+            </PageAnimation>
             <MobileNav />
           </div>
         </ThemeProvider>

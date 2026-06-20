@@ -7,8 +7,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { ArrowDown, ArrowUp, Trash2, Loader2, Wallet } from 'lucide-react'
+import { ArrowDown, ArrowUp, Trash2, Wallet } from 'lucide-react'
 import { ExportButton } from '@/components/export-button'
+import { SkeletonCard } from '@/components/skeleton-card'
 import type { Expense } from '@/lib/types'
 
 const categoryLabels: Record<string, string> = {
@@ -157,17 +158,17 @@ export default function ExpensesPage() {
 
       <ScrollArea className="flex-1">
         {loading ? (
-          <div className="flex h-32 items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <div className="p-4">
+            <SkeletonCard count={5} />
           </div>
         ) : displayExpenses.length === 0 ? (
           <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
             还没有收支记录，去 AI 对话页面添加吧
           </div>
         ) : (
-          <div className="space-y-1 p-4">
+          <div className="space-y-1 p-4 animate-stagger">
             {displayExpenses.map((expense) => (
-              <Card key={expense.id}>
+              <Card key={expense.id} className="card-hover">
                 <CardContent className="flex items-center gap-3 p-3">
                   <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
                     expense.type === 'expense'

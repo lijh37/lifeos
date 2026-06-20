@@ -15,10 +15,10 @@ import {
   Check,
   Undo2,
   Search,
-  Loader2,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { ExportButton } from '@/components/export-button'
+import { SkeletonCard } from '@/components/skeleton-card'
 import type { Note, NoteType } from '@/lib/types'
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
@@ -126,20 +126,18 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
 
       <ScrollArea className="flex-1 p-4">
         {loading ? (
-          <div className="flex h-32 items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <SkeletonCard count={5} />
         ) : displayNotes.length === 0 ? (
           <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
             {searchQuery ? '没有找到匹配的记录' : '还没有任何记录，去 AI 对话页面创建吧'}
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2 animate-stagger">
             {displayNotes.map((note) => {
               const Icon = typeIcons[note.type]
 
               return (
-                <Card key={note.id} className={cn(note.done && 'opacity-60')}>
+                <Card key={note.id} className={cn('card-hover', note.done && 'opacity-60')}>
                   <CardHeader className="p-3 pb-0">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">

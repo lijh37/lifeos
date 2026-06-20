@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bot, Notebook, CheckSquare, Plus, Wallet, Trophy, CalendarDays } from 'lucide-react'
+import { Bot, Notebook, CheckSquare, Plus, Wallet, Trophy, CalendarDays, Search, Settings, Tags, BarChart3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { cn } from '@/lib/utils'
@@ -13,7 +13,11 @@ const navItems = [
   { href: '/tasks', label: '任务', icon: CheckSquare },
   { href: '/expenses', label: '记账', icon: Wallet },
   { href: '/habits', label: '习惯', icon: Trophy },
+  { href: '/search', label: '搜索', icon: Search },
+  { href: '/tags', label: '标签', icon: Tags },
   { href: '/calendar', label: '日历', icon: CalendarDays },
+  { href: '/stats', label: '统计', icon: BarChart3 },
+  { href: '/settings', label: '设置', icon: Settings },
 ]
 
 export function Sidebar() {

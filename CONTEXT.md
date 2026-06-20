@@ -2,28 +2,62 @@
 
 ## 项目概述
 
-个人 AI 生活助手应用，用户通过自然语言与 AI 对话，AI 自动解析为结构化笔记、任务、事件、收支或习惯。支持手机端和 PC 端，深色模式，完整数据导出。
+个人 AI 生活助手应用，用户通过自然语言与 AI 对话，AI 自动解析为结构化笔记、任务、事件、收支或习惯。支持手机端和 PC 端、深色模式、数据导出、PWA 离线、统计看板。
 
 ## 当前状态（截至 2026-06-20）
 
-### ✅ 已实现
+### ✅ 已实现（23 路由，15 页面 + 8 API）
 
+**核心能力**
 - **AI 对话式记录**：DeepSeek 解析自然语言 → 自动创建笔记/任务/事件/支出/收入/习惯
 - **笔记/任务/事件** 三种类型，自动打标签，按类型筛选、搜索、标记完成
 - **收支管理**：AI 自动记账分类（餐饮/交通/购物等），月度汇总 + 分类柱状图
 - **习惯养成**：AI 创建习惯 + 每日打卡 + 连续天数 streak 徽章
-- **日历视图**：月历网格，彩色圆点标记条目类型，点击展开当日详情
+
+**页面（7 个）**
+- `/` AI 对话首页（流式聊天，打字动画，超时重试，复制按钮）
+- `/notes` 笔记列表（筛选/搜索/标记完成/删除）
+- `/tasks` 任务列表（默认过滤 task 类型）
+- `/expenses` 记账（月度汇总卡片 + 分类柱状图 + 类型筛选）
+- `/habits` 习惯（每日打卡 + streak 连续天数 + 进度计数）
+- `/calendar` 日历（月历网格 + 彩色圆点标记 + 点击查看当日详情）
+- `/search` 全局搜索（跨笔记/收支/习惯，300ms 防抖，分组显示）
+- `/tags` 标签管理（列表 + 内联重命名 + 删除确认）
+- `/stats` 统计看板（摘要卡片 + 支出分类图 + 热门标签 + 最近动态）
+- `/settings` 设置（数据概览/清除 + 备份导出/导入恢复 + 关于信息）
+
+**API（8 个）**
+- `/api/chat` DeepSeek 流式对话
+- `/api/notes` 笔记 CRUD（支持 type/q/startDate/endDate 参数）
+- `/api/expenses` 收支 CRUD
+- `/api/habits` 习惯 CRUD（含 streaks 和今日完成）
+- `/api/export` 导出（Markdown / JSON / CSV 含 BOM）
+- `/api/search` 跨类型搜索
+- `/api/tags` 标签管理（GET 列表 / PATCH 重命名 / DELETE 删除）
+- `/api/settings` 数据统计 GET + 批量清除 DELETE
+- `/api/import` JSON 备份导入 POST
+- `/api/stats` 聚合统计（月度/分类/打卡/标签/动态）
+
+**体验增强**
 - **深色模式**：light/dark/system 三态切换（localStorage 持久化）
-- **数据导出**：笔记/收支导出 Markdown / JSON / CSV（含 BOM，Excel 友好）
-- **响应优化**：打字动画，15s 超时提示，重试按钮，复制按钮，60s 服务端 abort
-- **全局导航**：PC 侧栏 + 手机底部 Tab（6 项：对话/笔记/任务/记账/习惯/日历）
-- **PWA 配置**：manifest.json + 图标
+- **离线支持**：Service Worker（`/sw.js`）缓存静态资源和 API GET 响应
+- **PWA 安装提示**：监听 `beforeinstallprompt`，弹出安装卡片
+- **UI 动效**：页面 fadeIn 过渡、列表交错入场、卡片 hover 悬浮、骨架屏加载
+- **导航**：PC 侧栏 + 手机底部 Tab（10 项：对话/笔记/任务/记账/习惯/搜索/日历/标签/统计/设置）
+- **数据导出**：Markdown / JSON / CSV（含 BOM，Excel 中文友好）
+
+**基础设施**
 - **Turso 多端同步预备**：`lib/db.ts` 双模式（Turso/local），迁移脚本 `scripts/migrate-to-turso.ts`，`data/schema.sql`
+- **PWA 配置**：manifest.json（192+512 图标，maskable）
+- **lint 零错误**（function hoisting / set-state-in-effect / 未转义实体均修复）
 
-### ❌ 已知问题
+### ❌ 待办
 
-- 本地 SQLite 数据尚未迁移到 Turso（已配置双模式连接，需配置 TURSO_DATABASE_URL 和 TURSO_AUTH_TOKEN）
-- `note-list.tsx` `useEffect` 缺少 `fetchNotes` 依赖项（无害 warning，非 build error）
+| 优先级 | 功能 | 备注 |
+|---|---|---|
+| P1 | **多端同步部署** | 注册 Turso → `npm run migrate` → 部署 Vercel |
+| P2 | **饮食+锻炼追踪** | 拍照识食物（需 GPT-4o vision API key） |
+| P3 | **迭代优化** | 通知提醒、富文本编辑、附件上传 |
 
 ## 技术栈
 
@@ -36,7 +70,7 @@
 | AI SDK | `@ai-sdk/react` + `ai` (v6) |
 | 数据库 | `@libsql/client` 本地 SQLite |
 | 状态管理 | Zustand |
-| 日期处理 | date-fns |
+| 日期处理 | date-fns v4 |
 | 图标 | lucide-react |
 
 ## AI SDK v6 关键约定
@@ -44,69 +78,84 @@
 - `useChat` 从 `@ai-sdk/react` 导入（非 `ai/react`）
 - 服务端 API Route 使用 `convertToModelMessages`（async）和 `result.toUIMessageStreamResponse()`
 - 客户端使用 `DefaultChatTransport` 配置 API 端点
-- DeepSeek 需使用 `deepseek.chat('deepseek-v4-flash')`（.chat() 方法走 Chat Completions API，直接调用走 Responses API 不支持）
+- DeepSeek 需使用 `deepseek.chat('deepseek-v4-flash')`（.chat() 走 Chat Completions API）
+- 消息内容通过 `message.parts` 获取（而非 `message.content`）
 
 ## 项目结构
 
 ```
-app/                  # Next.js App Router 页面和 API
-  ├── api/chat/       # DeepSeek 流式对话接口
-  ├── api/notes/      # 笔记 CRUD 接口
-  ├── api/expenses/   # 收支 CRUD 接口
-  ├── api/habits/     # 习惯 CRUD 接口（含 streaks）
-  ├── api/export/     # 导出（MD/JSON/CSV）
-  ├── notes/          # 笔记列表页
-  ├── tasks/          # 任务列表页
-  ├── expenses/       # 记账页面（月图+分类筛选）
-  ├── habits/         # 习惯页面（打卡+streak）
-  └── calendar/       # 日历视图页面
-components/           # React 组件
-  ├── ui/             # shadcn 组件（Badge/Button/Card/Input/ScrollArea/Sheet/Separator/Textarea）
-  ├── chat.tsx        # AI 对话组件（核心）
-  ├── note-list.tsx   # 笔记/任务列表组件
-  ├── sidebar.tsx     # 导航（PC 侧栏 + 手机底部栏）
-  ├── export-button.tsx # 导出按钮（MD/JSON/CSV）
-  ├── theme-provider.tsx # 主题上下文
-  └── theme-toggle.tsx  # 深色模式切换
-lib/                  # 核心逻辑
-  ├── db.ts           # 数据库操作（@libsql/client）
-  ├── types.ts        # TypeScript 类型
-  └── prompts.ts      # AI 系统提示词
-store/                # Zustand 全局状态
-public/
-  ├── manifest.json   # PWA 配置
-  └── icons/          # 应用图标
-scripts/
-  └── migrate-to-turso.ts  # 本地→Turso 数据迁移
-data/
-  └── schema.sql      # 完整 DDL
+opencode-demo/
+├── app/
+│   ├── layout.tsx              # 全局布局（侧栏 + 底栏 + PWA 处理 + 页面动效）
+│   ├── page.tsx                # AI 对话首页（dynamic import Chat）
+│   ├── notes/page.tsx          # 笔记列表
+│   ├── tasks/page.tsx          # 任务列表
+│   ├── expenses/page.tsx       # 记账（月图 + 筛选）
+│   ├── habits/page.tsx         # 习惯（打卡 + streak）
+│   ├── calendar/page.tsx       # 日历视图
+│   ├── search/page.tsx         # 全局搜索
+│   ├── tags/page.tsx           # 标签管理
+│   ├── stats/page.tsx          # 统计看板
+│   ├── settings/page.tsx       # 设置（数据管理 + 备份恢复）
+│   └── api/
+│       ├── chat/route.ts       # DeepSeek 流式对话
+│       ├── notes/route.ts      # 笔记 CRUD（含日期范围）
+│       ├── notes/[id]/route.ts # 单条笔记 PATCH/DELETE
+│       ├── expenses/route.ts   # 收支 CRUD
+│       ├── habits/route.ts     # 习惯 CRUD（含 streaks）
+│       ├── export/route.ts     # 导出 MD/JSON/CSV
+│       ├── search/route.ts     # 跨类型搜索
+│       ├── tags/route.ts       # 标签管理
+│       ├── settings/route.ts   # 数据统计 + 批量清除
+│       ├── import/route.ts     # JSON 备份导入
+│       └── stats/route.ts      # 聚合统计
+├── components/
+│   ├── ui/                     # shadcn 组件（Badge/Button/Card/Input/ScrollArea/Sheet/Separator/Textarea）
+│   ├── chat.tsx                # AI 对话组件（核心）
+│   ├── note-list.tsx           # 笔记/任务列表组件
+│   ├── sidebar.tsx             # 导航（PC 侧栏 + 手机底部栏，10 项）
+│   ├── export-button.tsx       # 导出按钮（MD/CSV/JSON）
+│   ├── theme-provider.tsx      # 主题上下文
+│   ├── theme-toggle.tsx        # 深色模式切换
+│   ├── pwa-handler.tsx         # 离线横幅 + PWA 安装提示
+│   ├── page-animation.tsx      # 页面过渡动画容器
+│   └── skeleton-card.tsx       # 骨架屏组件
+├── lib/
+│   ├── db.ts                   # 数据库操作（双模式 SQLite/Turso，含搜索/标签/统计/清除）
+│   ├── types.ts                # TypeScript 类型（Note/Expense/Habit/AIResponse/EntryType）
+│   └── prompts.ts              # AI 系统提示词（6 种输出类型）
+├── store/
+│   └── index.ts                # Zustand 全局状态
+├── scripts/
+│   └── migrate-to-turso.ts     # 本地→Turso 数据迁移
+├── data/
+│   └── schema.sql              # 数据库完整 DDL（6 表 + 索引）
+├── public/
+│   ├── manifest.json            # PWA 配置（192+512 图标，maskable）
+│   ├── sw.js                    # Service Worker（缓存策略）
+│   └── icons/                   # 应用图标
 ```
 
 ## 数据库
 
 `@libsql/client` 直接操作（非 ORM），6 个表：
 
-**notes**（笔记/任务/事件，通过 type 字段区分）:
-- id, content, title, type(note|task|event), tags(JSON), due_date, done, created_at, updated_at
+**notes**（笔记/任务/事件）: id, content, title, type, tags(JSON), due_date, done, created_at, updated_at
 - 索引: type, created_at, due_date
 
-**chat_messages**（聊天记录）:
-- id, role(user|assistant), content, related_note_id, created_at
+**chat_messages**（聊天历史）: id, role, content, related_note_id, created_at
 
-**expenses**（收支记录）:
-- id, amount, category(餐饮|交通|购物|娱乐|医疗|教育|住房|工资|其他), description, type(expense|income), created_at
+**expenses**（收支）: id, amount, category, description, type, created_at
 - 索引: type, created_at
 
-**habits**（习惯）:
-- id, name, description, frequency(daily|weekly), created_at
+**habits**（习惯）: id, name, description, frequency, created_at
 
-**habit_completions**（打卡记录）:
-- id, habit_id, date(YYYY-MM-DD), completed(0|1), created_at
-- 唯一约束: (habit_id, date)，复合索引
+**habit_completions**（打卡）: id, habit_id, date, completed, created_at
+- 唯一约束: (habit_id, date)
 
 ## AI Prompt 设计
 
-`lib/prompts.ts` 中的 SYSTEM_PROMPT 控制 AI 输出格式。AI 必须返回纯 JSON（无代码围栏）：
+`lib/prompts.ts` 的 SYSTEM_PROMPT 控制 AI 输出。AI 必须返回纯 JSON（无代码围栏）：
 
 ```json
 {"type":"note|task|event|expense|income|habit","title":"标题","tags":["标签"],"dueDate":"ISO日期|null","summary":"回复","isNewEntry":true|false,"amount":null,"category":null}
@@ -114,45 +163,41 @@ data/
 
 ## WSL2 环境
 
-项目在 WSL2 中开发。WSL2 有独立虚拟 IP (`192.168.82.x`)，局域网其他设备无法直接访问。
+项目在 WSL2 中开发。WSL2 有独立虚拟 IP（如 `192.168.82.x`），局域网其他设备无法直接访问。
 
-- PC 访问：Windows 浏览器 `http://localhost:3000`（Windows 自动转发）
-- 手机访问：需在 **Windows 管理员 PowerShell** 执行端口转发：
+- **PC 开发**：Windows 浏览器 `http://localhost:3000`（自动转发）
+- **手机测试**：Windows 管理员 PowerShell 执行端口转发：
 ```powershell
 netsh interface portproxy add v4tov4 listenport=3000 listenaddress=0.0.0.0 connectport=3000 connectaddress=192.168.82.57
 netsh advfirewall firewall add rule name="LifeOS Dev Server" dir=in action=allow protocol=TCP localport=3000
 ```
 助手脚本：`setup-wsl.ps1` / `wsl-port-forward.bat`
-手机访问 `http://[Windows本机IP]:3000`（已在 `allowedDevOrigins` 中添加 `192.168.31.111`）
 
-## 待实现需求
+手机访问 `http://[Windows本机IP]:3000`（`allowedDevOrigins` 已添加 `192.168.31.111`）
 
-| 优先级 | 功能 | 备注 |
-|---|---|---|
-| P1 | **多端同步部署** | 注册 Turso → `npm run migrate` → 部署 Vercel |
-| P2 | **离线支持** | Service Worker + IndexedDB 兜底 |
-| P3 | **饮食+锻炼追踪** | 拍照识食物（需 GPT-4o vision API key） |
-| P4 | **迭代优化** | 数据看板、搜索、设置页、动效 |
-
-## 启动方式
+## 启动
 
 ```bash
-cd /home/demo/project/opencode-demo
-npm run dev
+nvm use 24
+npm install
+npm run dev    # 开发 http://localhost:3000
+npm run build  # 生产构建
 ```
-
-访问 `http://localhost:3000`
 
 ## 部署
 
-目标部署平台：Vercel（免费）。部署前需迁移数据库到 Turso（serverless SQLite）以支持生产环境。
+目标：Vercel。需先迁移数据库到 Turso：
+1. 注册 [Turso](https://turso.tech)
+2. `turso db create life-app`
+3. 设置 `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` 到 `.env.local`
+4. `npm run migrate` 迁移数据
+5. 部署到 Vercel，添加环境变量
 
-## 已讨论的方案
+## 设计决策
 
-- 产品定位：AI 管家 + 工具箱 两者都要
-- 技术路线：Web App + PWA 先行，不纠结原生
-- 数据加密：简单模式（HTTPS + 服务端加密）
-- 一人开发，AI 全权负责编码
-- 手机为主要设备，PC 辅助
-- AI 提供商：DeepSeek API（Key 在 `.env.local`）
-- "工作助手"功能过于通用，无明确使用场景，已从 roadmap 移除
+- **产品定位**：AI 管家 + 工具箱，两者都要
+- **技术路线**：Web App + PWA 先行，不纠结原生
+- **一人开发**，AI 全权负责编码
+- **手机为主要设备**，PC 辅助
+- **AI 提供商**：DeepSeek API（`DEEPSEEK_API_KEY` 在 `.env.local`）
+- **"工作助手"功能**过于通用，已从 roadmap 移除
