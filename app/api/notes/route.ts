@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createNote, getNotes, deleteNote, searchNotes, initDB } from '@/lib/db'
+import { createNote, getNotes, deleteNote, searchNotes, getNotesByDateRange, initDB } from '@/lib/db'
 import type { Note } from '@/lib/types'
 
 export async function GET(req: NextRequest) {
@@ -7,9 +7,16 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const type = searchParams.get('type')
   const q = searchParams.get('q')
+  const startDate = searchParams.get('startDate')
+  const endDate = searchParams.get('endDate')
 
   if (q) {
     const notes = await searchNotes(q)
+    return NextResponse.json({ notes })
+  }
+
+  if (startDate && endDate) {
+    const notes = await getNotesByDateRange(startDate, endDate, type as Note['type'] | undefined)
     return NextResponse.json({ notes })
   }
 

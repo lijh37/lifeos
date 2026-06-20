@@ -14,10 +14,15 @@
 - **任务列表页**：默认过滤为任务视图
 - **全局导航**：PC 侧栏 + 手机底部 Tab
 - **PWA 配置**：可安装到手机桌面
+- **收支管理**：AI 自动记账分类，月度统计
+- **习惯养成**：AI 创建习惯 + 每日打卡
+- **深色模式**：light/dark/system 三态切换
+- **数据导出**：笔记/收支导出 Markdown / JSON
+- **响应优化**：打字动画，超时提示，重试按钮
 
 ### ❌ 已知问题
 
-- 数据存本地 SQLite，尚未实现多端云同步（预留了 Turso 方案）
+- 本地 SQLite 数据尚未迁移到 Turso（已配置双模式连接，需配置 TURSO_DATABASE_URL 和 TURSO_AUTH_TOKEN）
 
 ## 技术栈
 
@@ -117,23 +122,16 @@ netsh advfirewall firewall add rule name="LifeOS Dev Server" dir=in action=allow
 
 ## 已讨论但未实现的需求
 
-### P1 - 下一期功能
-
-1. **收支管理**：说"花35吃午饭"AI 自动记账分类，需要：新页面 + AI Prompt 扩展
-2. **饮食+锻炼追踪**：拍照识食物（GPT-4o vision），运动记录
-
 ### P2 - 后续
 
-3. **习惯养成**：AI 分析行为规律，主动建议习惯计划
-4. **工作助手**：会议纪要 + 日报自动生成
-5. **多端同步**：Turso 替代本地 SQLite
+1. **工作助手**：会议纪要 + 日报自动生成
+2. **饮食+锻炼追踪**：拍照识食物（GPT-4o vision），运动记录
+3. **多端同步部署**：设置 TURSO_DATABASE_URL + Vercel 部署
 
 ### 优化项
 
-6. **数据导出**：笔记/任务导出 Markdown / JSON
-7. **深色模式**：shadcn 内置支持，需加切换开关
-8. **离线支持**：Service Worker 缓存 + IndexedDB 兜底
-9. **DeepSeek 响应速度**：当前响应较慢（约 10-30s），可尝试 `deepseek-v4-pro` 或加 loading 状态优化
+4. **离线支持**：Service Worker 缓存 + IndexedDB 兜底
+5. **迭代细节**：习惯 streak 连续天数、记账月图表、导出 CSV 格式
 
 ## 启动方式
 

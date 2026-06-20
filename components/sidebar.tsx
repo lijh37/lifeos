@@ -2,14 +2,18 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bot, Notebook, CheckSquare, Plus } from 'lucide-react'
+import { Bot, Notebook, CheckSquare, Plus, Wallet, Trophy, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { href: '/', label: 'AI 对话', icon: Bot },
   { href: '/notes', label: '笔记', icon: Notebook },
   { href: '/tasks', label: '任务', icon: CheckSquare },
+  { href: '/expenses', label: '记账', icon: Wallet },
+  { href: '/habits', label: '习惯', icon: Trophy },
+  { href: '/calendar', label: '日历', icon: CalendarDays },
 ]
 
 export function Sidebar() {
@@ -39,13 +43,17 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-auto">
+      <div className="mt-auto space-y-1">
         <Link href="/">
           <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground">
             <Plus className="h-4 w-4" />
             新建记录
           </Button>
         </Link>
+        <div className="flex items-center justify-between px-2 py-1">
+          <span className="text-xs text-muted-foreground">主题</span>
+          <ThemeToggle />
+        </div>
       </div>
     </aside>
   )
@@ -74,6 +82,10 @@ export function MobileNav() {
           </Link>
         )
       })}
+      <div className="flex flex-col items-center gap-0 py-1">
+        <ThemeToggle />
+        <span className="text-[10px] text-muted-foreground">主题</span>
+      </div>
     </nav>
   )
 }

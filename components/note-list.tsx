@@ -18,6 +18,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { ExportButton } from '@/components/export-button'
 import type { Note, NoteType } from '@/lib/types'
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
@@ -32,10 +33,6 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Note[] | null>(null)
 
-  useEffect(() => {
-    fetchNotes()
-  }, [])
-
   async function fetchNotes() {
     setLoading(true)
     try {
@@ -48,6 +45,10 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchNotes()
+  }, [])
 
   async function handleDelete(id: string) {
     await fetch(`/api/notes/${id}`, { method: 'DELETE' })
@@ -105,18 +106,21 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
             className="pl-9"
           />
         </div>
-        <div className="mt-3 flex gap-1">
-          {filters.map((f) => (
-            <Button
-              key={f}
-              variant={filterType === f ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => setFilterType(f)}
-              className="text-xs"
-            >
-              {typeLabels[f]}
-            </Button>
-          ))}
+        <div className="mt-3 flex items-center justify-between">
+          <div className="flex gap-1">
+            {filters.map((f) => (
+              <Button
+                key={f}
+                variant={filterType === f ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setFilterType(f)}
+                className="text-xs"
+              >
+                {typeLabels[f]}
+              </Button>
+            ))}
+          </div>
+          <ExportButton type="notes" />
         </div>
       </div>
 

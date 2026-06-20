@@ -1,15 +1,17 @@
 import { createClient } from '@libsql/client'
 import type { InValue } from '@libsql/client'
-import type { Note, ChatMessage, NoteType } from './types'
-
-const url = process.env.DATABASE_URL || 'file:./data/life.db'
+import type { Note, ChatMessage, NoteType, Expense, Habit, HabitCompletion } from './types'
 
 let client: ReturnType<typeof createClient> | null = null
 
 function getClient() {
-  if (!client) {
-    client = createClient({ url })
-  }
+  if (client) return client
+  const tursoUrl = process.env.TURSO_DATABASE_URL
+  const url = tursoUrl || process.env.DATABASE_URL || 'file:./data/life.db'
+  const authToken = process.env.TURSO_AUTH_TOKEN
+  client = tursoUrl
+    ? createClient({ url: tursoUrl, authToken })
+    : createClient({ url })
   return client
 }
 
@@ -42,6 +44,49 @@ export async function initDB() {
   `)
   await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_notes_created ON notes(created_at)
+  `)
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_notes_due_date ON notes(due_date)
+  `)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS expenses (
+      id TEXT PRIMARY KEY,
+      amount REAL NOT NULL,
+      category TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      type TEXT NOT NULL DEFAULT 'expense',
+      created_at TEXT NOT NULL
+    )
+  `)
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_expenses_type ON expenses(type)
+  `)
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_expenses_created ON expenses(created_at)
+  `)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS habits (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      frequency TEXT NOT NULL DEFAULT 'daily',
+      created_at TEXT NOT NULL
+    )
+  `)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS habit_completions (
+      id TEXT PRIMARY KEY,
+      habit_id TEXT NOT NULL,
+      date TEXT NOT NULL,
+      completed INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL
+    )
+  `)
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_habit_completions_habit ON habit_completions(habit_id)
+  `)
+  await db.execute(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_habit_completions_unique ON habit_completions(habit_id, date)
   `)
 }
 
@@ -112,11 +157,176 @@ export async function getNotes(type?: NoteType): Promise<Note[]> {
   return result.rows.map(rowToNote)
 }
 
+export async function getNotesByDateRange(startDate: string, endDate: string, type?: NoteType): Promise<Note[]> {
+  const db = getClient()
+  let sql = 'SELECT * FROM notes WHERE due_date >= ? AND due_date <= ?'
+  const args: InValue[] = [startDate, endDate]
+  if (type) {
+    sql += ' AND type = ?'
+    args.push(type)
+  }
+  sql += ' ORDER BY due_date ASC, created_at DESC'
+  const result = await db.execute({ sql, args })
+  return result.rows.map(rowToNote)
+}
+
 export async function getNote(id: string): Promise<Note | null> {
   const db = getClient()
   const result = await db.execute({ sql: 'SELECT * FROM notes WHERE id = ?', args: [id] })
   if (result.rows.length === 0) return null
   return rowToNote(result.rows[0])
+}
+
+function rowToExpense(row: Record<string, unknown>): Expense {
+  return {
+    id: row.id as string,
+    amount: row.amount as number,
+    category: row.category as string,
+    description: row.description as string,
+    type: row.type as 'expense' | 'income',
+    createdAt: row.created_at as string,
+  }
+}
+
+export async function createExpense(expense: Expense): Promise<Expense> {
+  const db = getClient()
+  await db.execute({
+    sql: `INSERT INTO expenses (id, amount, category, description, type, created_at)
+          VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [expense.id, expense.amount, expense.category, expense.description, expense.type, expense.createdAt],
+  })
+  return expense
+}
+
+export async function getExpenses(type?: 'expense' | 'income'): Promise<Expense[]> {
+  const db = getClient()
+  let sql = 'SELECT * FROM expenses'
+  const args: InValue[] = []
+  if (type) {
+    sql += ' WHERE type = ?'
+    args.push(type)
+  }
+  sql += ' ORDER BY created_at DESC'
+  const result = await db.execute({ sql, args })
+  return result.rows.map(rowToExpense)
+}
+
+export async function deleteExpense(id: string): Promise<void> {
+  const db = getClient()
+  await db.execute({ sql: 'DELETE FROM expenses WHERE id = ?', args: [id] })
+}
+
+function rowToHabit(row: Record<string, unknown>): Habit {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    description: row.description as string,
+    frequency: row.frequency as 'daily' | 'weekly',
+    createdAt: row.created_at as string,
+  }
+}
+
+export async function createHabit(habit: Habit): Promise<Habit> {
+  const db = getClient()
+  await db.execute({
+    sql: `INSERT INTO habits (id, name, description, frequency, created_at) VALUES (?, ?, ?, ?, ?)`,
+    args: [habit.id, habit.name, habit.description, habit.frequency, habit.createdAt],
+  })
+  return habit
+}
+
+export async function getHabits(): Promise<Habit[]> {
+  const db = getClient()
+  const result = await db.execute('SELECT * FROM habits ORDER BY created_at DESC')
+  return result.rows.map(rowToHabit)
+}
+
+export async function deleteHabit(id: string): Promise<void> {
+  const db = getClient()
+  await db.execute({ sql: 'DELETE FROM habits WHERE id = ?', args: [id] })
+  await db.execute({ sql: 'DELETE FROM habit_completions WHERE habit_id = ?', args: [id] })
+}
+
+export async function toggleCompletion(habitId: string, date: string): Promise<boolean> {
+  const db = getClient()
+  const existing = await db.execute({
+    sql: 'SELECT id, completed FROM habit_completions WHERE habit_id = ? AND date = ?',
+    args: [habitId, date],
+  })
+  if (existing.rows.length > 0) {
+    const row = existing.rows[0]
+    const newCompleted = (row.completed as number) === 0 ? 1 : 0
+    await db.execute({
+      sql: 'UPDATE habit_completions SET completed = ? WHERE id = ?',
+      args: [newCompleted, row.id],
+    })
+    return newCompleted === 1
+  } else {
+    await db.execute({
+      sql: 'INSERT INTO habit_completions (id, habit_id, date, completed, created_at) VALUES (?, ?, ?, ?, ?)',
+      args: [crypto.randomUUID(), habitId, date, 1, new Date().toISOString()],
+    })
+    return true
+  }
+}
+
+export async function getCompletions(habitId: string): Promise<HabitCompletion[]> {
+  const db = getClient()
+  const result = await db.execute({
+    sql: 'SELECT * FROM habit_completions WHERE habit_id = ? ORDER BY date DESC',
+    args: [habitId],
+  })
+  return result.rows.map((row) => ({
+    id: row.id as string,
+    habitId: row.habit_id as string,
+    date: row.date as string,
+    completed: (row.completed as number) === 1,
+    createdAt: row.created_at as string,
+  }))
+}
+
+export async function getStreaks(): Promise<Record<string, number>> {
+  const db = getClient()
+  const result = await db.execute(
+    `SELECT habit_id, date FROM habit_completions WHERE completed = 1 ORDER BY habit_id, date DESC`
+  )
+  const streaks: Record<string, number> = {}
+  const today = new Date().toISOString().slice(0, 10)
+
+  for (const row of result.rows) {
+    const hid = row.habit_id as string
+    if (streaks[hid] !== undefined) continue
+    let streak = 0
+    const d = new Date()
+    for (let i = 0; i < 365; i++) {
+      const dateStr = d.toISOString().slice(0, 10)
+      const found = result.rows.some(
+        (r) => r.habit_id === hid && r.date === dateStr
+      )
+      if (found) {
+        streak++
+      } else if (i > 0) {
+        break
+      }
+      d.setDate(d.getDate() - 1)
+    }
+    streaks[hid] = streak
+  }
+  return streaks
+}
+
+export async function getTodayCompletions(): Promise<Record<string, boolean>> {
+  const today = new Date().toISOString().slice(0, 10)
+  const db = getClient()
+  const result = await db.execute({
+    sql: 'SELECT habit_id, completed FROM habit_completions WHERE date = ?',
+    args: [today],
+  })
+  const map: Record<string, boolean> = {}
+  for (const row of result.rows) {
+    map[row.habit_id as string] = (row.completed as number) === 1
+  }
+  return map
 }
 
 export async function searchNotes(query: string): Promise<Note[]> {

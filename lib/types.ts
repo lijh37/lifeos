@@ -1,4 +1,5 @@
 export type NoteType = 'note' | 'task' | 'event'
+export type EntryType = NoteType | 'expense' | 'income' | 'habit'
 
 export interface Note {
   id: string
@@ -12,6 +13,31 @@ export interface Note {
   updatedAt: string
 }
 
+export interface Expense {
+  id: string
+  amount: number
+  category: string
+  description: string
+  type: 'expense' | 'income'
+  createdAt: string
+}
+
+export interface Habit {
+  id: string
+  name: string
+  description: string
+  frequency: 'daily' | 'weekly'
+  createdAt: string
+}
+
+export interface HabitCompletion {
+  id: string
+  habitId: string
+  date: string
+  completed: boolean
+  createdAt: string
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
@@ -21,10 +47,12 @@ export interface ChatMessage {
 }
 
 export interface AIResponse {
-  type: NoteType
+  type: EntryType
   title: string
   tags: string[]
   dueDate: string | null
   summary: string
   isNewEntry: boolean
+  amount?: number
+  category?: string
 }

@@ -25,12 +25,17 @@ app/                  # Next.js App Router 页面和 API
   ├── api/chat/       # DeepSeek 流式对话接口
   ├── api/notes/      # 笔记 CRUD 接口
   ├── notes/          # 笔记列表页
-  └── tasks/          # 任务列表页
+  ├── tasks/          # 任务列表页
+  ├── expenses/       # 记账页面
+  ├── habits/         # 习惯页面
+  └── calendar/       # 日历视图页面
 components/           # React 组件
   ├── ui/             # shadcn 基础组件
   ├── chat.tsx        # AI 对话组件（核心）
   ├── note-list.tsx   # 笔记/任务列表
-  └── sidebar.tsx     # 导航（PC 侧栏 + 手机底部栏）
+  ├── sidebar.tsx     # 导航（PC 侧栏 + 手机底部栏）
+  ├── export-button.tsx # 导出按钮（MD/JSON/CSV）
+  └── theme-toggle.tsx  # 深色模式切换
 lib/                  # 核心逻辑
   ├── db.ts           # 数据库操作
   ├── types.ts        # TypeScript 类型定义

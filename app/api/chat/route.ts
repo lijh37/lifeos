@@ -22,18 +22,25 @@ export async function POST(req: Request) {
 
     const modelMessages = await convertToModelMessages(messages)
 
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60000)
+
     const result = streamText({
       model: deepseek.chat('deepseek-v4-flash'),
       system: SYSTEM_PROMPT,
       messages: modelMessages,
+      abortSignal: controller.signal,
     })
 
+    clearTimeout(timeoutId)
     return result.toUIMessageStreamResponse()
   } catch (error) {
     console.error('Chat API error:', error)
+    const message = error instanceof Error ? error.message : '请求失败，请重试'
+    const status = message.includes('abort') ? 504 : 500
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: message }),
+      { status, headers: { 'Content-Type': 'application/json' } }
     )
   }
 }

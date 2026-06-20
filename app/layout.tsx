@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
+import { ThemeProvider } from "@/components/theme-provider"
 import { Sidebar, MobileNav } from "@/components/sidebar"
 
 const geistSans = Geist({
@@ -40,14 +41,16 @@ export default function RootLayout({
     >
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-512.svg" />
-        <meta name="theme-color" content="#ffffff" />
+        <meta name="theme-color" content="#ffffff" id="theme-color" />
       </head>
       <body className="h-full">
-        <div className="flex h-full">
-          <Sidebar />
-          <main className="flex-1 pb-16 md:pb-0">{children}</main>
-          <MobileNav />
-        </div>
+        <ThemeProvider>
+          <div className="flex h-full">
+            <Sidebar />
+            <main className="flex-1 pb-16 md:pb-0">{children}</main>
+            <MobileNav />
+          </div>
+        </ThemeProvider>
       </body>
     </html>
   )

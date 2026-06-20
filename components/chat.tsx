@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Send, Bot, User, Loader2 } from 'lucide-react'
+import { Send, Bot, User, Loader2, Copy, RefreshCw, Clock } from 'lucide-react'
 import type { AIResponse, Note } from '@/lib/types'
 
 function genId(): string {
@@ -29,11 +29,15 @@ export default function Chat({ onNoteCreated }: ChatProps) {
   const [input, setInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [timedOut, setTimedOut] = useState(false)
+  const sentAtRef = useRef(0)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({ api: '/api/chat' }),
     onFinish: async (event) => {
       const { message, messages: allMessages, isAbort, isError } = event
+      setTimedOut(false)
       if (isAbort || isError) return
 
       const text = message.parts
@@ -55,28 +59,59 @@ export default function Chat({ onNoteCreated }: ChatProps) {
           if (parsed.isNewEntry && parsed.title !== undefined && parsed.title !== null) {
             const now = new Date().toISOString()
             const title = parsed.title || text.slice(0, 50).replace(/[{}"\n]/g, ' ').trim()
-            const note: Note = {
-              id: genId(),
-              content: userInputText || text,
-              title,
-              type: parsed.type,
-              tags: parsed.tags,
-              dueDate: parsed.dueDate,
-              done: false,
-              createdAt: now,
-              updatedAt: now,
-            }
-            const res = await fetch('/api/notes', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(note),
-            })
-            if (res.ok) {
-              const data = await res.json()
-              onNoteCreated?.(data.note)
-              console.log('Note saved:', title)
+
+            if (parsed.type === 'habit') {
+              const habitRes = await fetch('/api/habits', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  name: title,
+                  description: parsed.summary || '',
+                  frequency: 'daily',
+                }),
+              })
+              if (!habitRes.ok) {
+                console.error('Failed to save habit:', await habitRes.text())
+              }
+            } else if (parsed.type === 'expense' || parsed.type === 'income') {
+              const expenseRes = await fetch('/api/expenses', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  amount: parsed.amount || 0,
+                  category: parsed.category || '其他',
+                  description: title,
+                  type: parsed.type,
+                  createdAt: now,
+                }),
+              })
+              if (!expenseRes.ok) {
+                console.error('Failed to save expense:', await expenseRes.text())
+              }
             } else {
-              console.error('Failed to save note:', await res.text())
+              const note: Note = {
+                id: genId(),
+                content: userInputText || text,
+                title,
+                type: parsed.type,
+                tags: parsed.tags,
+                dueDate: parsed.dueDate,
+                done: false,
+                createdAt: now,
+                updatedAt: now,
+              }
+              const res = await fetch('/api/notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(note),
+              })
+              if (res.ok) {
+                const data = await res.json()
+                onNoteCreated?.(data.note)
+                console.log('Note saved:', title)
+              } else {
+                console.error('Failed to save note:', await res.text())
+              }
             }
           }
         }
@@ -91,6 +126,42 @@ export default function Chat({ onNoteCreated }: ChatProps) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages])
+
+  useEffect(() => {
+    if (status === 'submitted') {
+      sentAtRef.current = Date.now()
+      timeoutRef.current = setTimeout(() => {
+        setTimedOut(true)
+      }, 15000)
+    } else if (status === 'streaming' || status === 'ready') {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = undefined
+      }
+    }
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    }
+  }, [status])
+
+  async function handleCopy(text: string) {
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch { /* ignore */ }
+  }
+
+  function handleRetry() {
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user')
+    if (lastUserMsg) {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      setTimedOut(false)
+      const text = lastUserMsg.parts
+        .filter((p) => p.type === 'text')
+        .map((p) => (p as { text: string }).text)
+        .join('')
+      sendMessage({ text })
+    }
+  }
 
   function getMessageText(msg: typeof messages[0]): string {
     return msg.parts
@@ -126,11 +197,17 @@ export default function Chat({ onNoteCreated }: ChatProps) {
       note: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
       task: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
       event: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
+      expense: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
+      income: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
+      habit: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300',
     }
     const labels: Record<string, string> = {
       note: '笔记',
       task: '任务',
       event: '事件',
+      expense: '支出',
+      income: '收入',
+      habit: '习惯',
     }
     return (
       <Badge className={colors[type] || ''} variant="outline">
@@ -142,6 +219,7 @@ export default function Chat({ onNoteCreated }: ChatProps) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (input.trim() && status === 'ready') {
+      setTimedOut(false)
       sendMessage({ text: input })
       setInput('')
     }
@@ -170,13 +248,16 @@ export default function Chat({ onNoteCreated }: ChatProps) {
               </p>
               <div className="mt-4 space-y-2 text-left text-sm text-muted-foreground">
                 <div className="rounded-lg bg-muted p-3">
-                  "明天下午3点和张三开会讨论项目进度"
+                  &ldquo;明天下午3点和张三开会讨论项目进度&rdquo;
                 </div>
                 <div className="rounded-lg bg-muted p-3">
-                  "吃了午饭，花了35块"
+                  &ldquo;吃了午饭，花了35块&rdquo;
                 </div>
                 <div className="rounded-lg bg-muted p-3">
-                  "提醒我今晚8点锻炼"
+                  &ldquo;提醒我今晚8点锻炼&rdquo;
+                </div>
+                <div className="rounded-lg bg-muted p-3">
+                  &ldquo;我想每天跑步&rdquo;
                 </div>
               </div>
             </div>
@@ -211,8 +292,15 @@ export default function Chat({ onNoteCreated }: ChatProps) {
                     <Bot className="h-4 w-4" />
                   </div>
                   <div>
-                    <Card className="bg-card p-3">
+                    <Card className="group relative bg-card p-3">
                       <p className="whitespace-pre-wrap text-sm leading-relaxed">{summary}</p>
+                      <button
+                        onClick={() => handleCopy(text)}
+                        className="absolute right-2 top-2 hidden rounded p-1 text-muted-foreground hover:bg-accent group-hover:block"
+                        title="复制"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </button>
                     </Card>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {getTypeBadge(getTypeFromContent(text))}
@@ -228,16 +316,32 @@ export default function Chat({ onNoteCreated }: ChatProps) {
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
                   <Bot className="h-4 w-4" />
                 </div>
-                <Card className="bg-card p-3">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                </Card>
+                <div>
+                  <Card className="bg-card p-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm text-muted-foreground">思考中</span>
+                      <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+                      <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+                      <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+                    </div>
+                  </Card>
+                  {timedOut && (
+                    <p className="mt-1 flex items-center gap-1 text-xs text-amber-600">
+                      <Clock className="h-3 w-3" />
+                      DeepSeek 响应较慢，请稍候…
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           )}
           {error && (
             <div className="flex justify-center">
-              <Card className="bg-destructive/10 p-3 text-sm text-destructive">
-                {error.message || '出错了，请重试'}
+              <Card className="flex items-center gap-2 bg-destructive/10 p-3 text-sm text-destructive">
+                <span>{error.message || '出错了'}</span>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleRetry}>
+                  <RefreshCw className="h-3 w-3" />
+                </Button>
               </Card>
             </div>
           )}
