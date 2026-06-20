@@ -6,6 +6,7 @@ import { Sidebar, MobileNav } from "@/components/sidebar"
 import { PwaHandler } from "@/components/pwa-handler"
 import { PageAnimation } from "@/components/page-animation"
 import { NotificationManager } from "@/components/notification-manager"
+import { FabButton } from "@/components/fab-button"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -50,6 +51,7 @@ export default function RootLayout({
         <ThemeProvider>
           <PwaHandler />
           <NotificationManager />
+          <FabButton />
           <div className="flex h-full">
             <Sidebar />
             <PageAnimation>

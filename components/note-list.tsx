@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { format } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,10 +15,13 @@ import {
   Check,
   Undo2,
   Search,
+  Pencil,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { ExportButton } from '@/components/export-button'
 import { SkeletonCard } from '@/components/skeleton-card'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { RichEditor } from '@/components/rich-editor'
 import type { Note, NoteType } from '@/lib/types'
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
@@ -32,6 +35,7 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
   const [filterType, setFilterType] = useState<NoteType | 'all'>(defaultFilter)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Note[] | null>(null)
+  const [editingNote, setEditingNote] = useState<Note | null>(null)
 
   async function fetchNotes() {
     setLoading(true)
@@ -64,6 +68,16 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
     updateNote(id, { done: !done })
   }
 
+  async function handleSaveContent(id: string, content: string) {
+    await fetch(`/api/notes/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    })
+    updateNote(id, { content })
+    setEditingNote(null)
+  }
+
   async function handleSearch(q: string) {
     setSearchQuery(q)
     if (!q.trim()) {
@@ -74,6 +88,8 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
     const data = await res.json()
     setSearchResults(data.notes)
   }
+
+  const stripHtml = (html: string) => html.replace(/<[^>]*>/g, '')
 
   const displayNotes = searchResults ?? notes.filter(
     (n) => filterType === 'all' || n.type === filterType
@@ -135,21 +151,34 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
           <div className="space-y-2 animate-stagger">
             {displayNotes.map((note) => {
               const Icon = typeIcons[note.type]
+              const isHtml = note.content.includes('<')
 
               return (
-                <Card key={note.id} className={cn('card-hover', note.done && 'opacity-60')}>
+                <Card
+                  key={note.id}
+                  className={cn('card-hover cursor-pointer', note.done && 'opacity-60')}
+                  onClick={() => setEditingNote(note)}
+                >
                   <CardHeader className="p-3 pb-0">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">
                         <Icon className="h-4 w-4 text-muted-foreground" />
                         <CardTitle className="text-sm font-medium">
-                          {note.title || '无标题'}
+                          {note.title || stripHtml(note.content).slice(0, 40) || '无标题'}
                         </CardTitle>
                         <Badge variant="outline" className="text-[10px]">
                           {typeLabels[note.type]}
                         </Badge>
                       </div>
-                      <div className="flex gap-1">
+                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => setEditingNote(note)}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
                         {note.type === 'task' && (
                           <Button
                             variant="ghost"
@@ -176,9 +205,16 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
                     </div>
                   </CardHeader>
                   <CardContent className="p-3 pt-2">
-                    <p className="line-clamp-3 text-sm text-muted-foreground">
-                      {note.content}
-                    </p>
+                    {isHtml ? (
+                      <div
+                        className="line-clamp-3 text-sm text-muted-foreground [&_p]:inline [&_p]:mr-1 [&_h2]:inline [&_h3]:inline [&_li]:inline [&_li]:mr-1"
+                        dangerouslySetInnerHTML={{ __html: note.content }}
+                      />
+                    ) : (
+                      <p className="line-clamp-3 text-sm text-muted-foreground">
+                        {note.content}
+                      </p>
+                    )}
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       {note.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1">
@@ -205,6 +241,26 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
           </div>
         )}
       </ScrollArea>
+
+      <Sheet open={!!editingNote} onOpenChange={(open) => { if (!open) setEditingNote(null) }}>
+        <SheetContent side="bottom" className="h-[80vh] sm:max-w-lg sm:mx-auto sm:rounded-t-xl">
+          <SheetHeader>
+            <SheetTitle>
+              {editingNote?.title || (editingNote ? stripHtml(editingNote.content).slice(0, 40) : '编辑')}
+            </SheetTitle>
+          </SheetHeader>
+          {editingNote && (
+            <div className="flex-1 overflow-auto px-1">
+              <RichEditor
+                key={editingNote.id}
+                content={editingNote.content}
+                onSave={async (html) => handleSaveContent(editingNote.id, html)}
+                placeholder="开始编辑..."
+              />
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
