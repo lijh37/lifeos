@@ -1,6 +1,6 @@
 # LifeOS - AI 生活助手
 
-你的个人 AI 生活助手，支持自然语言记录笔记、管理任务、追踪生活。手机和 PC 均可使用。
+你的个人 AI 生活助手，支持自然语言记录笔记、管理任务、记账、养成习惯。手机和 PC 均可使用，支持深色模式和数据导出。
 
 ## 技术栈
 
@@ -10,6 +10,8 @@
 - **AI**: DeepSeek API (OpenAI 兼容接口)
 - **数据库**: SQLite (本地) / Turso (云端同步)
 - **状态管理**: Zustand
+- **日期处理**: date-fns
+- **图标**: lucide-react
 - **部署**: Vercel
 
 ## 快速开始
@@ -63,46 +65,61 @@ lt --port 3000
 
 ## 功能
 
-### MVP（已完成）
-- [x] AI 对话式笔记 — 自然语言输入，AI 自动解析为结构化笔记/任务/事件
-- [x] 笔记浏览 — 按类型筛选（笔记/任务/事件）、搜索
-- [x] 任务管理 — 标记完成/未完成、按截止日期排序
+### 已实现
+- [x] AI 对话式记录 — 自然语言输入，AI 自动解析为笔记/任务/事件/收支/习惯
+- [x] 笔记管理 — 按类型筛选、搜索、标记完成、删除
+- [x] 任务管理 — 标记完成/未完成，按截止日期排序
+- [x] 收支管理 — AI 自动分类记账（餐饮/交通/购物等），月度统计 + 分类柱状图
+- [x] 习惯养成 — AI 创建习惯，每日打卡，连续天数 streak 徽章
+- [x] 日历视图 — 月历网格，彩色圆点标记条目类型，点击查看当日详情
+- [x] 数据导出 — Markdown / JSON / CSV（Excel 中文友好）
+- [x] 深色模式 — light/dark/system 三态切换
 - [x] 多端自适应 — PC 侧栏导航 + 手机底部 Tab + PWA
-- [x] 多端同步 — 通过 Turso 实现（可选）
 
 ### 规划中
-- [ ] 收支管理 — AI 记账，自动分类
+- [ ] 多端同步 — Turso 云端同步 + Vercel 部署
+- [ ] 离线支持 — Service Worker 缓存
 - [ ] 饮食+锻炼追踪 — 拍照识食物，运动记录
-- [ ] 习惯养成 — AI 分析规律，主动建议
-- [ ] 工作助手 — 会议纪要，日报自动生成
+- [ ] 统计看板 — 数据可视化概览
 
 ## 项目结构
 
 ```
 opencode-demo/
 ├── app/
-│   ├── layout.tsx        # 全局布局（侧栏 + 底部导航）
-│   ├── page.tsx          # AI 对话首页
-│   ├── notes/page.tsx    # 笔记列表
-│   ├── tasks/page.tsx    # 任务列表
+│   ├── page.tsx              # AI 对话首页
+│   ├── notes/page.tsx        # 笔记列表
+│   ├── tasks/page.tsx        # 任务列表
+│   ├── expenses/page.tsx     # 记账页面
+│   ├── habits/page.tsx       # 习惯页面
+│   ├── calendar/page.tsx     # 日历视图
 │   └── api/
-│       ├── chat/route.ts    # DeepSeek 流式对话
-│       ├── notes/route.ts   # 笔记 CRUD
-│       └── notes/[id]/route.ts
+│       ├── chat/route.ts     # DeepSeek 流式对话
+│       ├── notes/route.ts    # 笔记 CRUD
+│       ├── expenses/route.ts # 收支 CRUD
+│       ├── habits/route.ts   # 习惯 CRUD（含 streaks）
+│       └── export/route.ts   # 导出（MD/JSON/CSV）
 ├── components/
-│   ├── ui/               # shadcn 组件
-│   ├── chat.tsx          # AI 对话组件
-│   ├── note-list.tsx     # 笔记/任务列表组件
-│   └── sidebar.tsx       # 导航组件
+│   ├── ui/                   # shadcn 组件
+│   ├── chat.tsx              # AI 对话组件
+│   ├── note-list.tsx         # 笔记/任务列表组件
+│   ├── sidebar.tsx           # 导航组件（PC 侧栏 + 手机底栏）
+│   ├── export-button.tsx     # 导出按钮
+│   ├── theme-provider.tsx    # 主题上下文
+│   └── theme-toggle.tsx      # 深色模式切换
 ├── lib/
-│   ├── db.ts             # 数据库操作
-│   ├── types.ts          # TypeScript 类型
-│   └── prompts.ts        # AI 提示词
+│   ├── db.ts                 # 数据库操作（双模式：SQLite/Turso）
+│   ├── types.ts              # TypeScript 类型
+│   └── prompts.ts            # AI 系统提示词
 ├── store/
-│   └── index.ts          # Zustand 状态管理
+│   └── index.ts              # Zustand 状态管理
+├── scripts/
+│   └── migrate-to-turso.ts   # 本地→Turso 数据迁移
+├── data/
+│   └── schema.sql            # 数据库完整 DDL
 └── public/
-    ├── manifest.json     # PWA 配置
-    └── icons/            # 应用图标
+    ├── manifest.json          # PWA 配置
+    └── icons/                 # 应用图标
 ```
 
 ## 如何与 AI 对话
@@ -111,10 +128,13 @@ opencode-demo/
 
 ```
 "明天下午3点和张三开会讨论项目进度"
-→ 创建事件 + 设置提醒
+→ 创建事件
 
 "吃了午饭，花了35块"
-→ 创建笔记 + 标签 [饮食, 支出]
+→ 创建支出（分类：餐饮）
+
+"我想每天跑步"
+→ 创建习惯
 
 "提醒我今晚8点锻炼"
 → 创建任务 + 截止时间
@@ -129,8 +149,8 @@ opencode-demo/
 
 1. 注册 [Turso](https://turso.tech)
 2. 创建数据库：`turso db create life-app`
-3. 获取连接信息
-4. 更新 `.env.local` 中的 `DATABASE_URL` 和 `TURSO_AUTH_TOKEN`
+3. 获取连接信息，填入 `.env.local` 的 `TURSO_DATABASE_URL` 和 `TURSO_AUTH_TOKEN`
+4. 运行 `npm run migrate` 迁移数据
 
 ## 部署到 Vercel
 
@@ -138,5 +158,12 @@ opencode-demo/
 
 1. Fork 或推送代码到 GitHub
 2. 在 Vercel 导入项目
-3. 添加环境变量 `DEEPSEEK_API_KEY`
+3. 添加环境变量 `DEEPSEEK_API_KEY` 和 `TURSO_DATABASE_URL`
 4. 部署完成
+
+## 本地开发
+
+```bash
+npm run dev    # 开发服务器
+npm run build  # 生产构建（输出到 .next/）
+```

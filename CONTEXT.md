@@ -2,27 +2,28 @@
 
 ## 项目概述
 
-个人 AI 生活助手应用，用户通过自然语言与 AI 对话，AI 自动解析为结构化笔记、任务或事件。支持手机端和 PC 端。
+个人 AI 生活助手应用，用户通过自然语言与 AI 对话，AI 自动解析为结构化笔记、任务、事件、收支或习惯。支持手机端和 PC 端，深色模式，完整数据导出。
 
 ## 当前状态（截至 2026-06-20）
 
 ### ✅ 已实现
 
-- **AI 对话式记录**：输入自然语言 → DeepSeek 解析 → 自动存入数据库
-- **笔记/任务/事件** 三种类型，自动打标签
-- **笔记列表页**：按类型筛选、搜索、标记完成、删除
-- **任务列表页**：默认过滤为任务视图
-- **全局导航**：PC 侧栏 + 手机底部 Tab
-- **PWA 配置**：可安装到手机桌面
-- **收支管理**：AI 自动记账分类，月度统计
-- **习惯养成**：AI 创建习惯 + 每日打卡
-- **深色模式**：light/dark/system 三态切换
-- **数据导出**：笔记/收支导出 Markdown / JSON
-- **响应优化**：打字动画，超时提示，重试按钮
+- **AI 对话式记录**：DeepSeek 解析自然语言 → 自动创建笔记/任务/事件/支出/收入/习惯
+- **笔记/任务/事件** 三种类型，自动打标签，按类型筛选、搜索、标记完成
+- **收支管理**：AI 自动记账分类（餐饮/交通/购物等），月度汇总 + 分类柱状图
+- **习惯养成**：AI 创建习惯 + 每日打卡 + 连续天数 streak 徽章
+- **日历视图**：月历网格，彩色圆点标记条目类型，点击展开当日详情
+- **深色模式**：light/dark/system 三态切换（localStorage 持久化）
+- **数据导出**：笔记/收支导出 Markdown / JSON / CSV（含 BOM，Excel 友好）
+- **响应优化**：打字动画，15s 超时提示，重试按钮，复制按钮，60s 服务端 abort
+- **全局导航**：PC 侧栏 + 手机底部 Tab（6 项：对话/笔记/任务/记账/习惯/日历）
+- **PWA 配置**：manifest.json + 图标
+- **Turso 多端同步预备**：`lib/db.ts` 双模式（Turso/local），迁移脚本 `scripts/migrate-to-turso.ts`，`data/schema.sql`
 
 ### ❌ 已知问题
 
 - 本地 SQLite 数据尚未迁移到 Turso（已配置双模式连接，需配置 TURSO_DATABASE_URL 和 TURSO_AUTH_TOKEN）
+- `note-list.tsx` `useEffect` 缺少 `fetchNotes` 依赖项（无害 warning，非 build error）
 
 ## 技术栈
 
@@ -48,60 +49,67 @@
 ## 项目结构
 
 ```
-app/
-  ├── layout.tsx          # 全局布局 + PWA meta
-  ├── page.tsx            # AI 对话首页（use client, dynamic import Chat）
-  ├── notes/page.tsx      # 笔记列表
-  ├── tasks/page.tsx      # 任务列表（默认过滤 task）
-  ├── globals.css
-  └── api/
-      ├── chat/route.ts   # DeepSeek 流式对话
-      ├── notes/route.ts  # 笔记 CRUD
-      └── notes/[id]/route.ts
-components/
-  ├── ui/                 # shadcn 组件
-  ├── chat.tsx            # AI 对话组件（核心）
-  ├── note-list.tsx       # 笔记/任务列表组件
-  └── sidebar.tsx         # 导航（PC 侧栏 + 手机底部栏）
-lib/
-  ├── db.ts               # 数据库操作（@libsql/client）
-  ├── types.ts            # TypeScript 类型
-  └── prompts.ts          # AI 系统提示词
-store/
-  └── index.ts            # Zustand 全局状态
+app/                  # Next.js App Router 页面和 API
+  ├── api/chat/       # DeepSeek 流式对话接口
+  ├── api/notes/      # 笔记 CRUD 接口
+  ├── api/expenses/   # 收支 CRUD 接口
+  ├── api/habits/     # 习惯 CRUD 接口（含 streaks）
+  ├── api/export/     # 导出（MD/JSON/CSV）
+  ├── notes/          # 笔记列表页
+  ├── tasks/          # 任务列表页
+  ├── expenses/       # 记账页面（月图+分类筛选）
+  ├── habits/         # 习惯页面（打卡+streak）
+  └── calendar/       # 日历视图页面
+components/           # React 组件
+  ├── ui/             # shadcn 组件（Badge/Button/Card/Input/ScrollArea/Sheet/Separator/Textarea）
+  ├── chat.tsx        # AI 对话组件（核心）
+  ├── note-list.tsx   # 笔记/任务列表组件
+  ├── sidebar.tsx     # 导航（PC 侧栏 + 手机底部栏）
+  ├── export-button.tsx # 导出按钮（MD/JSON/CSV）
+  ├── theme-provider.tsx # 主题上下文
+  └── theme-toggle.tsx  # 深色模式切换
+lib/                  # 核心逻辑
+  ├── db.ts           # 数据库操作（@libsql/client）
+  ├── types.ts        # TypeScript 类型
+  └── prompts.ts      # AI 系统提示词
+store/                # Zustand 全局状态
 public/
-  ├── manifest.json       # PWA 配置
-  └── icons/              # 应用图标
+  ├── manifest.json   # PWA 配置
+  └── icons/          # 应用图标
+scripts/
+  └── migrate-to-turso.ts  # 本地→Turso 数据迁移
+data/
+  └── schema.sql      # 完整 DDL
 ```
 
 ## 数据库
 
-两个表，使用 `@libsql/client` 直接操作（非 ORM）：
+`@libsql/client` 直接操作（非 ORM），6 个表：
 
-**notes**:
-- id TEXT PRIMARY KEY
-- content TEXT NOT NULL (用户原始输入)
-- title TEXT (AI 提取的标题)
-- type TEXT NOT NULL DEFAULT 'note' (note | task | event)
-- tags TEXT DEFAULT '[]' (JSON 数组)
-- due_date TEXT (ISO 日期)
-- done INTEGER DEFAULT 0
-- created_at TEXT NOT NULL
-- updated_at TEXT NOT NULL
+**notes**（笔记/任务/事件，通过 type 字段区分）:
+- id, content, title, type(note|task|event), tags(JSON), due_date, done, created_at, updated_at
+- 索引: type, created_at, due_date
 
-**chat_messages**:
-- id TEXT PRIMARY KEY
-- role TEXT NOT NULL (user | assistant)
-- content TEXT NOT NULL
-- related_note_id TEXT
-- created_at TEXT NOT NULL
+**chat_messages**（聊天记录）:
+- id, role(user|assistant), content, related_note_id, created_at
+
+**expenses**（收支记录）:
+- id, amount, category(餐饮|交通|购物|娱乐|医疗|教育|住房|工资|其他), description, type(expense|income), created_at
+- 索引: type, created_at
+
+**habits**（习惯）:
+- id, name, description, frequency(daily|weekly), created_at
+
+**habit_completions**（打卡记录）:
+- id, habit_id, date(YYYY-MM-DD), completed(0|1), created_at
+- 唯一约束: (habit_id, date)，复合索引
 
 ## AI Prompt 设计
 
-`lib/prompts.ts` 中的 SYSTEM_PROMPT 控制 AI 输出格式。AI 必须返回纯 JSON：
+`lib/prompts.ts` 中的 SYSTEM_PROMPT 控制 AI 输出格式。AI 必须返回纯 JSON（无代码围栏）：
 
 ```json
-{"type":"note|task|event","title":"标题","tags":["标签"],"dueDate":"ISO日期|null","summary":"回复","isNewEntry":true|false}
+{"type":"note|task|event|expense|income|habit","title":"标题","tags":["标签"],"dueDate":"ISO日期|null","summary":"回复","isNewEntry":true|false,"amount":null,"category":null}
 ```
 
 ## WSL2 环境
@@ -109,29 +117,22 @@ public/
 项目在 WSL2 中开发。WSL2 有独立虚拟 IP (`192.168.82.x`)，局域网其他设备无法直接访问。
 
 - PC 访问：Windows 浏览器 `http://localhost:3000`（Windows 自动转发）
-- 手机访问：需要先在 **Windows 管理员 PowerShell** 执行端口转发：
-
+- 手机访问：需在 **Windows 管理员 PowerShell** 执行端口转发：
 ```powershell
 netsh interface portproxy add v4tov4 listenport=3000 listenaddress=0.0.0.0 connectport=3000 connectaddress=192.168.82.57
 netsh advfirewall firewall add rule name="LifeOS Dev Server" dir=in action=allow protocol=TCP localport=3000
 ```
-
 助手脚本：`setup-wsl.ps1` / `wsl-port-forward.bat`
-
 手机访问 `http://[Windows本机IP]:3000`（已在 `allowedDevOrigins` 中添加 `192.168.31.111`）
 
-## 已讨论但未实现的需求
+## 待实现需求
 
-### P2 - 后续
-
-1. **工作助手**：会议纪要 + 日报自动生成
-2. **饮食+锻炼追踪**：拍照识食物（GPT-4o vision），运动记录
-3. **多端同步部署**：设置 TURSO_DATABASE_URL + Vercel 部署
-
-### 优化项
-
-4. **离线支持**：Service Worker 缓存 + IndexedDB 兜底
-5. **迭代细节**：习惯 streak 连续天数、记账月图表、导出 CSV 格式
+| 优先级 | 功能 | 备注 |
+|---|---|---|
+| P1 | **多端同步部署** | 注册 Turso → `npm run migrate` → 部署 Vercel |
+| P2 | **离线支持** | Service Worker + IndexedDB 兜底 |
+| P3 | **饮食+锻炼追踪** | 拍照识食物（需 GPT-4o vision API key） |
+| P4 | **迭代优化** | 数据看板、搜索、设置页、动效 |
 
 ## 启动方式
 
@@ -154,3 +155,4 @@ npm run dev
 - 一人开发，AI 全权负责编码
 - 手机为主要设备，PC 辅助
 - AI 提供商：DeepSeek API（Key 在 `.env.local`）
+- "工作助手"功能过于通用，无明确使用场景，已从 roadmap 移除
