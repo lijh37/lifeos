@@ -11,30 +11,7 @@ import { ArrowDown, ArrowUp, Trash2, Wallet } from 'lucide-react'
 import { ExportButton } from '@/components/export-button'
 import { SkeletonCard } from '@/components/skeleton-card'
 import type { Expense } from '@/lib/types'
-
-const categoryLabels: Record<string, string> = {
-  餐饮: '餐饮',
-  交通: '交通',
-  购物: '购物',
-  娱乐: '娱乐',
-  医疗: '医疗',
-  教育: '教育',
-  住房: '住房',
-  工资: '工资',
-  其他: '其他',
-}
-
-const categoryColors: Record<string, string> = {
-  餐饮: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
-  交通: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-  购物: 'bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300',
-  娱乐: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
-  医疗: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
-  教育: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300',
-  住房: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-  工资: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300',
-  其他: 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300',
-}
+import { categoryLabels, categoryColors } from '@/lib/constants'
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([])
@@ -42,8 +19,12 @@ export default function ExpensesPage() {
   const [filterType, setFilterType] = useState<'all' | 'expense' | 'income'>('all')
 
   async function handleDelete(id: string) {
-    await fetch(`/api/expenses?id=${id}`, { method: 'DELETE' })
-    setExpenses((prev) => prev.filter((e) => e.id !== id))
+    try {
+      await fetch(`/api/expenses?id=${id}`, { method: 'DELETE' })
+      setExpenses((prev) => prev.filter((e) => e.id !== id))
+    } catch (e) {
+      console.error('Failed to delete expense:', e)
+    }
   }
 
   useEffect(() => {

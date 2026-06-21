@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Send, Bot, User, Loader2, Copy, RefreshCw, Clock } from 'lucide-react'
+import { typeLabels, typeColors } from '@/lib/constants'
 import type { AIResponse, Note } from '@/lib/types'
 
 function genId(): string {
@@ -193,25 +194,9 @@ export default function Chat({ onNoteCreated }: ChatProps) {
 
   function getTypeBadge(type?: string) {
     if (!type) return null
-    const colors: Record<string, string> = {
-      note: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-      task: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
-      event: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
-      expense: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
-      income: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-      habit: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300',
-    }
-    const labels: Record<string, string> = {
-      note: '笔记',
-      task: '任务',
-      event: '事件',
-      expense: '支出',
-      income: '收入',
-      habit: '习惯',
-    }
     return (
-      <Badge className={colors[type] || ''} variant="outline">
-        {labels[type] || type}
+      <Badge className={typeColors[type] || ''} variant="outline">
+        {typeLabels[type] || type}
       </Badge>
     )
   }

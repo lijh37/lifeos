@@ -39,8 +39,12 @@ export default function HabitsPage() {
   }
 
   async function handleDelete(id: string) {
-    await fetch(`/api/habits?id=${id}`, { method: 'DELETE' })
-    setHabits((prev) => prev.filter((h) => h.id !== id))
+    try {
+      await fetch(`/api/habits?id=${id}`, { method: 'DELETE' })
+      setHabits((prev) => prev.filter((h) => h.id !== id))
+    } catch (e) {
+      console.error('Failed to delete habit:', e)
+    }
   }
 
   async function handleCreate() {

@@ -57,6 +57,7 @@ lib/                  # 核心逻辑
   ├── db.ts           # 数据库操作（6 表，搜索/标签/统计/清除）
   ├── types.ts        # TypeScript 类型定义（Note/Expense/Habit/AIResponse）
   ├── prompts.ts      # AI 系统提示词（6 种输出类型）
+  ├── constants.ts    # 共享常量（类型颜色/分类标签映射）
   └── utils.ts        # cn() 工具函数（clsx + tailwind-merge）
 store/                # Zustand 全局状态
 scripts/

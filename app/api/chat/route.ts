@@ -22,17 +22,13 @@ export async function POST(req: Request) {
 
     const modelMessages = await convertToModelMessages(messages)
 
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 60000)
-
     const result = streamText({
       model: deepseek.chat('deepseek-v4-flash'),
       system: SYSTEM_PROMPT,
       messages: modelMessages,
-      abortSignal: controller.signal,
+      abortSignal: AbortSignal.timeout(60000),
     })
 
-    clearTimeout(timeoutId)
     return result.toUIMessageStreamResponse()
   } catch (error) {
     console.error('Chat API error:', error)

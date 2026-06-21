@@ -8,21 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import type { Note, Expense, Habit } from '@/lib/types'
-
-const typeLabels: Record<string, string> = {
-  note: '笔记', task: '任务', event: '事件',
-}
-
-const typeColors: Record<string, string> = {
-  note: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-  task: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
-  event: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
-}
-
-const categoryLabels: Record<string, string> = {
-  餐饮: '餐饮', 交通: '交通', 购物: '购物', 娱乐: '娱乐',
-  医疗: '医疗', 教育: '教育', 住房: '住房', 工资: '工资', 其他: '其他',
-}
+import { typeLabels, typeColors, categoryLabels } from '@/lib/constants'
 
 export default function SearchPage() {
   const [query, setQuery] = useState('')
@@ -32,6 +18,7 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -44,20 +31,27 @@ export default function SearchPage() {
       return
     }
 
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
     const timer = setTimeout(() => {
       setLoading(true)
-      fetch(`/api/search?q=${encodeURIComponent(trimmed)}`)
+      fetch(`/api/search?q=${encodeURIComponent(trimmed)}`, { signal: controller.signal })
         .then(res => res.json())
         .then(data => {
-          setNotes(data.notes)
-          setExpenses(data.expenses)
-          setHabits(data.habits)
-          setSearched(true)
+          if (!controller.signal.aborted) {
+            setNotes(data.notes)
+            setExpenses(data.expenses)
+            setHabits(data.habits)
+            setSearched(true)
+          }
         })
-        .finally(() => setLoading(false))
+        .catch(() => {})
+        .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     }, 300)
 
-    return () => clearTimeout(timer)
+    return () => { clearTimeout(timer); controller.abort() }
   }, [query])
 
   const total = notes.length + expenses.length + habits.length

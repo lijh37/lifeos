@@ -272,27 +272,28 @@ export async function toggleCompletion(habitId: string, date: string): Promise<b
 
 export async function getStreaks(): Promise<Record<string, number>> {
   const db = getClient()
-  const result = await db.execute(
+  const rows = (await db.execute(
     `SELECT habit_id, date FROM habit_completions WHERE completed = 1 ORDER BY habit_id, date DESC`
-  )
-  const streaks: Record<string, number> = {}
+  )).rows
 
-  for (const row of result.rows) {
-    const hid = row.habit_id as string
-    if (streaks[hid] !== undefined) continue
+  const streaks: Record<string, number> = {}
+  const today = new Date().toISOString().slice(0, 10)
+
+  for (let i = 0; i < rows.length; ) {
+    const hid = rows[i].habit_id as string
+    if (streaks[hid] !== undefined) { i++; continue }
+
     let streak = 0
-    const d = new Date()
-    for (let i = 0; i < 365; i++) {
-      const dateStr = d.toISOString().slice(0, 10)
-      const found = result.rows.some(
-        (r) => r.habit_id === hid && r.date === dateStr
-      )
-      if (found) {
+    const cutoff = new Date()
+    for (let j = 0; j < 365; j++) {
+      const dateStr = cutoff.toISOString().slice(0, 10)
+      if (i < rows.length && rows[i].habit_id === hid && rows[i].date === dateStr) {
         streak++
-      } else if (i > 0) {
+        i++
+      } else if (j > 0 || dateStr !== today) {
         break
       }
-      d.setDate(d.getDate() - 1)
+      cutoff.setDate(cutoff.getDate() - 1)
     }
     streaks[hid] = streak
   }

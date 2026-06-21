@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input'
 import { ExportButton } from '@/components/export-button'
 import { SkeletonCard } from '@/components/skeleton-card'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import DOMPurify from 'dompurify'
 import { RichEditor } from '@/components/rich-editor'
 import type { Note, NoteType } from '@/lib/types'
 import { useAppStore } from '@/store'
@@ -55,8 +56,12 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
   }, [])
 
   async function handleDelete(id: string) {
-    await fetch(`/api/notes/${id}`, { method: 'DELETE' })
-    removeNote(id)
+    try {
+      await fetch(`/api/notes/${id}`, { method: 'DELETE' })
+      removeNote(id)
+    } catch (e) {
+      console.error('Failed to delete note:', e)
+    }
   }
 
   async function handleToggleDone(id: string, done: boolean) {
@@ -208,7 +213,7 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
                     {isHtml ? (
                       <div
                         className="line-clamp-3 text-sm text-muted-foreground [&_p]:inline [&_p]:mr-1 [&_h2]:inline [&_h3]:inline [&_li]:inline [&_li]:mr-1"
-                        dangerouslySetInnerHTML={{ __html: note.content }}
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(note.content) }}
                       />
                     ) : (
                       <p className="line-clamp-3 text-sm text-muted-foreground">

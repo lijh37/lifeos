@@ -127,6 +127,7 @@ opencode-demo/
 │   ├── db.ts                   # 数据库操作（双模式 SQLite/Turso，含搜索/标签/统计/清除）
 │   ├── types.ts                # TypeScript 类型（Note/Expense/Habit/AIResponse/EntryType）
 │   ├── prompts.ts              # AI 系统提示词（6 种输出类型）
+│   ├── constants.ts            # 共享常量（类型颜色/分类标签映射）
 │   └── utils.ts                # cn() 工具函数
 ├── store/
 │   └── index.ts                # Zustand 全局状态

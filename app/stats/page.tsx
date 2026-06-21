@@ -6,19 +6,19 @@ import { Card, CardContent } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { format } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
+import { typeLabels, categoryBarColors } from '@/lib/constants'
 
-const typeLabels: Record<string, string> = {
-  note: '笔记', task: '任务', event: '事件', expense: '支出', income: '收入', habit: '习惯',
-}
-
-const categoryColors: Record<string, string> = {
-  餐饮: 'bg-orange-500', 交通: 'bg-blue-500', 购物: 'bg-pink-500',
-  娱乐: 'bg-purple-500', 医疗: 'bg-red-500', 教育: 'bg-cyan-500',
-  住房: 'bg-green-500', 工资: 'bg-emerald-500', 其他: 'bg-gray-400',
+interface StatsData {
+  counts: { note: number; task: number; event: number }
+  expensesThisMonth: number
+  expenseCategories: { category: string; total: number }[]
+  habitCompletion7d: number
+  topTags: { name: string; count: number }[]
+  recentItems: { id: string; source: string; type: string; title: string; createdAt: string }[]
 }
 
 export default function StatsPage() {
-  const [data, setData] = useState<any>(null)
+  const [data, setData] = useState<StatsData | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -37,8 +37,6 @@ export default function StatsPage() {
   }
 
   if (!data) return null
-
-  const totalEntries = data.counts.note + data.counts.task + data.counts.event + data.expensesThisMonth > 0 ? 1 : 0
 
   const summaryCards = [
     { label: '笔记总数', value: data.counts.note + data.counts.task + data.counts.event, icon: Notebook, color: 'text-blue-500' },
@@ -83,7 +81,7 @@ export default function StatsPage() {
                 <div className="space-y-2">
                   {data.expenseCategories.map((c: any) => {
                     const pct = (c.total / maxExpense) * 100
-                    const barColor = categoryColors[c.category] || 'bg-gray-400'
+                    const barColor = categoryBarColors[c.category] || 'bg-gray-400'
                     return (
                       <div key={c.category} className="flex items-center gap-2 text-xs">
                         <span className="w-8 shrink-0 text-right text-muted-foreground">{c.category}</span>

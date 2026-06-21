@@ -9,20 +9,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import type { Note } from '@/lib/types'
+import { typeLabels, typeDotColors } from '@/lib/constants'
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
-
-const typeColors: Record<string, string> = {
-  note: 'bg-blue-500',
-  task: 'bg-orange-500',
-  event: 'bg-purple-500',
-}
-
-const typeLabels: Record<string, string> = {
-  note: '笔记',
-  task: '任务',
-  event: '事件',
-}
 
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -124,7 +113,7 @@ export default function CalendarPage() {
                 {dayNotes.length > 0 && (
                   <div className="mt-0.5 flex gap-0.5">
                     {dayNotes.slice(0, 3).map(n => (
-                      <span key={n.id} className={`h-1.5 w-1.5 rounded-full ${typeColors[n.type] || 'bg-gray-400'}`} />
+                      <span key={n.id} className={`h-1.5 w-1.5 rounded-full ${typeDotColors[n.type] || 'bg-gray-400'}`} />
                     ))}
                     {dayNotes.length > 3 && (
                       <span className="text-[10px] text-muted-foreground">+{dayNotes.length - 3}</span>
@@ -154,7 +143,7 @@ export default function CalendarPage() {
                 {selectedNotes.map(n => (
                   <Card key={n.id}>
                     <CardContent className="flex items-center gap-3 p-3">
-                      <span className={`h-2 w-2 shrink-0 rounded-full ${typeColors[n.type] || 'bg-gray-400'}`} />
+                      <span className={`h-2 w-2 shrink-0 rounded-full ${typeDotColors[n.type] || 'bg-gray-400'}`} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium">{n.title || n.content.slice(0, 40)}</span>
