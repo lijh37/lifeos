@@ -91,7 +91,6 @@ WSL2 用户需先在 Windows 管理员 PowerShell 运行 `.\setup-wsl.ps1`，然
 - [x] 多端自适应 — PC 侧栏导航 + 手机底部 Tab
 
 ### 规划中
-- [ ] 多端同步 — Turso 云端同步 + Vercel 部署
 - [ ] 饮食+锻炼追踪 — 拍照识食物，运动记录
 - [ ] 富文本编辑
 
@@ -212,7 +211,14 @@ bash scripts/tunnel.sh
 
 ### 生产部署（Vercel）
 
-部署到 Vercel 后自动获得 HTTPS，无需隧道，直接安装。
+生产地址: **https://opencode-demo.vercel.app**
+
+部署到 Vercel 后自动获得 HTTPS，无需隧道，直接安装。首次访问需输入密码（默认 `demo`）。
+
+```bash
+git push origin main
+# Vercel 自动重部署
+```
 
 ## 如何与 AI 对话
 
@@ -237,21 +243,41 @@ bash scripts/tunnel.sh
 
 ## 数据同步
 
-默认使用本地 SQLite（`data/life.db`）。如需多端同步：
+生产环境使用 **Turso** 云数据库（新加坡 `aps1` 集群）。本地开发默认使用 `data/life.db`（SQLite），有 `TURSO_DATABASE_URL` 环境变量时自动切换到 Turso。
 
-1. 注册 [Turso](https://turso.tech)
-2. 创建数据库：`turso db create life-app`
-3. 获取连接信息，填入 `.env.local` 的 `TURSO_DATABASE_URL` 和 `TURSO_AUTH_TOKEN`
-4. 运行 `npm run migrate` 迁移数据
+```bash
+# 本地迁移数据到 Turso
+npm run migrate
+```
 
 ## 部署到 Vercel
+
+已部署：**https://opencode-demo.vercel.app**
+
+### 环境变量
+
+| 变量 | 说明 |
+|---|---|
+| `DEEPSEEK_API_KEY` | DeepSeek AI 推理 |
+| `TURSO_DATABASE_URL` | Turso 数据库地址 |
+| `TURSO_AUTH_TOKEN` | Turso 认证 Token |
+| `APP_PASSWORD` | 登录密码（默认 `demo`） |
+
+### 重新部署
+
+```bash
+git push origin main
+# Vercel 自动触发
+```
+
+### 从零部署
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
 
 1. Fork 或推送代码到 GitHub
 2. 在 Vercel 导入项目
-3. 添加环境变量 `DEEPSEEK_API_KEY` 和 `TURSO_DATABASE_URL`
-4. 部署完成
+3. 添加上表所有环境变量
+4. 创建并迁移 Turso 数据库：`npm run migrate`
 
 ## 本地开发
 

@@ -6,7 +6,7 @@
 
 ## 当前状态（截至 2026-06-21）
 
-### ✅ 已实现（24 路由，10 页面 + 11 API）
+### ✅ 已实现（25 路由，11 页面 + 12 API）
 
 **核心能力**
 - **AI 对话式记录**：DeepSeek 解析自然语言 → 自动创建笔记/任务/事件/支出/收入/习惯
@@ -47,17 +47,18 @@
 - **数据导出**：Markdown / JSON / CSV（含 BOM，Excel 中文友好）
 
 **基础设施**
-- **Turso 多端同步预备**：`lib/db.ts` 双模式（Turso/local），迁移脚本 `scripts/migrate-to-turso.ts`，`data/schema.sql`
+- **生产部署**：Vercel `https://opencode-demo.vercel.app`，密码保护
+- **云端数据库**：Turso `aps1` 集群，5 表已迁移
+- **密码保护**：`proxy.ts` 验证 `app_auth` cookie，`/login` 登录页，`/api/auth` 接口
 - **PWA 配置**：manifest.json（192+512 PNG 图标，maskable + any）
-- **lint 零错误**（function hoisting / set-state-in-effect / 未转义实体均修复）
+- **lint 零错误**，build 通过
 
 ### ❌ 待办
 
 | 优先级 | 功能 | 备注 |
 |---|---|---|
-| P1 | **多端同步部署** | 注册 Turso → `npm run migrate` → 部署 Vercel |
 | P2 | **饮食+锻炼追踪** | 拍照识食物（需 GPT-4o vision API key） |
-| P3 | **迭代优化** | 富文本编辑、附件上传 |
+| P3 | **迭代优化** | 富文本编辑、附件上传、聊天持久化 |
 
 ## 技术栈
 
@@ -68,7 +69,7 @@
 | UI | Tailwind CSS + shadcn/ui |
 | AI | DeepSeek API (`deepseek-v4-flash`) |
 | AI SDK | `@ai-sdk/react` + `ai` (v6) |
-| 数据库 | `@libsql/client` 本地 SQLite |
+| 数据库 | `@libsql/client` SQLite + Turso |
 | 状态管理 | Zustand |
 | 日期处理 | date-fns v4 |
 | 图标 | lucide-react |
@@ -107,8 +108,11 @@ opencode-demo/
 │       ├── search/route.ts     # 跨类型搜索
 │       ├── tags/route.ts       # 标签管理
 │       ├── settings/route.ts   # 数据统计 + 批量清除
+│       ├── auth/route.ts      # 密码验证（POST）
 │       ├── import/route.ts     # JSON 备份导入
 │       └── stats/route.ts      # 聚合统计
+├── proxy.ts                    # Next.js 16 proxy 中间件（密码保护）
+├── app/login/page.tsx          # 登录页
 ├── components/
 │   ├── ui/                     # shadcn 组件（Badge/Button/Card/Input/ScrollArea/Sheet/Textarea）
 │   ├── chat.tsx                # AI 对话组件（核心）
@@ -134,13 +138,14 @@ opencode-demo/
 ├── scripts/
 │   ├── https-setup.sh          # HTTPS 开发证书一键生成（mkcert）
 │   ├── migrate-to-turso.ts     # 本地→Turso 数据迁移
+│   ├── setup-turso.ts          # Turso 数据库创建 + 数据迁移一键脚本
 │   └── tunnel.sh               # HTTPS 隧道（cloudflared/ngrok/localtunnel）
 ├── data/
 │   └── schema.sql              # 完整 DDL（6 表 + 索引）
-├── public/
-│   ├── manifest.json            # PWA 配置（192+512 图标，maskable）
-│   ├── sw.js                    # Service Worker（最简 pass-through）
-│   └── icons/                   # 应用图标
+└── public/
+    ├── manifest.json            # PWA 配置（192+512 图标，maskable）
+    ├── sw.js                    # Service Worker（最简 pass-through）
+    └── icons/                   # 应用图标
 ```
 
 ## 数据库
@@ -149,18 +154,15 @@ opencode-demo/
 
 **notes**（笔记/任务/事件）: id, content, title, type, tags(JSON), due_date, done, created_at, updated_at
 - 索引: type, created_at, due_date
-- 索引: type, created_at, due_date
 
 **chat_messages**（聊天历史）: id, role, content, related_note_id, created_at
 
 **expenses**（收支）: id, amount, category, description, type, created_at
 - 索引: type, created_at
-- 索引: type, created_at
 
 **habits**（习惯）: id, name, description, frequency, created_at
 
 **habit_completions**（打卡）: id, habit_id, date, completed, created_at
-- 唯一约束: (habit_id, date)
 - 唯一约束: (habit_id, date)
 
 ## AI Prompt 设计
@@ -194,12 +196,38 @@ npm run build              # 生产构建
 
 ## 部署
 
-目标：Vercel。需先迁移数据库到 Turso：
-1. 注册 [Turso](https://turso.tech)
-2. `turso db create life-app`
-3. 设置 `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` 到 `.env.local`
-4. `npm run migrate` 迁移数据
-5. 部署到 Vercel，添加环境变量
+已部署到 **Vercel**：`https://opencode-demo.vercel.app`
+
+### 数据库
+
+使用 **Turso** 云数据库（新加坡 `aps1` 集群）：
+- URL: `libsql://lifeos-lijh37.aws-ap-northeast-1.turso.io`
+- Agent: `@tursodatabase/api` 创建数据库 + `@libsql/client` 迁移数据
+- 密码：`proxy.ts` 中间件验证 `app_auth` cookie
+
+### 环境变量（Vercel 配置）
+
+| 变量 | 说明 |
+|---|---|
+| `DEEPSEEK_API_KEY` | DeepSeek AI 推理 |
+| `TURSO_DATABASE_URL` | Turso 数据库地址 |
+| `TURSO_AUTH_TOKEN` | Turso 认证 Token |
+| `APP_PASSWORD` | 登录密码 |
+
+### 重新部署
+
+```bash
+git push origin main
+# Vercel 自动触发部署
+```
+
+### 本地开发
+
+```bash
+nvm use 24
+npm install
+npx vercel env pull .env.local   # 拉取 Vercel 环境变量
+npm run dev
 
 ## 设计决策
 
