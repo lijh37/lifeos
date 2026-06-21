@@ -110,11 +110,13 @@ opencode-demo/
 │       ├── import/route.ts     # JSON 备份导入
 │       └── stats/route.ts      # 聚合统计
 ├── components/
-│   ├── ui/                     # shadcn 组件（Badge/Button/Card/Input/ScrollArea/Sheet/Separator/Textarea）
+│   ├── ui/                     # shadcn 组件（Badge/Button/Card/Input/ScrollArea/Sheet/Textarea）
 │   ├── chat.tsx                # AI 对话组件（核心）
 │   ├── note-list.tsx           # 笔记/任务列表组件
 │   ├── sidebar.tsx             # 导航（PC 侧栏 + 手机底部栏，10 项）
 │   ├── export-button.tsx       # 导出按钮（MD/CSV/JSON）
+│   ├── fab-button.tsx          # 悬浮快捷按钮
+│   ├── rich-editor.tsx         # 富文本编辑器（基于 TipTap）
 │   ├── theme-provider.tsx      # 主题上下文
 │   ├── theme-toggle.tsx        # 深色模式切换
 │   ├── pwa-handler.tsx         # PWA 安装管理 + 诊断面板
@@ -124,7 +126,8 @@ opencode-demo/
 ├── lib/
 │   ├── db.ts                   # 数据库操作（双模式 SQLite/Turso，含搜索/标签/统计/清除）
 │   ├── types.ts                # TypeScript 类型（Note/Expense/Habit/AIResponse/EntryType）
-│   └── prompts.ts              # AI 系统提示词（6 种输出类型）
+│   ├── prompts.ts              # AI 系统提示词（6 种输出类型）
+│   └── utils.ts                # cn() 工具函数
 ├── store/
 │   └── index.ts                # Zustand 全局状态
 ├── scripts/
@@ -145,15 +148,18 @@ opencode-demo/
 
 **notes**（笔记/任务/事件）: id, content, title, type, tags(JSON), due_date, done, created_at, updated_at
 - 索引: type, created_at, due_date
+- 索引: type, created_at, due_date
 
 **chat_messages**（聊天历史）: id, role, content, related_note_id, created_at
 
 **expenses**（收支）: id, amount, category, description, type, created_at
 - 索引: type, created_at
+- 索引: type, created_at
 
 **habits**（习惯）: id, name, description, frequency, created_at
 
 **habit_completions**（打卡）: id, habit_id, date, completed, created_at
+- 唯一约束: (habit_id, date)
 - 唯一约束: (habit_id, date)
 
 ## AI Prompt 设计

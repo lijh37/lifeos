@@ -26,7 +26,11 @@ detect_lan_ip() {
   echo "127.0.0.1"
 }
 
-LAN_IP="${1:-$(detect_lan_ip)}"
+if [ $# -gt 0 ]; then
+  LAN_IPS=("$@")
+else
+  LAN_IPS=("$(detect_lan_ip)")
+fi
 
 install_mkcert() {
   if command -v mkcert &>/dev/null; then
@@ -65,9 +69,9 @@ if [ ! -f "$CA_DIR/rootCA.pem" ]; then
   exit 1
 fi
 
-echo "🔐 正在生成证书 (localhost, 127.0.0.1, $LAN_IP)..."
+echo "🔐 正在生成证书 (localhost, 127.0.0.1, ${LAN_IPS[*]})..."
 $MKCERT_CMD -key-file "$CERTS_DIR/dev-key.pem" -cert-file "$CERTS_DIR/dev-cert.pem" \
-  localhost 127.0.0.1 ::1 "$LAN_IP"
+  localhost 127.0.0.1 ::1 "${LAN_IPS[@]}"
 
 PUBLIC_DIR="$(dirname "$0")/../public"
 cp "$CA_DIR/rootCA.pem" "$PUBLIC_DIR/ca.pem"
@@ -80,14 +84,18 @@ echo ""
 echo "  启动:   npm run dev:https  或  bash start.sh"
 echo ""
 echo "  PC:     https://localhost:3000"
-echo "  手机:   https://${LAN_IP}:3000 (PWA 可安装)"
+for ip in "${LAN_IPS[@]}"; do
+  echo "  手机:   https://${ip}:3000 (PWA 可安装)"
+done
 echo ""
 echo "=============================="
 echo "  📱 手机安装 CA 证书（仅首次）"
 echo "=============================="
 echo ""
 echo "  手机访问（需先启动 start.sh）:"
-echo "    https://${LAN_IP}:3000/ca.pem"
+for ip in "${LAN_IPS[@]}"; do
+  echo "    https://${ip}:3000/ca.pem"
+done
 echo "  下载后:"
 echo "    Android → 设置 → 安全 → 安装 CA 证书"
 echo "    iOS → 设置 → 通用 → VPN 与设备管理 → 安装 → 启用"

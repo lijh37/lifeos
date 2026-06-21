@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { Download, Bug, RefreshCw, Loader2, Check } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 export function PwaHandler() {
   const [isOffline, setIsOffline] = useState(false)
@@ -15,6 +16,28 @@ export function PwaHandler() {
   const [installState, setInstallState] = useState<'idle' | 'installing' | 'done' | 'error'>('idle')
 
   const deferredPromptRef = useRef<Event | null>(null)
+  const handleInstallRef = useRef<() => void>(() => {})
+
+  handleInstallRef.current = () => {
+    const prompt = deferredPromptRef.current
+    if (!prompt) return
+    const p = prompt as any
+    p.prompt()
+    setInstallState('installing')
+    p.userChoice.then(({ outcome }: { outcome: string }) => {
+      if (outcome === 'accepted') {
+        setInstalled(true)
+        setShowInstall(false)
+        setInstallState('done')
+      } else {
+        setInstallState('idle')
+      }
+      deferredPromptRef.current = null
+    }).catch(() => {
+      setInstallState('error')
+      deferredPromptRef.current = null
+    })
+  }
 
   const checkSW = useCallback(() => {
     if (!('serviceWorker' in navigator)) {
@@ -69,33 +92,6 @@ export function PwaHandler() {
     }).catch(() => setManifestStatus('❌ fetch failed'))
   }, [])
 
-  const handleInstall = () => {
-    const prompt = deferredPromptRef.current
-    if (!prompt) return
-
-    setInstallState('installing')
-
-    try {
-      ;(prompt as any).prompt()
-      ;(prompt as any).userChoice.then(({ outcome }: { outcome: string }) => {
-        if (outcome === 'accepted') {
-          setInstalled(true)
-          setShowInstall(false)
-          setInstallState('done')
-        } else {
-          setInstallState('idle')
-        }
-        deferredPromptRef.current = null
-      }).catch(() => {
-        setInstallState('error')
-        deferredPromptRef.current = null
-      })
-    } catch {
-      setInstallState('error')
-      deferredPromptRef.current = null
-    }
-  }
-
   const isInstallReady = installState === 'idle'
 
   const debugInfo = [
@@ -119,11 +115,10 @@ export function PwaHandler() {
           <p className="mb-2 text-sm font-medium">安装 LifeOS 到桌面</p>
           <p className="mb-3 text-xs text-muted-foreground">快速访问，像原生应用一样使用</p>
           <div className="flex gap-2">
-            <Button
-              size="sm"
-              className="flex-1"
+            <button
+              className={cn(buttonVariants({ size: "sm" }), "flex-1", !isInstallReady && "pointer-events-none opacity-50")}
               disabled={!isInstallReady}
-              onPointerDown={handleInstall}
+              onClick={() => handleInstallRef.current?.()}
             >
               {installState === 'installing' ? (
                 <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -133,7 +128,7 @@ export function PwaHandler() {
                 <Download className="mr-1 h-4 w-4" />
               )}
               {installState === 'installing' ? '安装中...' : installState === 'done' ? '已安装' : '安装'}
-            </Button>
+            </button>
             <Button size="sm" variant="outline" onClick={() => setShowInstall(false)}>
               稍后
             </Button>

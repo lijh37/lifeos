@@ -1,6 +1,6 @@
 import { createClient } from '@libsql/client'
 import type { InValue } from '@libsql/client'
-import type { Note, ChatMessage, NoteType, Expense, Habit, HabitCompletion } from './types'
+import type { Note, NoteType, Expense, Habit } from './types'
 
 let client: ReturnType<typeof createClient> | null = null
 
@@ -270,28 +270,12 @@ export async function toggleCompletion(habitId: string, date: string): Promise<b
   }
 }
 
-export async function getCompletions(habitId: string): Promise<HabitCompletion[]> {
-  const db = getClient()
-  const result = await db.execute({
-    sql: 'SELECT * FROM habit_completions WHERE habit_id = ? ORDER BY date DESC',
-    args: [habitId],
-  })
-  return result.rows.map((row) => ({
-    id: row.id as string,
-    habitId: row.habit_id as string,
-    date: row.date as string,
-    completed: (row.completed as number) === 1,
-    createdAt: row.created_at as string,
-  }))
-}
-
 export async function getStreaks(): Promise<Record<string, number>> {
   const db = getClient()
   const result = await db.execute(
     `SELECT habit_id, date FROM habit_completions WHERE completed = 1 ORDER BY habit_id, date DESC`
   )
   const streaks: Record<string, number> = {}
-  const today = new Date().toISOString().slice(0, 10)
 
   for (const row of result.rows) {
     const hid = row.habit_id as string
@@ -437,26 +421,4 @@ export async function clearTable(table: string): Promise<void> {
   await db.execute(`DELETE FROM ${table}`)
 }
 
-export async function saveMessage(msg: ChatMessage): Promise<void> {
-  const db = getClient()
-  await db.execute({
-    sql: `INSERT INTO chat_messages (id, role, content, related_note_id, created_at)
-          VALUES (?, ?, ?, ?, ?)`,
-    args: [msg.id, msg.role, msg.content, msg.relatedNoteId, msg.createdAt],
-  })
-}
 
-export async function getRecentMessages(limit = 50): Promise<ChatMessage[]> {
-  const db = getClient()
-  const result = await db.execute({
-    sql: 'SELECT * FROM chat_messages ORDER BY created_at DESC LIMIT ?',
-    args: [limit],
-  })
-  return result.rows.reverse().map((row) => ({
-    id: row.id as string,
-    role: row.role as 'user' | 'assistant',
-    content: row.content as string,
-    relatedNoteId: row.related_note_id as string | null,
-    createdAt: row.created_at as string,
-  }))
-}

@@ -125,6 +125,7 @@ opencode-demo/
 │   ├── ui/                   # shadcn 组件
 │   ├── chat.tsx              # AI 对话组件
 │   ├── note-list.tsx         # 笔记/任务列表组件
+│   ├── rich-editor.tsx       # 富文本编辑器（基于 TipTap）
 │   ├── sidebar.tsx           # 导航组件（PC 侧栏 + 手机底栏）
 │   ├── fab-button.tsx        # 悬浮快捷按钮
 │   ├── export-button.tsx     # 导出按钮
@@ -137,7 +138,8 @@ opencode-demo/
 ├── lib/
 │   ├── db.ts                 # 数据库操作（双模式：SQLite/Turso）
 │   ├── types.ts              # TypeScript 类型
-│   └── prompts.ts            # AI 系统提示词（6 种输出）
+│   ├── prompts.ts            # AI 系统提示词（6 种输出）
+│   └── utils.ts              # cn() 工具函数
 ├── store/
 │   └── index.ts              # Zustand 状态管理
 ├── scripts/

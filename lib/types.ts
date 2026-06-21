@@ -38,14 +38,6 @@ export interface HabitCompletion {
   createdAt: string
 }
 
-export interface ChatMessage {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  relatedNoteId: string | null
-  createdAt: string
-}
-
 export interface AIResponse {
   type: EntryType
   title: string

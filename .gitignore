@@ -36,6 +36,9 @@ yarn-error.log*
 # local database
 /data/
 
+# auto-generated scripts
+/port-forward.ps1
+
 # vercel
 .vercel
 

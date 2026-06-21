@@ -3,6 +3,10 @@
 # 自动安装 cloudflared → fallback ngrok/lt
 
 PORT=${1:-3000}
+PROTO=${2:-http}
+SKIP_OPTS=""
+TLS_VERIFY=""
+[ "$PROTO" = "https" ] && { SKIP_OPTS="-sk"; TLS_VERIFY="--no-tls-verify"; }
 CLOUDFLARED_BIN="/tmp/cloudflared"
 
 echo "=========================================="
@@ -11,7 +15,7 @@ echo "  手机打开输出的 HTTPS 地址 → 点 Install"
 echo "=========================================="
 echo ""
 
-if ! curl -s http://localhost:$PORT > /dev/null 2>&1; then
+if ! curl $SKIP_OPTS "$PROTO://localhost:$PORT" > /dev/null 2>&1; then
   echo "❌ 开发服务器未运行，请先执行: npm run dev"
   exit 1
 fi
@@ -41,7 +45,7 @@ try_cloudflared() {
   echo "🚀 启动 cloudflared..."
   echo "   手机访问: https://xxxx.trycloudflare.com"
   echo ""
-  "$CLOUDFLARED_BIN" tunnel --url "http://localhost:$PORT"
+  "$CLOUDFLARED_BIN" tunnel $TLS_VERIFY --url "$PROTO://localhost:$PORT"
 }
 
 try_ngrok() {
