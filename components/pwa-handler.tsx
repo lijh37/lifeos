@@ -1,13 +1,36 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Download } from 'lucide-react'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { Download, Bug, RefreshCw, Loader2, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export function PwaHandler() {
   const [isOffline, setIsOffline] = useState(false)
-  const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null)
   const [showInstall, setShowInstall] = useState(false)
+  const [swStatus, setSwStatus] = useState<'pending' | 'active' | 'error'>('pending')
+  const [showDebug, setShowDebug] = useState(false)
+  const [manifestStatus, setManifestStatus] = useState<string>('checking')
+  const [pageUrl, setPageUrl] = useState('')
+  const [installed, setInstalled] = useState(false)
+  const [installState, setInstallState] = useState<'idle' | 'installing' | 'done' | 'error'>('idle')
+
+  const deferredPromptRef = useRef<Event | null>(null)
+
+  const checkSW = useCallback(() => {
+    if (!('serviceWorker' in navigator)) {
+      setSwStatus('error')
+      return
+    }
+    navigator.serviceWorker.register('/sw.js').then((reg) => {
+      setSwStatus(reg.active ? 'active' : 'pending')
+      reg.addEventListener('updatefound', () => {
+        setSwStatus(reg.installing ? 'pending' : 'active')
+      })
+    }).catch((err) => {
+      console.warn('SW registration failed:', err)
+      setSwStatus('error')
+    })
+  }, [])
 
   useEffect(() => {
     setIsOffline(!navigator.onLine)
@@ -18,33 +41,71 @@ export function PwaHandler() {
 
     const handler = (e: Event) => {
       e.preventDefault()
-      setDeferredPrompt(e)
+      deferredPromptRef.current = e
       setShowInstall(true)
     }
     window.addEventListener('beforeinstallprompt', handler)
+    window.addEventListener('appinstalled', () => {
+      setInstalled(true)
+      setShowInstall(false)
+      setInstallState('done')
+    })
 
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-      })
-    }
+    if (window.location.search.includes('debug=1')) setShowDebug(true)
+    checkSW()
 
     return () => {
       window.removeEventListener('online', onOnline)
       window.removeEventListener('offline', onOffline)
       window.removeEventListener('beforeinstallprompt', handler)
     }
+  }, [checkSW])
+
+  useEffect(() => {
+    setPageUrl(`${location.protocol}//${location.host}`)
+    fetch('/manifest.json').then((r) => {
+      if (r.ok) setManifestStatus(`✅ ${r.status} ${r.headers.get('content-type') || ''}`)
+      else setManifestStatus(`❌ ${r.status}`)
+    }).catch(() => setManifestStatus('❌ fetch failed'))
   }, [])
 
-  const handleInstall = async () => {
-    if (!deferredPrompt) return
-    ;(deferredPrompt as any).prompt()
-    const result = await (deferredPrompt as any).userChoice
-    if (result.outcome === 'accepted') {
-      setShowInstall(false)
+  const handleInstall = () => {
+    const prompt = deferredPromptRef.current
+    if (!prompt) return
+
+    setInstallState('installing')
+
+    try {
+      ;(prompt as any).prompt()
+      ;(prompt as any).userChoice.then(({ outcome }: { outcome: string }) => {
+        if (outcome === 'accepted') {
+          setInstalled(true)
+          setShowInstall(false)
+          setInstallState('done')
+        } else {
+          setInstallState('idle')
+        }
+        deferredPromptRef.current = null
+      }).catch(() => {
+        setInstallState('error')
+        deferredPromptRef.current = null
+      })
+    } catch {
+      setInstallState('error')
+      deferredPromptRef.current = null
     }
-    setDeferredPrompt(null)
   }
+
+  const isInstallReady = installState === 'idle'
+
+  const debugInfo = [
+    `URL: ${pageUrl || '加载中...'}`,
+    `SW: ${swStatus === 'active' ? '✅ 已注册' : swStatus === 'error' ? '❌ 失败' : '⏳ 注册中'}`,
+    `beforeinstallprompt: ${deferredPromptRef.current ? '✅ 已触发' : '⏳ 等待交互后触发'}`,
+    `manifest: ${manifestStatus}`,
+    `离线: ${isOffline ? '⚠️ 是' : '✅ 否'}`,
+    `已安装: ${installed ? '✅ 是' : '否'}`,
+  ]
 
   return (
     <>
@@ -53,18 +114,64 @@ export function PwaHandler() {
           当前离线，部分功能可能不可用
         </div>
       )}
-      {showInstall && (
-        <div className="fixed bottom-20 left-4 right-4 z-50 rounded-lg border bg-card p-3 shadow-lg md:bottom-4 md:left-auto md:right-4 md:w-72">
+      {showInstall && !installed && (
+        <div className="fixed bottom-24 left-4 right-4 z-50 rounded-lg border bg-card p-3 shadow-lg md:bottom-4 md:left-auto md:right-4 md:w-72">
           <p className="mb-2 text-sm font-medium">安装 LifeOS 到桌面</p>
           <p className="mb-3 text-xs text-muted-foreground">快速访问，像原生应用一样使用</p>
           <div className="flex gap-2">
-            <Button size="sm" className="flex-1" onClick={handleInstall}>
-              <Download className="mr-1 h-4 w-4" />
-              安装
+            <Button
+              size="sm"
+              className="flex-1"
+              disabled={!isInstallReady}
+              onPointerDown={handleInstall}
+            >
+              {installState === 'installing' ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : installState === 'done' ? (
+                <Check className="mr-1 h-4 w-4" />
+              ) : (
+                <Download className="mr-1 h-4 w-4" />
+              )}
+              {installState === 'installing' ? '安装中...' : installState === 'done' ? '已安装' : '安装'}
             </Button>
             <Button size="sm" variant="outline" onClick={() => setShowInstall(false)}>
               稍后
             </Button>
+          </div>
+          {installState === 'error' && (
+            <p className="mt-2 text-xs text-destructive">安装失败，请重试</p>
+          )}
+        </div>
+      )}
+
+      <button
+        onClick={() => setShowDebug(!showDebug)}
+        className="fixed right-4 top-4 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary shadow-sm hover:bg-primary/20 active:scale-95 transition-transform"
+        title="PWA 诊断"
+      >
+        <Bug className="h-5 w-5" />
+      </button>
+
+      {showDebug && (
+        <div className="fixed right-4 top-16 z-50 w-72 rounded-lg border bg-card p-3 text-xs shadow-lg">
+          <div className="mb-1.5 flex items-center justify-between">
+            <p className="font-medium">PWA 诊断</p>
+            <button onClick={() => setShowDebug(false)} className="text-muted-foreground hover:text-foreground">
+              ✕
+            </button>
+          </div>
+          {debugInfo.map((line, i) => (
+            <p key={i} className="font-mono leading-5">{line}</p>
+          ))}
+          <div className="mt-2 flex gap-2">
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={checkSW}>
+              <RefreshCw className="mr-1 h-3 w-3" />
+              刷新
+            </Button>
+            <p className="text-muted-foreground">
+              {swStatus !== 'active' ? 'SW 未注册成功' : ''}
+              {!deferredPromptRef.current && swStatus === 'active' ? '在页面上点几下即可触发安装' : ''}
+            </p>
           </div>
         </div>
       )}

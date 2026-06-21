@@ -4,7 +4,7 @@
 
 个人 AI 生活助手应用，用户通过自然语言与 AI 对话，AI 自动解析为结构化笔记、任务、事件、收支或习惯。支持手机端和 PC 端、深色模式、数据导出、PWA 离线、统计看板。
 
-## 当前状态（截至 2026-06-20）
+## 当前状态（截至 2026-06-21）
 
 ### ✅ 已实现（24 路由，10 页面 + 11 API）
 
@@ -40,8 +40,7 @@
 
 **体验增强**
 - **深色模式**：light/dark/system 三态切换（localStorage 持久化）
-- **离线支持**：Service Worker（`/sw.js`）缓存静态资源和 API GET 响应
-- **PWA 安装提示**：监听 `beforeinstallprompt`，弹出安装卡片
+- **PWA 安装**：`beforeinstallprompt` useRef 保存 + onPointerDown 同步触发，含诊断面板（右上角 Bug / `?debug=1`）
 - **通知提醒**：浏览器通知权限请求 + 到期检查（on mount + 每 5 分钟）+ 浏览器推送 + 内联降级提醒
 - **UI 动效**：页面 fadeIn 过渡、列表交错入场、卡片 hover 悬浮、骨架屏加载
 - **导航**：PC 侧栏 + 手机底部 Tab（10 项：对话/笔记/任务/记账/习惯/搜索/日历/标签/统计/设置）
@@ -49,7 +48,7 @@
 
 **基础设施**
 - **Turso 多端同步预备**：`lib/db.ts` 双模式（Turso/local），迁移脚本 `scripts/migrate-to-turso.ts`，`data/schema.sql`
-- **PWA 配置**：manifest.json（192+512 图标，maskable）
+- **PWA 配置**：manifest.json（192+512 PNG 图标，maskable + any）
 - **lint 零错误**（function hoisting / set-state-in-effect / 未转义实体均修复）
 
 ### ❌ 待办
@@ -118,7 +117,7 @@ opencode-demo/
 │   ├── export-button.tsx       # 导出按钮（MD/CSV/JSON）
 │   ├── theme-provider.tsx      # 主题上下文
 │   ├── theme-toggle.tsx        # 深色模式切换
-│   ├── pwa-handler.tsx         # 离线横幅 + PWA 安装提示
+│   ├── pwa-handler.tsx         # PWA 安装管理 + 诊断面板
 │   ├── page-animation.tsx      # 页面过渡动画容器
 │   ├── notification-manager.tsx # 通知提醒管理器
 │   └── skeleton-card.tsx       # 骨架屏组件
@@ -129,12 +128,14 @@ opencode-demo/
 ├── store/
 │   └── index.ts                # Zustand 全局状态
 ├── scripts/
-│   └── migrate-to-turso.ts     # 本地→Turso 数据迁移
+│   ├── https-setup.sh          # HTTPS 开发证书一键生成（mkcert）
+│   ├── migrate-to-turso.ts     # 本地→Turso 数据迁移
+│   └── tunnel.sh               # HTTPS 隧道（cloudflared/ngrok/localtunnel）
 ├── data/
 │   └── schema.sql              # 完整 DDL（6 表 + 索引）
 ├── public/
 │   ├── manifest.json            # PWA 配置（192+512 图标，maskable）
-│   ├── sw.js                    # Service Worker（缓存策略）
+│   ├── sw.js                    # Service Worker（最简 pass-through）
 │   └── icons/                   # 应用图标
 ```
 
@@ -168,22 +169,20 @@ opencode-demo/
 项目在 WSL2 中开发。WSL2 有独立虚拟 IP（如 `192.168.82.x`），局域网其他设备无法直接访问。
 
 - **PC 开发**：Windows 浏览器 `http://localhost:3000`（自动转发）
-- **手机测试**：Windows 管理员 PowerShell 执行端口转发：
-```powershell
-netsh interface portproxy add v4tov4 listenport=3000 listenaddress=0.0.0.0 connectport=3000 connectaddress=192.168.82.57
-netsh advfirewall firewall add rule name="LifeOS Dev Server" dir=in action=allow protocol=TCP localport=3000
-```
-助手脚本：`setup-wsl.ps1` / `wsl-port-forward.bat`
-
-手机访问 `http://[Windows本机IP]:3000`（`allowedDevOrigins` 已添加 `192.168.31.111`）
+- **手机 PWA 安装**：
+  1. 生成 HTTPS 证书：`bash scripts/https-setup.sh <Windows-IP>`
+  2. 启动：`bash start.sh <Windows-IP>`（如 `192.168.31.111`）
+  3. Windows 管理员 PowerShell 端口转发：`.\setup-wsl.ps1`
+  4. 手机装 CA：`https://<Windows-IP>:3000/ca.pem`（Android 14+ 需开启 `chrome://flags/#enable-granular-android-pre-14-ca-trust`）
+- **备用隧道**：`bash scripts/tunnel.sh`（cloudflared，无需端口转发）
 
 ## 启动
 
 ```bash
 nvm use 24
 npm install
-npm run dev    # 开发 http://localhost:3000
-npm run build  # 生产构建
+bash start.sh              # 自动检测 HTTPS 证书，使用 HTTPS 或 HTTP
+npm run build              # 生产构建
 ```
 
 ## 部署

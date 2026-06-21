@@ -40,28 +40,35 @@ npm run dev
 
 访问 http://localhost:3000
 
-### 4. 手机预览
+### 4. 手机端访问（PWA）
 
-#### 方式一：端口转发（推荐，WSL2 用户）
-
-项目运行在 WSL2 中时，手机无法直接访问 WSL2 的虚拟 IP。需要在 **Windows 中以管理员身份** 运行：
-
-```powershell
-# PowerShell (管理员)
-.\setup-wsl.ps1
-```
-
-或双击 `wsl-port-forward.bat`（以管理员运行）。
-
-然后手机访问 `http://[Windows主机IP]:3000`（查看主机 IP：Windows 上运行 `ipconfig`）。
-
-#### 方式二：启动本地隧道
+#### 方式一：局域网 HTTPS（推荐，一劳永逸）
 
 ```bash
-npm install -g localtunnel
-lt --port 3000
-# 会输出一个 https://xxx.loca.lt 地址，手机访问即可
+# 首次：安装 HTTPS 开发证书（仅一次）
+bash scripts/https-setup.sh
+
+# 以后每次：直接启动
+bash start.sh
 ```
+
+- PC 访问 `https://localhost:3000`
+- **手机首次**需安装 CA 证书，按终端输出的指引操作（Android 下载 `.pem` → 设置 → 安装 CA 证书）
+- 之后手机直接打开 `https://<LAN-IP>:3000`，同局域网内随时可用，每次地址不变
+- PWA 完整支持：安装提示、离线缓存、通知
+
+#### 方式二：HTTPS 隧道（备用，无局域网时）
+
+```bash
+bash scripts/tunnel.sh
+# 自动使用 cloudflared → ngrok → localtunnel
+```
+
+手机打开输出的随机 `https://xxx.trycloudflare.com`，PWA 可安装。每次重启地址会变。
+
+#### 方式三：HTTP（仅浏览，不可 PWA）
+
+WSL2 用户需先在 Windows 管理员 PowerShell 运行 `.\setup-wsl.ps1`，然后手机访问 `http://[Windows主机IP]:3000`。
 
 ## 功能
 
@@ -85,7 +92,6 @@ lt --port 3000
 
 ### 规划中
 - [ ] 多端同步 — Turso 云端同步 + Vercel 部署
-- [ ] 饮食+锻炼追踪 — 拍照识食物，运动记录
 - [ ] 饮食+锻炼追踪 — 拍照识食物，运动记录
 - [ ] 富文本编辑
 
@@ -120,10 +126,11 @@ opencode-demo/
 │   ├── chat.tsx              # AI 对话组件
 │   ├── note-list.tsx         # 笔记/任务列表组件
 │   ├── sidebar.tsx           # 导航组件（PC 侧栏 + 手机底栏）
+│   ├── fab-button.tsx        # 悬浮快捷按钮
 │   ├── export-button.tsx     # 导出按钮
 │   ├── theme-provider.tsx    # 主题上下文
 │   ├── theme-toggle.tsx      # 深色模式切换
-│   ├── pwa-handler.tsx       # 离线横幅 + 安装提示
+│   ├── pwa-handler.tsx       # PWA 安装管理 + 诊断面板
 │   ├── notification-manager.tsx # 通知提醒管理器
 │   ├── page-animation.tsx    # 页面过渡动效
 │   └── skeleton-card.tsx     # 骨架屏
@@ -134,7 +141,9 @@ opencode-demo/
 ├── store/
 │   └── index.ts              # Zustand 状态管理
 ├── scripts/
-│   └── migrate-to-turso.ts   # 本地→Turso 数据迁移
+│   ├── https-setup.sh       # HTTPS 开发证书一键生成
+│   ├── migrate-to-turso.ts  # 本地→Turso 数据迁移
+│   └── tunnel.sh            # HTTPS 隧道（cloudflared/ngrok/localtunnel）
 ├── data/
 │   └── schema.sql            # 数据库完整 DDL
 └── public/
@@ -142,6 +151,65 @@ opencode-demo/
     ├── sw.js                  # Service Worker
     └── icons/                 # 应用图标
 ```
+
+## PWA 移动端安装
+
+LifeOS 支持以 PWA 方式安装到手机桌面，像原生 App 一样运行。
+
+### PWA 架构
+
+```
+public/sw.js              # Service Worker（最简，仅满足浏览器检测）
+public/manifest.json      # 应用清单（PNG 图标 + standalone 模式）
+public/icons/icon-{192,512}.png  # 应用图标
+components/pwa-handler.tsx # 安装管理 + 诊断面板（右上角 Bug 图标 / ?debug=1）
+```
+
+### 必要条件
+
+| 条件 | 说明 |
+|---|---|
+| HTTPS | PWA 必须在 HTTPS 下运行（localhost 除外）|
+| 用户交互 | 需在页面上点击/滚动后才能触发安装提示 |
+| Service Worker | `/sw.js` 必须正确注册并返回 200 |
+
+### 开发期测试
+
+#### 方式一：局域网 HTTPS（推荐）
+
+```bash
+# 首次：生成开发证书
+bash scripts/https-setup.sh
+
+# 启动（自动检测证书，启用 HTTPS）
+bash start.sh
+
+# 或直接
+npm run dev:https
+```
+
+手机打开 `https://<LAN-IP>:3000`（地址不变），点「安装」。诊断面板：右上角 Bug 图标 / `?debug=1`。
+
+```
+SW: ✅ 已注册
+beforeinstallprompt: ✅ 已触发
+manifest: ✅ 200 ...
+```
+
+#### 方式二：HTTPS 隧道（无局域网时）
+
+```bash
+npm run dev
+
+# 新终端
+bash scripts/tunnel.sh
+```
+
+手机打开随机的 `https://xxx.trycloudflare.com` 安装 PWA。每次重启地址会变。
+
+### 生产部署（Vercel）
+
+部署到 Vercel 后自动获得 HTTPS，无需隧道，直接安装。
 
 ## 如何与 AI 对话
 

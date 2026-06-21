@@ -44,7 +44,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
-        <link rel="apple-touch-icon" href="/icons/icon-512.svg" />
+        <link rel="apple-touch-icon" href="/icons/icon-512.png" />
         <meta name="theme-color" content="#ffffff" id="theme-color" />
       </head>
       <body className="h-full">

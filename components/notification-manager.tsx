@@ -49,7 +49,7 @@ export function NotificationManager() {
           const label = item.type === 'task' ? '任务' : item.type === 'event' ? '事件' : '条目'
           new Notification('LifeOS 提醒', {
             body: `${label}「${item.title}」今天截止`,
-            icon: '/icons/icon-192.svg',
+            icon: '/icons/icon-192.png',
             tag: item.id,
           })
         }
