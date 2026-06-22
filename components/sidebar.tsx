@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bot, Notebook, CheckSquare, Plus, Wallet, Trophy, CalendarDays, Search, Settings, Tags, BarChart3 } from 'lucide-react'
+import { Bot, Notebook, CheckSquare, Plus, PiggyBank, Trophy, CalendarDays, Search, Settings, Tags, BarChart3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { cn } from '@/lib/utils'
@@ -11,7 +11,7 @@ const navItems = [
   { href: '/', label: 'AI 对话', icon: Bot },
   { href: '/notes', label: '笔记', icon: Notebook },
   { href: '/tasks', label: '任务', icon: CheckSquare },
-  { href: '/expenses', label: '记账', icon: Wallet },
+  { href: '/expenses', label: '预算', icon: PiggyBank },
   { href: '/habits', label: '习惯', icon: Trophy },
   { href: '/search', label: '搜索', icon: Search },
   { href: '/tags', label: '标签', icon: Tags },

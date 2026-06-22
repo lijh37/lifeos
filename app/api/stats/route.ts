@@ -7,16 +7,13 @@ export async function GET() {
   await initDB()
   const c = db()
 
-  const [noteCounts, expenseMonth, expenseCat, habitRate, tagRows, recent] = await Promise.all([
+  const [noteCounts, budgetData, habitRate, tagRows, recent] = await Promise.all([
     c.execute(`SELECT type, COUNT(*) as count FROM notes GROUP BY type`),
-    c.execute(`SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE type='expense' AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')`),
-    c.execute(`SELECT category, SUM(amount) as total FROM expenses WHERE type='expense' AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now') GROUP BY category ORDER BY total DESC`),
+    c.execute(`SELECT * FROM budgets ORDER BY month DESC LIMIT 1`),
     c.execute(`SELECT COUNT(*) as done FROM habit_completions WHERE completed=1 AND date >= date('now', '-7 days')`),
     c.execute(`SELECT tags FROM notes`),
     c.execute(`
       SELECT id, 'note' as source, type, COALESCE(title, content) as title, created_at FROM notes
-      UNION ALL
-      SELECT id, 'expense' as source, type, description as title, created_at FROM expenses
       UNION ALL
       SELECT id, 'habit' as source, 'habit' as type, name as title, created_at FROM habits
       ORDER BY created_at DESC LIMIT 15
@@ -44,13 +41,18 @@ export async function GET() {
     .sort((a, b) => b.count - a.count)
     .slice(0, 5)
 
+  const currentBudget = budgetData.rows[0] ? {
+    month: budgetData.rows[0].month as string,
+    fixedBudget: budgetData.rows[0].fixed_budget as number,
+    variableBudget: budgetData.rows[0].variable_budget as number,
+    fixedActual: budgetData.rows[0].fixed_actual as number | null,
+    variableActual: budgetData.rows[0].variable_actual as number | null,
+    isCompleted: (budgetData.rows[0].is_completed as number) === 1,
+  } : null
+
   return NextResponse.json({
     counts: { note, task, event },
-    expensesThisMonth: (expenseMonth.rows[0]?.total as number) || 0,
-    expenseCategories: expenseCat.rows.map(r => ({
-      category: r.category as string,
-      total: r.total as number,
-    })),
+    currentBudget,
     habitCompletion7d: (habitRate.rows[0]?.done as number) || 0,
     topTags: sortedTags,
     recentItems: recent.rows.map(r => ({

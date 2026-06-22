@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Download, FileText, FileJson, Table2 } from 'lucide-react'
 
 interface ExportButtonProps {
-  type: 'notes' | 'expenses' | 'all'
+  type: 'notes' | 'budgets' | 'all'
 }
 
 export function ExportButton({ type }: ExportButtonProps) {

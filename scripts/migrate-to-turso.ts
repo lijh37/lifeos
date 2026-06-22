@@ -40,7 +40,7 @@ async function main() {
   await remote.execute(schema)
 
   // 迁移数据
-  const tables = ['notes', 'chat_messages', 'expenses', 'habits', 'habit_completions']
+  const tables = ['notes', 'chat_messages', 'budgets', 'habits', 'habit_completions']
 
   for (const table of tables) {
     console.log(`迁移 ${table}...`)

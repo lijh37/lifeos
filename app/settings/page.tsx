@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { Settings, Download, Upload, Trash2, AlertTriangle, Info, Loader2 } from 'lucide-react'
+import { Settings, Download, Upload, Trash2, AlertTriangle, Loader2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -11,7 +11,7 @@ export default function SettingsPage() {
   const [stats, setStats] = useState<{
     notes: number
     notesDetail: { note: number; task: number; event: number }
-    expenses: number
+    budgets: number
     habits: number
   } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -78,7 +78,7 @@ export default function SettingsPage() {
     { label: '笔记', count: stats.notesDetail.note, type: 'notes', color: 'bg-blue-500' },
     { label: '任务', count: stats.notesDetail.task, type: 'notes', color: 'bg-orange-500' },
     { label: '事件', count: stats.notesDetail.event, type: 'notes', color: 'bg-purple-500' },
-    { label: '收支', count: stats.expenses, type: 'expenses', color: 'bg-green-500' },
+    { label: '预算', count: stats.budgets, type: 'budgets', color: 'bg-emerald-500' },
     { label: '习惯', count: stats.habits, type: 'habits', color: 'bg-rose-500' },
   ] : []
 
@@ -125,7 +125,7 @@ export default function SettingsPage() {
                       )}
                     </div>
                   ))}
-                  {stats && (stats.notes + stats.expenses + stats.habits) > 0 && (
+                  {stats && (stats.notes + stats.budgets + stats.habits) > 0 && (
                     <div className="flex items-center gap-3 pt-2">
                       <AlertTriangle className="h-4 w-4 text-destructive" />
                       <Button
@@ -159,7 +159,7 @@ export default function SettingsPage() {
                 <input ref={fileRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                导出的 JSON 文件包含所有笔记、任务、事件和收支记录
+                导出的 JSON 文件包含所有笔记、任务、事件和预算记录
               </p>
             </CardContent>
           </Card>

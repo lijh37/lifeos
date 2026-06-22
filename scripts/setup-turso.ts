@@ -98,7 +98,7 @@ async function main() {
   }
   console.log('✅ 表结构创建完成')
 
-  const tables = ['notes', 'chat_messages', 'expenses', 'habits', 'habit_completions']
+  const tables = ['notes', 'chat_messages', 'budgets', 'habits', 'habit_completions']
   for (const table of tables) {
     const rows = await local.execute(`SELECT * FROM ${table}`)
     if (rows.rows.length === 0) { console.log(`  ${table}: 无数据`); continue }

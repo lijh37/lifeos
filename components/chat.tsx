@@ -74,21 +74,6 @@ export default function Chat({ onNoteCreated }: ChatProps) {
               if (!habitRes.ok) {
                 console.error('Failed to save habit:', await habitRes.text())
               }
-            } else if (parsed.type === 'expense' || parsed.type === 'income') {
-              const expenseRes = await fetch('/api/expenses', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  amount: parsed.amount || 0,
-                  category: parsed.category || '其他',
-                  description: title,
-                  type: parsed.type,
-                  createdAt: now,
-                }),
-              })
-              if (!expenseRes.ok) {
-                console.error('Failed to save expense:', await expenseRes.text())
-              }
             } else {
               const note: Note = {
                 id: genId(),
@@ -234,9 +219,6 @@ export default function Chat({ onNoteCreated }: ChatProps) {
               <div className="mt-4 space-y-2 text-left text-sm text-muted-foreground">
                 <div className="rounded-lg bg-muted p-3">
                   &ldquo;明天下午3点和张三开会讨论项目进度&rdquo;
-                </div>
-                <div className="rounded-lg bg-muted p-3">
-                  &ldquo;吃了午饭，花了35块&rdquo;
                 </div>
                 <div className="rounded-lg bg-muted p-3">
                   &ldquo;提醒我今晚8点锻炼&rdquo;

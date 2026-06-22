@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { initDB, createNote, createExpense } from '@/lib/db'
-import type { Note, Expense } from '@/lib/types'
+import { initDB, createNote, upsertBudget } from '@/lib/db'
+import type { Note } from '@/lib/types'
 
 export async function POST(req: NextRequest) {
   await initDB()
@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '无效的 JSON 格式' }, { status: 400 })
   }
 
-  const { notes, expenses } = body
+  const { notes, budgets } = body
   let imported = 0
 
   if (Array.isArray(notes)) {
@@ -32,17 +32,17 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (Array.isArray(expenses)) {
-    for (const e of expenses) {
-      const expense: Expense = {
-        id: e.id || crypto.randomUUID(),
-        amount: e.amount || 0,
-        category: e.category || '其他',
-        description: e.description || '',
-        type: e.type || 'expense',
-        createdAt: e.createdAt || e.created_at || new Date().toISOString(),
-      }
-      await createExpense(expense)
+  if (Array.isArray(budgets)) {
+    for (const b of budgets) {
+      await upsertBudget(b.month, {
+        fixedBudget: b.fixedBudget ?? b.fixed_budget ?? 0,
+        variableBudget: b.variableBudget ?? b.variable_budget ?? 0,
+        fixedActual: b.fixedActual ?? b.fixed_actual ?? null,
+        variableActual: b.variableActual ?? b.variable_actual ?? null,
+        notes: b.notes ?? '',
+        isCompleted: b.isCompleted ?? b.is_completed ?? false,
+        savingsCompleted: b.savingsCompleted ?? b.savings_completed ?? false,
+      })
       imported++
     }
   }

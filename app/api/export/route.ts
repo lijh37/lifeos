@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
-import { getNotes, getExpenses, initDB } from '@/lib/db'
-import type { Note, Expense } from '@/lib/types'
+import { getNotes, getBudgets, initDB } from '@/lib/db'
+import type { Note, Budget } from '@/lib/types'
 
 function notesToMarkdown(notes: Note[]): string {
   const lines: string[] = []
@@ -30,38 +30,38 @@ function notesToMarkdown(notes: Note[]): string {
   return lines.join('\n')
 }
 
-function expensesToMarkdown(expenses: Expense[]): string {
+function budgetsToMarkdown(budgets: Budget[]): string {
   const lines: string[] = []
-  lines.push('# LifeOS 收支导出')
+  lines.push('# LifeOS 预算导出')
   lines.push('')
   lines.push(`导出时间: ${new Date().toISOString()}`)
-  lines.push(`总计: ${expenses.length} 条`)
+  lines.push(`总计: ${budgets.length} 个月`)
   lines.push('')
   lines.push('---')
   lines.push('')
 
-  const totalExpense = expenses.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount, 0)
-  const totalIncome = expenses.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0)
-  lines.push(`**总支出**: ¥${totalExpense.toFixed(2)}`)
-  lines.push(`**总收入**: ¥${totalIncome.toFixed(2)}`)
-  lines.push(`**净收支**: ¥${(totalIncome - totalExpense).toFixed(2)}`)
-  lines.push('')
-
-  for (const exp of expenses) {
-    const sign = exp.type === 'expense' ? '-' : '+'
-    lines.push(`- [${sign}¥${exp.amount.toFixed(2)}] ${exp.description || exp.category}`)
-    lines.push(`  - 分类: ${exp.category} | 时间: ${exp.createdAt}`)
+  for (const b of budgets) {
+    lines.push(`## ${b.month}`)
+    lines.push(`- **固定预算**: ¥${b.fixedBudget.toFixed(2)}`)
+    lines.push(`- **浮动预算**: ¥${b.variableBudget.toFixed(2)}`)
+    if (b.fixedActual !== null) lines.push(`- **固定实际**: ¥${b.fixedActual.toFixed(2)}`)
+    if (b.variableActual !== null) lines.push(`- **浮动实际**: ¥${b.variableActual.toFixed(2)}`)
+    lines.push(`- **完成月任务**: ${b.isCompleted ? '是' : '否'}`)
+    lines.push(`- **完成存储**: ${b.savingsCompleted ? '是' : '否'}`)
+    if (b.notes) lines.push(`- **备注**: ${b.notes}`)
+    lines.push('')
+    lines.push('---')
+    lines.push('')
   }
 
-  lines.push('')
   return lines.join('\n')
 }
 
-function toJSON(notes: Note[], expenses: Expense[]): string {
+function toJSON(notes: Note[], budgets: Budget[]): string {
   return JSON.stringify({
     exportedAt: new Date().toISOString(),
     notes,
-    expenses,
+    budgets,
   }, null, 2)
 }
 
@@ -72,9 +72,8 @@ function escapeCSV(val: string): string {
   return val
 }
 
-function toCSV(notes: Note[], expenses: Expense[]): string {
+function toCSV(notes: Note[], budgets: Budget[]): string {
   const lines: string[] = []
-  // BOM for Excel Chinese support
   lines.push('\uFEFF')
 
   if (notes.length > 0) {
@@ -94,16 +93,18 @@ function toCSV(notes: Note[], expenses: Expense[]): string {
     lines.push('')
   }
 
-  if (expenses.length > 0) {
-    lines.push('类型,金额,分类,描述,创建时间')
-    for (const e of expenses) {
-      const typeLabel = e.type === 'expense' ? '支出' : '收入'
+  if (budgets.length > 0) {
+    lines.push('月份,固定预算,浮动预算,固定实际,浮动实际,完成月任务,完成存储,备注')
+    for (const b of budgets) {
       lines.push([
-        typeLabel,
-        e.amount.toFixed(2),
-        escapeCSV(e.category),
-        escapeCSV(e.description),
-        escapeCSV(e.createdAt),
+        escapeCSV(b.month),
+        b.fixedBudget.toFixed(2),
+        b.variableBudget.toFixed(2),
+        b.fixedActual !== null ? b.fixedActual.toFixed(2) : '',
+        b.variableActual !== null ? b.variableActual.toFixed(2) : '',
+        b.isCompleted ? '是' : '否',
+        b.savingsCompleted ? '是' : '否',
+        escapeCSV(b.notes),
       ].join(','))
     }
   }
@@ -118,24 +119,24 @@ export async function GET(req: NextRequest) {
   const format = searchParams.get('format') || 'md'
 
   const notes = type === 'all' || type === 'notes' ? await getNotes() : []
-  const expenses = type === 'all' || type === 'expenses' ? await getExpenses() : []
+  const budgets = type === 'all' || type === 'budgets' ? await getBudgets() : []
 
   let content: string
   let filename: string
   let contentType: string
 
   if (format === 'json') {
-    content = toJSON(notes, expenses)
+    content = toJSON(notes, budgets)
     filename = `lifeos-export-${new Date().toISOString().slice(0, 10)}.json`
     contentType = 'application/json'
   } else if (format === 'csv') {
-    content = toCSV(notes, expenses)
+    content = toCSV(notes, budgets)
     filename = `lifeos-export-${new Date().toISOString().slice(0, 10)}.csv`
     contentType = 'text/csv; charset=utf-8'
   } else {
     const mdParts: string[] = []
     if (notes.length > 0) mdParts.push(notesToMarkdown(notes))
-    if (expenses.length > 0) mdParts.push(expensesToMarkdown(expenses))
+    if (budgets.length > 0) mdParts.push(budgetsToMarkdown(budgets))
     content = mdParts.join('\n\n') || '没有数据'
     filename = `lifeos-export-${new Date().toISOString().slice(0, 10)}.md`
     contentType = 'text/markdown'

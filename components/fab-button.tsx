@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Notebook, CheckSquare, Wallet, Trophy, X } from 'lucide-react'
+import { Plus, Notebook, CheckSquare, Trophy, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const STORAGE_KEY = 'fab-position'
@@ -15,7 +15,6 @@ interface Pos { x: number; y: number }
 const menuItems = [
   { href: '/', label: '新建笔记', icon: Notebook, query: '' },
   { href: '/', label: '新建任务', icon: CheckSquare, query: '?quick=task' },
-  { href: '/expenses', label: '记账', icon: Wallet, query: '' },
   { href: '/habits', label: '新建习惯', icon: Trophy, query: '' },
 ]
 

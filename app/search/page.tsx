@@ -3,17 +3,16 @@
 import { useEffect, useState, useRef } from 'react'
 import { format } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
-import { Search, ArrowDown, ArrowUp, Trophy, Loader2 } from 'lucide-react'
+import { Search, Trophy, Loader2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import type { Note, Expense, Habit } from '@/lib/types'
-import { typeLabels, typeColors, categoryLabels } from '@/lib/constants'
+import type { Note, Habit } from '@/lib/types'
+import { typeLabels, typeColors } from '@/lib/constants'
 
 export default function SearchPage() {
   const [query, setQuery] = useState('')
   const [notes, setNotes] = useState<Note[]>([])
-  const [expenses, setExpenses] = useState<Expense[]>([])
   const [habits, setHabits] = useState<Habit[]>([])
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
@@ -27,7 +26,7 @@ export default function SearchPage() {
   useEffect(() => {
     const trimmed = query.trim()
     if (trimmed.length === 0) {
-      setNotes([]); setExpenses([]); setHabits([]); setSearched(false)
+      setNotes([]); setHabits([]); setSearched(false)
       return
     }
 
@@ -42,7 +41,6 @@ export default function SearchPage() {
         .then(data => {
           if (!controller.signal.aborted) {
             setNotes(data.notes)
-            setExpenses(data.expenses)
             setHabits(data.habits)
             setSearched(true)
           }
@@ -54,7 +52,7 @@ export default function SearchPage() {
     return () => { clearTimeout(timer); controller.abort() }
   }, [query])
 
-  const total = notes.length + expenses.length + habits.length
+  const total = notes.length + habits.length
 
   return (
     <div className="flex h-full flex-col">
@@ -66,7 +64,7 @@ export default function SearchPage() {
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="搜索笔记、收支、习惯..."
+            placeholder="搜索笔记、习惯..."
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           {query && (
@@ -107,33 +105,6 @@ export default function SearchPage() {
                       </div>
                       <span className="shrink-0 text-xs text-muted-foreground">
                         {format(new Date(n.createdAt), 'MM/dd', { locale: zhCN })}
-                      </span>
-                    </CardContent>
-                  </Card>
-                ))}
-              </Section>
-            )}
-
-            {expenses.length > 0 && (
-              <Section title={`收支 (${expenses.length})`}>
-                {expenses.map(e => (
-                  <Card key={e.id}>
-                    <CardContent className="flex items-center gap-3 p-3">
-                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                        e.type === 'expense'
-                          ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400'
-                          : 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400'
-                      }`}>
-                        {e.type === 'expense' ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">{e.description || e.category}</span>
-                          <Badge variant="outline" className="text-[10px]">{categoryLabels[e.category] || e.category}</Badge>
-                        </div>
-                      </div>
-                      <span className={`shrink-0 text-sm font-bold ${e.type === 'expense' ? 'text-red-500' : 'text-green-500'}`}>
-                        {e.type === 'expense' ? '-' : '+'}¥{e.amount.toFixed(1)}
                       </span>
                     </CardContent>
                   </Card>

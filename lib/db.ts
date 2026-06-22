@@ -1,6 +1,6 @@
 import { createClient } from '@libsql/client'
 import type { InValue } from '@libsql/client'
-import type { Note, NoteType, Expense, Habit } from './types'
+import type { Note, NoteType, Budget, Habit } from './types'
 
 let client: ReturnType<typeof createClient> | null = null
 
@@ -49,20 +49,19 @@ export async function initDB() {
     CREATE INDEX IF NOT EXISTS idx_notes_due_date ON notes(due_date)
   `)
   await db.execute(`
-    CREATE TABLE IF NOT EXISTS expenses (
+    CREATE TABLE IF NOT EXISTS budgets (
       id TEXT PRIMARY KEY,
-      amount REAL NOT NULL,
-      category TEXT NOT NULL,
-      description TEXT NOT NULL DEFAULT '',
-      type TEXT NOT NULL DEFAULT 'expense',
-      created_at TEXT NOT NULL
+      month TEXT NOT NULL UNIQUE,
+      fixed_budget REAL NOT NULL DEFAULT 0,
+      variable_budget REAL NOT NULL DEFAULT 0,
+      fixed_actual REAL DEFAULT NULL,
+      variable_actual REAL DEFAULT NULL,
+      notes TEXT DEFAULT '',
+      is_completed INTEGER DEFAULT 0,
+      savings_completed INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
     )
-  `)
-  await db.execute(`
-    CREATE INDEX IF NOT EXISTS idx_expenses_type ON expenses(type)
-  `)
-  await db.execute(`
-    CREATE INDEX IF NOT EXISTS idx_expenses_created ON expenses(created_at)
   `)
   await db.execute(`
     CREATE TABLE IF NOT EXISTS habits (
@@ -177,43 +176,85 @@ export async function getNote(id: string): Promise<Note | null> {
   return rowToNote(result.rows[0])
 }
 
-function rowToExpense(row: Record<string, unknown>): Expense {
+function rowToBudget(row: Record<string, unknown>): Budget {
   return {
     id: row.id as string,
-    amount: row.amount as number,
-    category: row.category as string,
-    description: row.description as string,
-    type: row.type as 'expense' | 'income',
+    month: row.month as string,
+    fixedBudget: row.fixed_budget as number,
+    variableBudget: row.variable_budget as number,
+    fixedActual: row.fixed_actual as number | null,
+    variableActual: row.variable_actual as number | null,
+    notes: row.notes as string,
+    isCompleted: (row.is_completed as number) === 1,
+    savingsCompleted: (row.savings_completed as number) === 1,
     createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
   }
 }
 
-export async function createExpense(expense: Expense): Promise<Expense> {
+export async function getBudget(month: string): Promise<Budget | null> {
   const db = getClient()
-  await db.execute({
-    sql: `INSERT INTO expenses (id, amount, category, description, type, created_at)
-          VALUES (?, ?, ?, ?, ?, ?)`,
-    args: [expense.id, expense.amount, expense.category, expense.description, expense.type, expense.createdAt],
+  const result = await db.execute({
+    sql: 'SELECT * FROM budgets WHERE month = ?',
+    args: [month],
   })
-  return expense
+  if (result.rows.length === 0) return null
+  return rowToBudget(result.rows[0])
 }
 
-export async function getExpenses(type?: 'expense' | 'income'): Promise<Expense[]> {
+export async function getBudgets(): Promise<Budget[]> {
   const db = getClient()
-  let sql = 'SELECT * FROM expenses'
-  const args: InValue[] = []
-  if (type) {
-    sql += ' WHERE type = ?'
-    args.push(type)
+  const result = await db.execute('SELECT * FROM budgets ORDER BY month DESC')
+  return result.rows.map(rowToBudget)
+}
+
+export async function upsertBudget(month: string, data: Partial<Budget>): Promise<Budget> {
+  const db = getClient()
+  const existing = await getBudget(month)
+  const now = new Date().toISOString()
+
+  if (existing) {
+    const fields: string[] = []
+    const args: InValue[] = []
+    if (data.fixedBudget !== undefined) { fields.push('fixed_budget = ?'); args.push(data.fixedBudget) }
+    if (data.variableBudget !== undefined) { fields.push('variable_budget = ?'); args.push(data.variableBudget) }
+    if (data.fixedActual !== undefined) { fields.push('fixed_actual = ?'); args.push(data.fixedActual) }
+    if (data.variableActual !== undefined) { fields.push('variable_actual = ?'); args.push(data.variableActual) }
+    if (data.notes !== undefined) { fields.push('notes = ?'); args.push(data.notes) }
+    if (data.isCompleted !== undefined) { fields.push('is_completed = ?'); args.push(data.isCompleted ? 1 : 0) }
+    if (data.savingsCompleted !== undefined) { fields.push('savings_completed = ?'); args.push(data.savingsCompleted ? 1 : 0) }
+    fields.push('updated_at = ?')
+    args.push(now)
+    args.push(existing.id)
+    await db.execute({
+      sql: `UPDATE budgets SET ${fields.join(', ')} WHERE id = ?`,
+      args,
+    })
+    const clean = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    ) as Record<string, unknown>
+    return { ...existing, ...clean, updatedAt: now } as Budget
   }
-  sql += ' ORDER BY created_at DESC'
-  const result = await db.execute({ sql, args })
-  return result.rows.map(rowToExpense)
-}
 
-export async function deleteExpense(id: string): Promise<void> {
-  const db = getClient()
-  await db.execute({ sql: 'DELETE FROM expenses WHERE id = ?', args: [id] })
+  const budget: Budget = {
+    id: crypto.randomUUID(),
+    month,
+    fixedBudget: data.fixedBudget ?? 0,
+    variableBudget: data.variableBudget ?? 0,
+    fixedActual: data.fixedActual ?? null,
+    variableActual: data.variableActual ?? null,
+    notes: data.notes ?? '',
+    isCompleted: data.isCompleted ?? false,
+    savingsCompleted: data.savingsCompleted ?? false,
+    createdAt: now,
+    updatedAt: now,
+  }
+  await db.execute({
+    sql: `INSERT INTO budgets (id, month, fixed_budget, variable_budget, fixed_actual, variable_actual, notes, is_completed, savings_completed, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [budget.id, budget.month, budget.fixedBudget, budget.variableBudget, budget.fixedActual, budget.variableActual, budget.notes, budget.isCompleted ? 1 : 0, budget.savingsCompleted ? 1 : 0, budget.createdAt, budget.updatedAt],
+  })
+  return budget
 }
 
 function rowToHabit(row: Record<string, unknown>): Habit {
@@ -324,16 +365,6 @@ export async function searchNotes(query: string): Promise<Note[]> {
   return result.rows.map(rowToNote)
 }
 
-export async function searchExpenses(query: string): Promise<Expense[]> {
-  const term = `%${query}%`
-  const db = getClient()
-  const result = await db.execute({
-    sql: `SELECT * FROM expenses WHERE description LIKE ? OR category LIKE ? ORDER BY created_at DESC`,
-    args: [term, term],
-  })
-  return result.rows.map(rowToExpense)
-}
-
 export async function searchHabits(query: string): Promise<Habit[]> {
   const term = `%${query}%`
   const db = getClient()
@@ -403,9 +434,9 @@ export async function getNotesCount(): Promise<{ note: number; task: number; eve
   return counts
 }
 
-export async function getExpensesCount(): Promise<number> {
+export async function getBudgetsCount(): Promise<number> {
   const db = getClient()
-  const result = await db.execute('SELECT COUNT(*) as count FROM expenses')
+  const result = await db.execute('SELECT COUNT(*) as count FROM budgets')
   return result.rows[0]?.count as number || 0
 }
 
@@ -417,7 +448,7 @@ export async function getHabitsCount(): Promise<number> {
 
 export async function clearTable(table: string): Promise<void> {
   const db = getClient()
-  const allowed = ['notes', 'expenses', 'habits', 'habit_completions', 'chat_messages']
+  const allowed = ['notes', 'budgets', 'habits', 'habit_completions', 'chat_messages']
   if (!allowed.includes(table)) throw new Error(`Table '${table}' not allowed for clearing`)
   await db.execute(`DELETE FROM ${table}`)
 }
