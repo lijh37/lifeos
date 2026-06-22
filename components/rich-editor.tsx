@@ -131,7 +131,7 @@ export function RichEditor({ content, onSave, placeholder = '开始写笔记...'
           </Button>
         </div>
       </div>
-      <EditorContent editor={editor} className="min-h-[200px]" />
+      <EditorContent editor={editor} />
     </div>
   )
 }

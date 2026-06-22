@@ -139,20 +139,16 @@ export function PwaHandler() {
         </div>
       )}
 
-      <button
-        onClick={() => setShowDebug(!showDebug)}
-        className="fixed right-4 top-4 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary shadow-sm hover:bg-primary/20 active:scale-95 transition-transform"
-        title="PWA 诊断"
-      >
-        <Bug className="h-5 w-5" />
-      </button>
-
       {showDebug && (
         <div className="fixed right-4 top-16 z-50 w-72 rounded-lg border bg-card p-3 text-xs shadow-lg">
           <div className="mb-1.5 flex items-center justify-between">
-            <p className="font-medium">PWA 诊断</p>
-            <button onClick={() => setShowDebug(false)} className="text-muted-foreground hover:text-foreground">
-              ✕
+            <p className="font-medium">PWA 诊断 <button onClick={() => setShowDebug(false)} className="ml-1 text-muted-foreground hover:text-foreground">✕</button></p>
+            <button
+              onClick={() => setShowDebug(false)}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20"
+              title="关闭诊断"
+            >
+              <Bug className="h-3.5 w-3.5" />
             </button>
           </div>
           {debugInfo.map((line, i) => (

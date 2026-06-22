@@ -255,7 +255,7 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
             </SheetTitle>
           </SheetHeader>
           {editingNote && (
-            <div className="flex-1 overflow-auto px-1">
+            <div className="flex-1 overflow-y-auto px-1">
               <RichEditor
                 key={editingNote.id}
                 content={editingNote.content}

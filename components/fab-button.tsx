@@ -54,9 +54,12 @@ export function FabButton() {
     const dx = e.clientX - dragStart.current.sx
     const dy = e.clientY - dragStart.current.sy
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragging.current = true
+    const isMobile = window.innerWidth < 768
+    const minY = isMobile ? 76 : 12
+    const maxY = window.innerHeight - 64
     const next: Pos = {
       x: Math.max(0, dragStart.current.ox - dx),
-      y: Math.max(0, dragStart.current.oy - dy),
+      y: Math.min(Math.max(minY, dragStart.current.oy - dy), maxY),
     }
     curPos.current = next
     setPos(next)
