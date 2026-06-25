@@ -21,10 +21,17 @@ export function RichEditor({ content, onSave, placeholder = '开始写笔记...'
   const savedContent = useRef(content)
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
+  const doSave = (html: string) => {
+    savedContent.current = html
+    try { Promise.resolve(onSave(html)).catch(() => {}) } catch {}
+  }
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
         heading: { levels: [2, 3] },
+        link: false,
+        underline: false,
       }),
       Underline,
       LinkExtension.configure({ openOnClick: false }),
@@ -43,8 +50,7 @@ export function RichEditor({ content, onSave, placeholder = '开始写笔记...'
       saveTimer.current = setTimeout(() => {
         if (!editor) return
         const html = editor.getHTML()
-        savedContent.current = html
-        onSave(html)
+        doSave(html)
       }, 500)
     },
   })
@@ -57,8 +63,7 @@ export function RichEditor({ content, onSave, placeholder = '开始写笔记...'
       if (!editor) return
       const html = editor.getHTML()
       if (html !== savedContent.current) {
-        savedContent.current = html
-        onSave(html)
+        doSave(html)
       }
     }
     el.addEventListener('blur', onBlur)
