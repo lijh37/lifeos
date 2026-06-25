@@ -82,7 +82,7 @@ export default function CalendarPage() {
         </Button>
       </div>
 
-      <div className="px-4 pb-2">
+      <div className="px-4 max-sm:px-2 pb-2">
         <div className="grid grid-cols-7 text-center text-xs text-muted-foreground">
           {WEEKDAYS.map(d => (
             <div key={d} className="py-2">{d}</div>
@@ -102,7 +102,7 @@ export default function CalendarPage() {
                 onClick={() => setSelectedDate(isSelected ? null : dateStr)}
                 className="relative flex flex-col items-center py-1"
               >
-                <span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm
+                <span className={`flex h-8 w-8 max-sm:h-7 max-sm:w-7 items-center justify-center rounded-full text-sm max-sm:text-xs
                   ${isTodayDay ? 'bg-primary text-primary-foreground font-bold' : ''}
                   ${isSelected && !isTodayDay ? 'ring-2 ring-primary' : ''}
                   ${!inMonth ? 'text-muted-foreground/30' : ''}
@@ -113,7 +113,7 @@ export default function CalendarPage() {
                 {dayNotes.length > 0 && (
                   <div className="mt-0.5 flex gap-0.5">
                     {dayNotes.slice(0, 3).map(n => (
-                      <span key={n.id} className={`h-1.5 w-1.5 rounded-full ${typeDotColors[n.type] || 'bg-gray-400'}`} />
+                      <span key={n.id} className={`h-1.5 w-1.5 max-sm:h-1 max-sm:w-1 rounded-full ${typeDotColors[n.type] || 'bg-gray-400'}`} />
                     ))}
                     {dayNotes.length > 3 && (
                       <span className="text-[10px] text-muted-foreground">+{dayNotes.length - 3}</span>

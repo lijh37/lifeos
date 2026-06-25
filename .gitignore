@@ -39,6 +39,9 @@ yarn-error.log*
 # auto-generated scripts
 /port-forward.ps1
 
+# auto-generated dev certs
+/public/ca.pem
+
 # turso cli artifacts
 /auth
 /auth-wal

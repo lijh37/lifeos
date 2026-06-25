@@ -14,4 +14,5 @@ export const typeDotColors: Record<string, string> = {
   note: 'bg-blue-500',
   task: 'bg-orange-500',
   event: 'bg-purple-500',
+  habit: 'bg-cyan-500',
 }

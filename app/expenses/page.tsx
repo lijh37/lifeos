@@ -121,8 +121,8 @@ export default function BudgetPage() {
       <div className="space-y-1">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">{label}</span>
-          <span className={over ? 'text-red-500 font-medium' : 'text-green-500 font-medium'}>
-            ¥{actual.toFixed(0)} / ¥{b.toFixed(0)}
+                  <span className={over ? 'text-red-500 font-medium whitespace-nowrap' : 'text-green-500 font-medium whitespace-nowrap'}>
+                    ¥{actual.toFixed(0)} / ¥{b.toFixed(0)}
             {over ? ` (+¥${diff.toFixed(0)})` : ` (-¥${Math.abs(diff).toFixed(0)})`}
           </span>
         </div>
@@ -213,7 +213,7 @@ export default function BudgetPage() {
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">¥</span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <span className="rounded-lg bg-muted px-3 py-1.5 text-sm">
                       总预算：<span className="font-bold">
                         ¥{((fixedBudgetInput ? parseFloat(fixedBudgetInput) : 0) + (variableBudgetInput ? parseFloat(variableBudgetInput) : 0)).toFixed(0)}
@@ -372,7 +372,7 @@ export default function BudgetPage() {
                       return (
                         <div
                           key={b.id}
-                          className={`flex items-center justify-between rounded-lg border p-3 text-sm transition-colors ${
+                          className={`flex items-center justify-between max-sm:flex-col max-sm:items-start max-sm:gap-1 rounded-lg border p-3 text-sm transition-colors ${
                             b.month === currentMonth ? 'border-primary/50 bg-primary/5' : ''
                           }`}
                         >

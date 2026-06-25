@@ -53,3 +53,5 @@ CREATE INDEX IF NOT EXISTS idx_notes_created ON notes(created_at);
 CREATE INDEX IF NOT EXISTS idx_notes_due_date ON notes(due_date);
 CREATE INDEX IF NOT EXISTS idx_habit_completions_habit ON habit_completions(habit_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_habit_completions_unique ON habit_completions(habit_id, date);
+
+CREATE INDEX IF NOT EXISTS idx_notes_search ON notes(content, title);

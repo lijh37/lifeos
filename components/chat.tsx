@@ -2,7 +2,7 @@
 
 import { useChat } from '@ai-sdk/react'
 import { useState, useEffect, useRef } from 'react'
-import { DefaultChatTransport } from 'ai'
+import { DefaultChatTransport, type UIMessage } from 'ai'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Send, Bot, User, Loader2, Copy, RefreshCw, Clock } from 'lucide-react'
 import { typeLabels, typeColors } from '@/lib/constants'
-import type { AIResponse, Note } from '@/lib/types'
+import type { AIResponse, Note, ChatMessage } from '@/lib/types'
 
 function genId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -33,9 +33,16 @@ export default function Chat({ onNoteCreated }: ChatProps) {
   const [timedOut, setTimedOut] = useState(false)
   const sentAtRef = useRef(0)
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const [initialMessages, setInitialMessages] = useState<UIMessage[]>([])
+  const [chatInitialized, setChatInitialized] = useState(false)
+  const savedCountRef = useRef(0)
 
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({ api: '/api/chat' }),
+    // Use controlled `messages` (not `initialMessages`) because history loads async
+    // After load, `messages` is set via state; useChat syncs via its internal effect.
+    // Once seeded, the stable reference prevents the sync effect from re-firing.
+    messages: initialMessages.length > 0 ? initialMessages : undefined,
     onFinish: async (event) => {
       const { message, messages: allMessages, isAbort, isError } = event
       setTimedOut(false)
@@ -101,6 +108,34 @@ export default function Chat({ onNoteCreated }: ChatProps) {
             }
           }
         }
+
+        // Save chat messages to history
+        const unsaved = allMessages.slice(savedCountRef.current)
+        if (unsaved.length > 0) {
+          const now = new Date().toISOString()
+          for (const m of unsaved) {
+            const text = m.parts
+              .filter((p: any) => p.type === 'text')
+              .map((p: any) => p.text)
+              .join('')
+            try {
+              await fetch('/api/chat/history', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  id: m.id || genId(),
+                  role: m.role,
+                  content: text,
+                  relatedNoteId: null,
+                  createdAt: now,
+                }),
+              })
+            } catch (e) {
+              console.error('Failed to save chat message:', e)
+            }
+          }
+          savedCountRef.current = allMessages.length
+        }
       } catch (e) {
         console.error('Failed to parse AI response:', e)
       }
@@ -129,6 +164,30 @@ export default function Chat({ onNoteCreated }: ChatProps) {
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
     }
   }, [status])
+
+  useEffect(() => {
+    loadChatHistory()
+  }, [])
+
+  async function loadChatHistory() {
+    try {
+      const res = await fetch('/api/chat/history')
+      if (res.ok) {
+        const data = await res.json()
+        setInitialMessages(data.messages.map((m: ChatMessage) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          parts: [{ type: 'text' as const, text: m.content }],
+        })))
+        savedCountRef.current = data.messages.length
+      }
+    } catch (e) {
+      console.error('Failed to load chat history:', e)
+    } finally {
+      setChatInitialized(true)
+    }
+  }
 
   async function handleCopy(text: string) {
     try {
@@ -204,6 +263,14 @@ export default function Chat({ onNoteCreated }: ChatProps) {
   }
 
   const isLoading = status === 'streaming' || status === 'submitted'
+
+  if (!chatInitialized) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-full flex-col">

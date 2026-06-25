@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Notebook, CheckSquare, Trophy, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
 
 const STORAGE_KEY = 'fab-position'
 

@@ -1,6 +1,6 @@
 import { createClient } from '@libsql/client'
 import type { InValue } from '@libsql/client'
-import type { Note, NoteType, Budget, Habit } from './types'
+import type { Note, NoteType, Budget, Habit, ChatMessage } from './types'
 
 let client: ReturnType<typeof createClient> | null = null
 
@@ -86,6 +86,9 @@ export async function initDB() {
   `)
   await db.execute(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_habit_completions_unique ON habit_completions(habit_id, date)
+  `)
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_notes_search ON notes(content, title)
   `)
 }
 
@@ -359,7 +362,7 @@ export async function searchNotes(query: string): Promise<Note[]> {
   const term = `%${query}%`
   const db = getClient()
   const result = await db.execute({
-    sql: `SELECT * FROM notes WHERE content LIKE ? OR title LIKE ? ORDER BY created_at DESC`,
+    sql: `SELECT * FROM notes WHERE content LIKE ? OR title LIKE ? ORDER BY created_at DESC LIMIT 50`,
     args: [term, term],
   })
   return result.rows.map(rowToNote)
@@ -369,7 +372,7 @@ export async function searchHabits(query: string): Promise<Habit[]> {
   const term = `%${query}%`
   const db = getClient()
   const result = await db.execute({
-    sql: `SELECT * FROM habits WHERE name LIKE ? OR description LIKE ? ORDER BY created_at DESC`,
+    sql: `SELECT * FROM habits WHERE name LIKE ? OR description LIKE ? ORDER BY created_at DESC LIMIT 50`,
     args: [term, term],
   })
   return result.rows.map(rowToHabit)
@@ -444,6 +447,34 @@ export async function getHabitsCount(): Promise<number> {
   const db = getClient()
   const result = await db.execute('SELECT COUNT(*) as count FROM habits')
   return result.rows[0]?.count as number || 0
+}
+
+export async function saveChatMessage(msg: ChatMessage): Promise<void> {
+  const db = getClient()
+  await db.execute({
+    sql: 'INSERT OR REPLACE INTO chat_messages (id, role, content, related_note_id, created_at) VALUES (?, ?, ?, ?, ?)',
+    args: [msg.id, msg.role, msg.content, msg.relatedNoteId, msg.createdAt],
+  })
+}
+
+export async function getRecentChatMessages(limit = 50): Promise<ChatMessage[]> {
+  const db = getClient()
+  const result = await db.execute({
+    sql: 'SELECT * FROM chat_messages ORDER BY created_at ASC LIMIT ?',
+    args: [limit],
+  })
+  return result.rows.map(row => ({
+    id: row.id as string,
+    role: row.role as 'user' | 'assistant',
+    content: row.content as string,
+    relatedNoteId: row.related_note_id as string | null,
+    createdAt: row.created_at as string,
+  }))
+}
+
+export async function clearChatMessages(): Promise<void> {
+  const db = getClient()
+  await db.execute('DELETE FROM chat_messages')
 }
 
 export async function clearTable(table: string): Promise<void> {

@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { Bell, BellOff, X, Clock } from 'lucide-react'
-import { format, isToday, isPast, parseISO } from 'date-fns'
+import { Bell, X, Clock } from 'lucide-react'
+import { format, isPast, parseISO } from 'date-fns'
 import type { Note } from '@/lib/types'
 
 interface DueItem {
