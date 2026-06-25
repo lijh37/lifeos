@@ -36,6 +36,10 @@ export function FabButton() {
     if (!saved) {
       saved = window.innerWidth < 768 ? DEFAULT_MOBILE : DEFAULT_DESKTOP
     }
+    const isMobile = window.innerWidth < 768
+    const minY = isMobile ? 76 : 12
+    const maxY = window.innerHeight - 64
+    saved.y = Math.min(Math.max(minY, saved.y), maxY)
     setPos(saved)
     curPos.current = saved
   }, [])
