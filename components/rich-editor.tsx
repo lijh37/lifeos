@@ -82,8 +82,8 @@ export function RichEditor({ content, onSave, placeholder = '开始写笔记...'
   )
 
   return (
-    <div className="flex flex-col rounded-lg border">
-      <div className="flex flex-wrap items-center gap-0.5 border-b bg-muted/30 px-2 py-1.5">
+    <div className="flex h-full flex-col rounded-lg border">
+      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b bg-muted/30 px-2 py-1.5">
         <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="粗体">
           <Bold className="h-4 w-4" />
         </ToolBtn>
@@ -131,7 +131,7 @@ export function RichEditor({ content, onSave, placeholder = '开始写笔记...'
           </Button>
         </div>
       </div>
-      <EditorContent editor={editor} />
+      <EditorContent editor={editor} className="flex-1 overflow-y-auto" />
     </div>
   )
 }

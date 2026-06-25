@@ -248,14 +248,14 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
       </ScrollArea>
 
       <Sheet open={!!editingNote} onOpenChange={(open) => { if (!open) setEditingNote(null) }}>
-        <SheetContent side="bottom" className="h-[80vh] sm:max-w-lg sm:mx-auto sm:rounded-t-xl">
+        <SheetContent side="bottom" className="max-h-[85vh] sm:max-w-lg sm:mx-auto sm:rounded-t-xl">
           <SheetHeader>
             <SheetTitle>
               {editingNote?.title || (editingNote ? stripHtml(editingNote.content).slice(0, 40) : '编辑')}
             </SheetTitle>
           </SheetHeader>
           {editingNote && (
-            <div className="flex-1 overflow-y-auto px-1">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-1">
               <RichEditor
                 key={editingNote.id}
                 content={editingNote.content}
