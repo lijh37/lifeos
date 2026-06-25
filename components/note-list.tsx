@@ -212,7 +212,7 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
                   <CardContent className="p-3 pt-2">
                     {isHtml ? (
                       <div
-                        className="line-clamp-3 text-sm text-muted-foreground [&_p]:inline [&_p]:mr-1 [&_h2]:inline [&_h3]:inline [&_li]:inline [&_li]:mr-1"
+                        className="line-clamp-3 text-sm text-muted-foreground [&_h2]:text-base [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:mb-0.5"
                         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(note.content) }}
                       />
                     ) : (

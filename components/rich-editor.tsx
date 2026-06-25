@@ -7,13 +7,8 @@ import LinkExtension from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
-import { useState, useCallback } from 'react'
-import {
-  Bold, Italic, Underline as UnderlineIcon, Strikethrough,
-  Heading2, Heading3, List, ListOrdered, ListTodo,
-  Link as LinkIcon, Undo2, Redo2, Save,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { useEffect, useRef } from 'react'
+import { Bold, Italic, Heading2, List } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface RichEditorProps {
@@ -23,7 +18,8 @@ interface RichEditorProps {
 }
 
 export function RichEditor({ content, onSave, placeholder = '开始写笔记...' }: RichEditorProps) {
-  const [saving, setSaving] = useState(false)
+  const savedContent = useRef(content)
+  const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const editor = useEditor({
     extensions: [
@@ -39,31 +35,37 @@ export function RichEditor({ content, onSave, placeholder = '开始写笔记...'
     content,
     editorProps: {
       attributes: {
-        class: 'prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[200px] px-4 py-3',
+        class: 'focus:outline-none min-h-[200px] px-4 py-3 text-sm leading-relaxed',
       },
+    },
+    onUpdate: () => {
+      clearTimeout(saveTimer.current)
+      saveTimer.current = setTimeout(() => {
+        if (!editor) return
+        const html = editor.getHTML()
+        savedContent.current = html
+        onSave(html)
+      }, 500)
     },
   })
 
-  const handleSave = useCallback(async () => {
-    if (!editor) return
-    setSaving(true)
-    const html = editor.getHTML()
-    await onSave(html)
-    setSaving(false)
+  useEffect(() => {
+    const el = editor?.view?.dom
+    if (!el) return
+    const onBlur = () => {
+      clearTimeout(saveTimer.current)
+      if (!editor) return
+      const html = editor.getHTML()
+      if (html !== savedContent.current) {
+        savedContent.current = html
+        onSave(html)
+      }
+    }
+    el.addEventListener('blur', onBlur)
+    return () => el.removeEventListener('blur', onBlur)
   }, [editor, onSave])
 
   if (!editor) return null
-
-  const toggleLink = () => {
-    const previousUrl = editor.getAttributes('link').href
-    const url = window.prompt('输入链接地址', previousUrl || 'https://')
-    if (url === null) return
-    if (url === '') {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run()
-      return
-    }
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
-  }
 
   const ToolBtn = ({ onClick, active, children, title }: {
     onClick: () => void; active?: boolean; children: React.ReactNode; title?: string
@@ -73,7 +75,7 @@ export function RichEditor({ content, onSave, placeholder = '开始写笔记...'
       onClick={onClick}
       title={title}
       className={cn(
-        'rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors',
+        'flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors',
         active && 'bg-accent text-accent-foreground'
       )}
     >
@@ -81,55 +83,32 @@ export function RichEditor({ content, onSave, placeholder = '开始写笔记...'
     </button>
   )
 
+  const toggleHeading = () => {
+    if (editor.isActive('heading', { level: 2 })) {
+      editor.chain().focus().toggleHeading({ level: 3 }).run()
+    } else if (editor.isActive('heading', { level: 3 })) {
+      editor.chain().focus().setParagraph().run()
+    } else {
+      editor.chain().focus().toggleHeading({ level: 2 }).run()
+    }
+  }
+
   return (
     <div className="flex h-full flex-col rounded-lg border">
-      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b bg-muted/30 px-2 py-1.5">
+      <div className="sticky top-0 z-10 flex items-center gap-1 border-b bg-muted/30 px-2 py-1.5">
         <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="粗体">
           <Bold className="h-4 w-4" />
         </ToolBtn>
         <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="斜体">
           <Italic className="h-4 w-4" />
         </ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} title="下划线">
-          <UnderlineIcon className="h-4 w-4" />
-        </ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="删除线">
-          <Strikethrough className="h-4 w-4" />
-        </ToolBtn>
-        <span className="mx-0.5 h-5 w-px bg-border" />
-        <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="二级标题">
+        <ToolBtn onClick={toggleHeading} active={editor.isActive('heading')} title="标题">
           <Heading2 className="h-4 w-4" />
         </ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} title="三级标题">
-          <Heading3 className="h-4 w-4" />
-        </ToolBtn>
-        <span className="mx-0.5 h-5 w-px bg-border" />
         <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="无序列表">
           <List className="h-4 w-4" />
         </ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="有序列表">
-          <ListOrdered className="h-4 w-4" />
-        </ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')} title="任务列表">
-          <ListTodo className="h-4 w-4" />
-        </ToolBtn>
-        <span className="mx-0.5 h-5 w-px bg-border" />
-        <ToolBtn onClick={toggleLink} active={editor.isActive('link')} title="链接">
-          <LinkIcon className="h-4 w-4" />
-        </ToolBtn>
-        <span className="mx-0.5 h-5 w-px bg-border" />
-        <ToolBtn onClick={() => editor.chain().focus().undo().run()} title="撤销">
-          <Undo2 className="h-4 w-4" />
-        </ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().redo().run()} title="重做">
-          <Redo2 className="h-4 w-4" />
-        </ToolBtn>
-        <div className="ml-auto">
-          <Button size="sm" onClick={handleSave} disabled={saving}>
-            <Save className="mr-1 h-4 w-4" />
-            {saving ? '保存中...' : '保存'}
-          </Button>
-        </div>
+        <span className="ml-auto text-[10px] text-muted-foreground">自动保存</span>
       </div>
       <EditorContent editor={editor} className="flex-1 overflow-y-auto" />
     </div>
