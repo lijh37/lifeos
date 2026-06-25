@@ -94,7 +94,7 @@ export function RichEditor({ content, onSave, placeholder = '开始写笔记...'
   }
 
   return (
-    <div className="flex h-full flex-col rounded-lg border">
+    <div className="flex min-h-0 flex-1 flex-col rounded-lg border">
       <div className="sticky top-0 z-10 flex items-center gap-1 border-b bg-muted/30 px-2 py-1.5">
         <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="粗体">
           <Bold className="h-4 w-4" />
