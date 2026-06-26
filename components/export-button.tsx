@@ -23,7 +23,9 @@ export function ExportButton({ type }: ExportButtonProps) {
   }, [])
 
   function download(format: 'md' | 'json' | 'csv') {
-    const params = new URLSearchParams({ type, format })
+    const params = new URLSearchParams()
+    if (type) params.set('type', type)
+    params.set('format', format)
     window.open(`/api/export?${params}`, '_blank')
     setOpen(false)
   }

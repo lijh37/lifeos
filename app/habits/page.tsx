@@ -4,14 +4,25 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { CheckCircle, Circle, Plus, Trash2, Trophy } from 'lucide-react'
-import { SkeletonCard } from '@/components/skeleton-card'
+import { ErrorBoundary } from '@/components/error-boundary'
+import { CheckCircle, Circle, Plus, Trash2, Trophy, Flame, CalendarCheck, Target, TrendingUp } from 'lucide-react'
+import { SkeletonHabits } from '@/components/skeleton-card'
+import { format } from 'date-fns'
+import { zhCN } from 'date-fns/locale'
 import type { Habit } from '@/lib/types'
 
-export default function HabitsPage() {
+interface HabitStats {
+  monthlyRate: number
+  monthCompletions: number
+  totalCompletions: number
+  trend7d: { date: string; count: number }[]
+}
+
+function HabitsPageInner() {
   const [habits, setHabits] = useState<Habit[]>([])
   const [todayMap, setTodayMap] = useState<Record<string, boolean>>({})
   const [streaks, setStreaks] = useState<Record<string, number>>({})
+  const [stats, setStats] = useState<HabitStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [newName, setNewName] = useState('')
   const [showInput, setShowInput] = useState(false)
@@ -23,6 +34,7 @@ export default function HabitsPage() {
         setHabits(data.habits)
         setTodayMap(data.todayCompletions)
         setStreaks(data.streaks || {})
+        setStats(data.stats || null)
       })
       .catch((e) => console.error('Failed to fetch habits:', e))
       .finally(() => setLoading(false))
@@ -36,12 +48,20 @@ export default function HabitsPage() {
     })
     const data = await res.json()
     setTodayMap((prev) => ({ ...prev, [habitId]: data.completed }))
+    fetch('/api/habits')
+      .then(r => r.json())
+      .then(d => setStats(d.stats || null))
+      .catch(() => {})
   }
 
   async function handleDelete(id: string) {
     try {
       await fetch(`/api/habits?id=${id}`, { method: 'DELETE' })
       setHabits((prev) => prev.filter((h) => h.id !== id))
+      fetch('/api/habits')
+        .then(r => r.json())
+        .then(d => setStats(d.stats || null))
+        .catch(() => {})
     } catch (e) {
       console.error('Failed to delete habit:', e)
     }
@@ -58,6 +78,10 @@ export default function HabitsPage() {
     setHabits((prev) => [data.habit, ...prev])
     setNewName('')
     setShowInput(false)
+    fetch('/api/habits')
+      .then(r => r.json())
+      .then(d => setStats(d.stats || null))
+      .catch(() => {})
   }
 
   const today = new Date().toISOString().slice(0, 10)
@@ -91,72 +115,122 @@ export default function HabitsPage() {
             <Button size="sm" onClick={handleCreate} disabled={!newName.trim()}>添加</Button>
           </div>
         )}
-
-        {habits.length > 0 && (
-          <div className="mt-3 flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">今日打卡</span>
-            <span className={allDone ? 'font-semibold text-green-500' : 'font-semibold'}>
-              {completedCount}/{habits.length}
-            </span>
-            {allDone && <span className="text-green-500">🎉</span>}
-          </div>
-        )}
       </div>
 
       <ScrollArea className="flex-1">
         {loading ? (
-          <div className="p-4">
-            <SkeletonCard count={4} />
-          </div>
+          <SkeletonHabits count={4} />
         ) : habits.length === 0 ? (
           <div className="flex h-32 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
             <Trophy className="h-8 w-8" />
             <p>还没有习惯，去 AI 对话或点新建添加</p>
           </div>
         ) : (
-          <div className="space-y-1 p-4 animate-stagger">
-            {habits.map((habit) => {
-              const done = todayMap[habit.id] ?? false
-              return (
-                <Card key={habit.id} className="card-hover">
-                  <CardContent className="flex items-center gap-3 p-3">
-                    <button onClick={() => handleToggle(habit.id, today)} className="shrink-0">
-                      {done ? (
-                        <CheckCircle className="h-6 w-6 text-green-500" />
-                      ) : (
-                        <Circle className="h-6 w-6 text-muted-foreground" />
-                      )}
-                    </button>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className={`text-sm font-medium ${done ? 'line-through text-muted-foreground' : ''}`}>
-                          {habit.name}
-                        </p>
-                        {streaks[habit.id] > 0 && (
-                          <span className="text-xs text-orange-500">
-                            🔥 {streaks[habit.id]}天
-                          </span>
+          <div className="space-y-4 p-4">
+            {stats && (
+              <div className="grid grid-cols-4 gap-2">
+                <div className="rounded-lg bg-card p-3 text-center">
+                  <Flame className="mx-auto mb-1 h-4 w-4 text-orange-500" />
+                  <p className="text-lg font-bold">{completedCount}/{habits.length}</p>
+                  <p className="text-[10px] text-muted-foreground">今日</p>
+                </div>
+                <div className="rounded-lg bg-card p-3 text-center">
+                  <CalendarCheck className="mx-auto mb-1 h-4 w-4 text-green-500" />
+                  <p className="text-lg font-bold">{stats.monthlyRate}%</p>
+                  <p className="text-[10px] text-muted-foreground">月完成率</p>
+                </div>
+                <div className="rounded-lg bg-card p-3 text-center">
+                  <Target className="mx-auto mb-1 h-4 w-4 text-blue-500" />
+                  <p className="text-lg font-bold">{stats.monthCompletions}</p>
+                  <p className="text-[10px] text-muted-foreground">本月打卡</p>
+                </div>
+                <div className="rounded-lg bg-card p-3 text-center">
+                  <Trophy className="mx-auto mb-1 h-4 w-4 text-purple-500" />
+                  <p className="text-lg font-bold">{stats.totalCompletions}</p>
+                  <p className="text-[10px] text-muted-foreground">累计</p>
+                </div>
+              </div>
+            )}
+
+            {stats && stats.trend7d.length > 1 && (
+              <div className="rounded-lg bg-card p-3">
+                <div className="mb-2 flex items-center gap-1.5">
+                  <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">近7天趋势</span>
+                </div>
+                <div className="flex items-end gap-1.5" style={{ height: 48 }}>
+                  {stats.trend7d.map((d) => {
+                    const maxCount = Math.max(...stats.trend7d.map(x => x.count), 1)
+                    const height = (d.count / maxCount) * 100
+                    return (
+                      <div key={d.date} className="flex flex-1 flex-col items-center gap-0.5">
+                        <div
+                          className="w-full rounded-t bg-orange-400"
+                          style={{ height: `${Math.max(height, 8)}%` }}
+                        />
+                        <span className="text-[9px] text-muted-foreground">
+                          {format(new Date(d.date), 'E', { locale: zhCN }).charAt(0)}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="animate-stagger space-y-1">
+              {habits.map((habit) => {
+                const done = todayMap[habit.id] ?? false
+                return (
+                  <Card key={habit.id} className="card-hover">
+                    <CardContent className="flex items-center gap-3 p-3">
+                      <button onClick={() => handleToggle(habit.id, today)} className="shrink-0">
+                        {done ? (
+                          <CheckCircle className="h-6 w-6 text-green-500" />
+                        ) : (
+                          <Circle className="h-6 w-6 text-muted-foreground" />
+                        )}
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className={`text-sm font-medium ${done ? 'line-through text-muted-foreground' : ''}`}>
+                            {habit.name}
+                          </p>
+                          {streaks[habit.id] > 0 && (
+                            <span className="flex items-center gap-0.5 text-xs text-orange-500">
+                              <Flame className="h-3 w-3" />
+                              {streaks[habit.id]}天
+                            </span>
+                          )}
+                        </div>
+                        {habit.description && (
+                          <p className="text-xs text-muted-foreground">{habit.description}</p>
                         )}
                       </div>
-                      {habit.description && (
-                        <p className="text-xs text-muted-foreground">{habit.description}</p>
-                      )}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive"
-                      onClick={() => handleDelete(habit.id)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </CardContent>
-                </Card>
-              )
-            })}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive"
+                        onClick={() => handleDelete(habit.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
           </div>
         )}
       </ScrollArea>
     </div>
+  )
+}
+
+export default function HabitsPage() {
+  return (
+    <ErrorBoundary>
+      <HabitsPageInner />
+    </ErrorBoundary>
   )
 }

@@ -11,6 +11,7 @@ const navItems = [
   { href: '/', label: 'AI 对话', icon: Bot },
   { href: '/notes', label: '笔记', icon: Notebook },
   { href: '/tasks', label: '任务', icon: CheckSquare },
+
   { href: '/expenses', label: '预算', icon: PiggyBank },
   { href: '/habits', label: '习惯', icon: Trophy },
   { href: '/search', label: '搜索', icon: Search },
@@ -34,7 +35,7 @@ export function Sidebar() {
         {navItems.map((item) => {
           const isActive = pathname === item.href
           return (
-            <Link key={item.href} href={item.href}>
+            <Link key={item.href} href={item.href} prefetch={['/', '/notes', '/tasks', '/habits'].includes(item.href)}>
               <Button
                 variant={isActive ? 'secondary' : 'ghost'}
                 className={cn('w-full justify-start gap-3', isActive && 'font-medium')}

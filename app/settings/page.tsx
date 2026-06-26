@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { Settings, Download, Upload, Trash2, AlertTriangle, Loader2 } from 'lucide-react'
+import { Settings, Download, Upload, Trash2, AlertTriangle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { BackupManager } from '@/components/auto-backup'
 
 export default function SettingsPage() {
   const [stats, setStats] = useState<{
@@ -106,7 +107,7 @@ export default function SettingsPage() {
               <h2 className="mb-3 text-sm font-medium text-muted-foreground">数据概览</h2>
               {loading ? (
                 <div className="flex justify-center py-4">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -144,16 +145,18 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
+          <BackupManager />
+
           <Card>
             <CardContent className="p-4">
-              <h2 className="mb-3 text-sm font-medium text-muted-foreground">备份与恢复</h2>
+              <h2 className="mb-3 text-sm font-medium text-muted-foreground">手动导出/导入</h2>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" className="flex-1" onClick={handleExport}>
                   <Download className="mr-1 h-4 w-4" />
                   导出备份
                 </Button>
                 <Button variant="outline" size="sm" className="flex-1" onClick={() => fileRef.current?.click()} disabled={importing}>
-                  {importing ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Upload className="mr-1 h-4 w-4" />}
+                  {importing ? <div className="mr-1 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Upload className="mr-1 h-4 w-4" />}
                   导入恢复
                 </Button>
                 <input ref={fileRef} type="file" accept=".json" onChange={handleImport} className="hidden" />

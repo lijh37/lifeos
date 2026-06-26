@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { BarChart3, Notebook, PiggyBank, Trophy, Hash, Loader2 } from 'lucide-react'
+import { BarChart3, Notebook, PiggyBank, Trophy, Hash, TrendingUp } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { format } from 'date-fns'
@@ -21,6 +21,8 @@ interface StatsData {
   counts: { note: number; task: number; event: number }
   currentBudget: BudgetInfo | null
   habitCompletion7d: number
+  habitTrend: { date: string; count: number }[]
+  habitTotalCompletions: number
   topTags: { name: string; count: number }[]
   recentItems: { id: string; source: string; type: string; title: string; createdAt: string }[]
 }
@@ -39,20 +41,21 @@ export default function StatsPage() {
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
       </div>
     )
   }
 
   if (!data) return null
 
+  const totalNotes = data.counts.note + data.counts.task + data.counts.event
   const budgetInfo = data.currentBudget
   const budgetText = budgetInfo
     ? `¥${(budgetInfo.fixedBudget + budgetInfo.variableBudget).toFixed(0)}`
     : '未设置'
 
   const summaryCards = [
-    { label: '笔记总数', value: data.counts.note + data.counts.task + data.counts.event, icon: Notebook, color: 'text-blue-500' },
+    { label: '笔记总数', value: totalNotes, icon: Notebook, color: 'text-blue-500' },
     { label: '本月预算', value: budgetText, icon: PiggyBank, color: 'text-emerald-500' },
     { label: '7天打卡', value: `${data.habitCompletion7d} 次`, icon: Trophy, color: 'text-orange-500' },
     { label: '常用标签', value: data.topTags[0]?.name || '无', icon: Hash, color: 'text-purple-500' },
@@ -104,12 +107,46 @@ export default function StatsPage() {
             </Card>
           )}
 
+          {data.habitTrend.length > 0 && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-orange-500" />
+                  <h2 className="text-sm font-medium text-muted-foreground">习惯趋势（近30天）</h2>
+                </div>
+                <div className="flex items-end gap-1" style={{ height: 100 }}>
+                  {data.habitTrend.map((d, i) => {
+                    const maxCount = Math.max(...data.habitTrend.map(x => x.count), 1)
+                    const height = (d.count / maxCount) * 100
+                    return (
+                      <div
+                        key={d.date}
+                        className="flex flex-1 flex-col items-center gap-1"
+                        title={`${d.date}: ${d.count} 次`}
+                      >
+                        <div
+                          className="w-full rounded-t bg-orange-400 transition-all hover:bg-orange-500"
+                          style={{ height: `${Math.max(height, 2)}%` }}
+                        />
+                        {data.habitTrend.length <= 15 && (
+                          <span className="text-[8px] text-muted-foreground">
+                            {format(new Date(d.date), 'MM/dd', { locale: zhCN })}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {data.topTags.length > 0 && (
             <Card>
               <CardContent className="p-4">
                 <h2 className="mb-3 text-sm font-medium text-muted-foreground">热门标签</h2>
                 <div className="flex flex-wrap gap-2">
-                  {data.topTags.map((t: any, i: number) => (
+                  {data.topTags.map((t) => (
                     <span key={t.name} className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
                       #{t.name}
                       <span className="text-muted-foreground">{t.count}</span>
@@ -124,7 +161,7 @@ export default function StatsPage() {
             <CardContent className="p-4">
               <h2 className="mb-3 text-sm font-medium text-muted-foreground">最近动态</h2>
               <div className="space-y-2">
-                {data.recentItems.map((item: any) => (
+                {data.recentItems.map((item) => (
                   <div key={item.id} className="flex items-center gap-3 text-sm">
                     <div className={`h-2 w-2 shrink-0 rounded-full ${
                       item.source === 'habit' ? 'bg-orange-500' : 'bg-blue-500'

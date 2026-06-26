@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createNote, getNotes, deleteNote, searchNotes, getNotesByDateRange, initDB } from '@/lib/db'
+import { createNote, getNotes, deleteNote, searchNotes, getNotesByDateRange, getNotesCountByType, initDB } from '@/lib/db'
 import type { Note } from '@/lib/types'
 
 export async function GET(req: NextRequest) {
@@ -9,21 +9,26 @@ export async function GET(req: NextRequest) {
   const q = searchParams.get('q')
   const startDate = searchParams.get('startDate')
   const endDate = searchParams.get('endDate')
+  const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '200'), 1), 500)
+  const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0)
 
   if (q) {
     const notes = await searchNotes(q)
     return NextResponse.json({ notes })
   }
 
+  const noteType = type && type !== 'all' ? type as Note['type'] : undefined
+
   if (startDate && endDate) {
-    const notes = await getNotesByDateRange(startDate, endDate, type as Note['type'] | undefined)
+    const notes = await getNotesByDateRange(startDate, endDate, noteType, limit, offset)
     return NextResponse.json({ notes })
   }
 
-  const notes = type && type !== 'all'
-    ? await getNotes(type as Note['type'])
-    : await getNotes()
-  return NextResponse.json({ notes })
+  const [notes, total] = await Promise.all([
+    getNotes(noteType, limit, offset),
+    getNotesCountByType(noteType),
+  ])
+  return NextResponse.json({ notes, total, limit, offset })
 }
 
 export async function POST(req: NextRequest) {

@@ -7,6 +7,7 @@ import { PwaHandler } from "@/components/pwa-handler"
 import { PageAnimation } from "@/components/page-animation"
 import { NotificationManager } from "@/components/notification-manager"
 import { FabButton } from "@/components/fab-button"
+import { AutoBackup } from "@/components/auto-backup"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

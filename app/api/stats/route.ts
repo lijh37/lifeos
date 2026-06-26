@@ -7,7 +7,7 @@ export async function GET() {
   await initDB()
   const c = db()
 
-  const [noteCounts, budgetData, habitRate, tagRows, recent] = await Promise.all([
+  const [noteCounts, budgetData, habitRate, tagRows, recent, habitTrend, habitTotal] = await Promise.all([
     c.execute(`SELECT type, COUNT(*) as count FROM notes GROUP BY type`),
     c.execute(`SELECT * FROM budgets ORDER BY month DESC LIMIT 1`),
     c.execute(`SELECT COUNT(*) as done FROM habit_completions WHERE completed=1 AND date >= date('now', '-7 days')`),
@@ -18,6 +18,8 @@ export async function GET() {
       SELECT id, 'habit' as source, 'habit' as type, name as title, created_at FROM habits
       ORDER BY created_at DESC LIMIT 15
     `),
+    c.execute(`SELECT date, COUNT(*) as count FROM habit_completions WHERE completed=1 AND date >= date('now', '-30 days') GROUP BY date ORDER BY date ASC`),
+    c.execute(`SELECT COUNT(*) as count FROM habit_completions WHERE completed=1`),
   ])
 
   let note = 0, task = 0, event = 0
@@ -54,6 +56,11 @@ export async function GET() {
     counts: { note, task, event },
     currentBudget,
     habitCompletion7d: (habitRate.rows[0]?.done as number) || 0,
+    habitTrend: habitTrend.rows.map(r => ({
+      date: r.date as string,
+      count: r.count as number,
+    })),
+    habitTotalCompletions: (habitTotal.rows[0]?.count as number) || 0,
     topTags: sortedTags,
     recentItems: recent.rows.map(r => ({
       id: r.id as string,

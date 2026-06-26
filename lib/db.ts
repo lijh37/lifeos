@@ -1,6 +1,14 @@
 import { createClient } from '@libsql/client'
 import type { InValue } from '@libsql/client'
-import type { Note, NoteType, Budget, Habit, ChatMessage } from './types'
+import type { Note, NoteType, Budget, Habit, ChatMessage, Conversation } from './types'
+
+function genId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
+  })
+}
 
 let client: ReturnType<typeof createClient> | null = null
 
@@ -36,7 +44,16 @@ export async function initDB() {
       role TEXT NOT NULL,
       content TEXT NOT NULL,
       related_note_id TEXT,
+      conversation_id TEXT,
       created_at TEXT NOT NULL
+    )
+  `)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS conversations (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL DEFAULT '新对话',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
     )
   `)
   await db.execute(`
@@ -90,6 +107,58 @@ export async function initDB() {
   await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_notes_search ON notes(content, title)
   `)
+  try {
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_notes_type_due ON notes(type, due_date)`)
+  } catch {}
+  try {
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_notes_done ON notes(type, done)`)
+  } catch {}
+  try {
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_chat_messages_conv ON chat_messages(conversation_id, created_at)`)
+  } catch {}
+
+  try {
+    await db.execute(`ALTER TABLE chat_messages ADD COLUMN conversation_id TEXT`)
+  } catch {}
+}
+
+export async function createConversation(id: string, title: string): Promise<void> {
+  const db = getClient()
+  const now = new Date().toISOString()
+  await db.execute({
+    sql: 'INSERT OR REPLACE INTO conversations (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
+    args: [id, title, now, now],
+  })
+}
+
+export async function getConversations(): Promise<{ id: string; title: string; createdAt: string; updatedAt: string; messageCount: number }[]> {
+  const db = getClient()
+  const result = await db.execute(`
+    SELECT c.id, c.title, c.created_at, c.updated_at,
+      (SELECT COUNT(*) FROM chat_messages WHERE conversation_id = c.id) as message_count
+    FROM conversations c ORDER BY c.updated_at DESC
+  `)
+  return result.rows.map(r => ({
+    id: r.id as string,
+    title: r.title as string,
+    createdAt: r.created_at as string,
+    updatedAt: r.updated_at as string,
+    messageCount: r.message_count as number,
+  }))
+}
+
+export async function deleteConversation(id: string): Promise<void> {
+  const db = getClient()
+  await db.execute({ sql: 'DELETE FROM conversations WHERE id = ?', args: [id] })
+  await db.execute({ sql: 'DELETE FROM chat_messages WHERE conversation_id = ?', args: [id] })
+}
+
+export async function updateConversationTitle(id: string, title: string): Promise<void> {
+  const db = getClient()
+  await db.execute({
+    sql: 'UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?',
+    args: [title, new Date().toISOString(), id],
+  })
 }
 
 function rowToNote(row: Record<string, unknown>): Note {
@@ -146,7 +215,7 @@ export async function deleteNote(id: string): Promise<void> {
   await db.execute({ sql: 'DELETE FROM notes WHERE id = ?', args: [id] })
 }
 
-export async function getNotes(type?: NoteType): Promise<Note[]> {
+export async function getNotes(type?: NoteType, limit = 200, offset = 0): Promise<Note[]> {
   const db = getClient()
   let sql = 'SELECT * FROM notes'
   const args: InValue[] = []
@@ -154,12 +223,13 @@ export async function getNotes(type?: NoteType): Promise<Note[]> {
     sql += ' WHERE type = ?'
     args.push(type)
   }
-  sql += ' ORDER BY created_at DESC'
+  sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
+  args.push(limit, offset)
   const result = await db.execute({ sql, args })
   return result.rows.map(rowToNote)
 }
 
-export async function getNotesByDateRange(startDate: string, endDate: string, type?: NoteType): Promise<Note[]> {
+export async function getNotesByDateRange(startDate: string, endDate: string, type?: NoteType, limit = 200, offset = 0): Promise<Note[]> {
   const db = getClient()
   let sql = 'SELECT * FROM notes WHERE due_date >= ? AND due_date <= ?'
   const args: InValue[] = [startDate, endDate]
@@ -167,9 +237,22 @@ export async function getNotesByDateRange(startDate: string, endDate: string, ty
     sql += ' AND type = ?'
     args.push(type)
   }
-  sql += ' ORDER BY due_date ASC, created_at DESC'
+  sql += ' ORDER BY due_date ASC, created_at DESC LIMIT ? OFFSET ?'
+  args.push(limit, offset)
   const result = await db.execute({ sql, args })
   return result.rows.map(rowToNote)
+}
+
+export async function getNotesCountByType(type?: NoteType): Promise<number> {
+  const db = getClient()
+  let sql = 'SELECT COUNT(*) as count FROM notes'
+  const args: InValue[] = []
+  if (type) {
+    sql += ' WHERE type = ?'
+    args.push(type)
+  }
+  const result = await db.execute({ sql, args })
+  return result.rows[0]?.count as number || 0
 }
 
 export async function getNote(id: string): Promise<Note | null> {
@@ -240,7 +323,7 @@ export async function upsertBudget(month: string, data: Partial<Budget>): Promis
   }
 
   const budget: Budget = {
-    id: crypto.randomUUID(),
+    id: genId(),
     month,
     fixedBudget: data.fixedBudget ?? 0,
     variableBudget: data.variableBudget ?? 0,
@@ -308,7 +391,7 @@ export async function toggleCompletion(habitId: string, date: string): Promise<b
   } else {
     await db.execute({
       sql: 'INSERT INTO habit_completions (id, habit_id, date, completed, created_at) VALUES (?, ?, ?, ?, ?)',
-      args: [crypto.randomUUID(), habitId, date, 1, new Date().toISOString()],
+      args: [genId(), habitId, date, 1, new Date().toISOString()],
     })
     return true
   }
@@ -452,8 +535,8 @@ export async function getHabitsCount(): Promise<number> {
 export async function saveChatMessage(msg: ChatMessage): Promise<void> {
   const db = getClient()
   await db.execute({
-    sql: 'INSERT OR REPLACE INTO chat_messages (id, role, content, related_note_id, created_at) VALUES (?, ?, ?, ?, ?)',
-    args: [msg.id, msg.role, msg.content, msg.relatedNoteId, msg.createdAt],
+    sql: 'INSERT OR REPLACE INTO chat_messages (id, role, content, related_note_id, conversation_id, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    args: [msg.id, msg.role, msg.content, msg.relatedNoteId, msg.conversationId, msg.createdAt],
   })
 }
 
@@ -468,6 +551,23 @@ export async function getRecentChatMessages(limit = 50): Promise<ChatMessage[]> 
     role: row.role as 'user' | 'assistant',
     content: row.content as string,
     relatedNoteId: row.related_note_id as string | null,
+    conversationId: row.conversation_id as string | null,
+    createdAt: row.created_at as string,
+  }))
+}
+
+export async function getChatMessagesByConversation(conversationId: string): Promise<ChatMessage[]> {
+  const db = getClient()
+  const result = await db.execute({
+    sql: 'SELECT * FROM chat_messages WHERE conversation_id = ? ORDER BY created_at ASC',
+    args: [conversationId],
+  })
+  return result.rows.map(row => ({
+    id: row.id as string,
+    role: row.role as 'user' | 'assistant',
+    content: row.content as string,
+    relatedNoteId: row.related_note_id as string | null,
+    conversationId: row.conversation_id as string | null,
     createdAt: row.created_at as string,
   }))
 }

@@ -8,9 +8,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Send, Bot, User, Loader2, Copy, RefreshCw, Clock } from 'lucide-react'
+import { Send, Bot, User, Loader2, Copy, RefreshCw, Clock, Plus, MessageSquare, Trash2, ChevronLeft } from 'lucide-react'
+import { SkeletonChat } from '@/components/skeleton-card'
 import { typeLabels, typeColors } from '@/lib/constants'
-import type { AIResponse, Note, ChatMessage } from '@/lib/types'
+import type { AIResponse, Note, ChatMessage, Conversation } from '@/lib/types'
 
 function genId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -37,11 +38,13 @@ export default function Chat({ onNoteCreated }: ChatProps) {
   const [chatInitialized, setChatInitialized] = useState(false)
   const savedCountRef = useRef(0)
 
-  const { messages, sendMessage, status, error } = useChat({
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
+  const [showSidebar, setShowSidebar] = useState(false)
+  const [loadingConversations, setLoadingConversations] = useState(true)
+
+  const { messages, sendMessage, status, error, setMessages } = useChat({
     transport: new DefaultChatTransport({ api: '/api/chat' }),
-    // Use controlled `messages` (not `initialMessages`) because history loads async
-    // After load, `messages` is set via state; useChat syncs via its internal effect.
-    // Once seeded, the stable reference prevents the sync effect from re-firing.
     messages: initialMessages.length > 0 ? initialMessages : undefined,
     onFinish: async (event) => {
       const { message, messages: allMessages, isAbort, isError } = event
@@ -101,7 +104,6 @@ export default function Chat({ onNoteCreated }: ChatProps) {
               if (res.ok) {
                 const data = await res.json()
                 onNoteCreated?.(data.note)
-                console.log('Note saved:', title)
               } else {
                 console.error('Failed to save note:', await res.text())
               }
@@ -109,14 +111,11 @@ export default function Chat({ onNoteCreated }: ChatProps) {
           }
         }
 
-        // Save chat messages to history
         const unsaved = allMessages.slice(savedCountRef.current)
         if (unsaved.length > 0) {
-          const now = new Date().toISOString()
           for (const m of unsaved) {
             const text = m.parts
-              .filter((p: any) => p.type === 'text')
-              .map((p: any) => p.text)
+              .map((p: { type: string; text?: string }) => getPartText(p))
               .join('')
             try {
               await fetch('/api/chat/history', {
@@ -127,7 +126,8 @@ export default function Chat({ onNoteCreated }: ChatProps) {
                   role: m.role,
                   content: text,
                   relatedNoteId: null,
-                  createdAt: now,
+                  conversationId: activeConversationId,
+                  createdAt: new Date().toISOString(),
                 }),
               })
             } catch (e) {
@@ -135,6 +135,21 @@ export default function Chat({ onNoteCreated }: ChatProps) {
             }
           }
           savedCountRef.current = allMessages.length
+        }
+
+        if (activeConversationId) {
+          const firstUserMsg = allMessages.find(m => m.role === 'user')
+          if (firstUserMsg) {
+            const firstText = firstUserMsg.parts
+              .map((p: { type: string; text?: string }) => getPartText(p))
+              .join('')
+            const title = firstText.slice(0, 30) + (firstText.length > 30 ? '...' : '')
+            await fetch('/api/conversations', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: activeConversationId, title }),
+            })
+          }
         }
       } catch (e) {
         console.error('Failed to parse AI response:', e)
@@ -166,10 +181,33 @@ export default function Chat({ onNoteCreated }: ChatProps) {
   }, [status])
 
   useEffect(() => {
-    loadChatHistory()
+    loadConversations()
   }, [])
 
-  async function loadChatHistory() {
+  useEffect(() => {
+    if (activeConversationId) {
+      loadConversationMessages(activeConversationId)
+    } else {
+      loadRecentMessages()
+    }
+  }, [activeConversationId])
+
+  async function loadConversations() {
+    setLoadingConversations(true)
+    try {
+      const res = await fetch('/api/conversations')
+      if (res.ok) {
+        const data = await res.json()
+        setConversations(data.conversations)
+      }
+    } catch (e) {
+      console.error('Failed to load conversations:', e)
+    } finally {
+      setLoadingConversations(false)
+    }
+  }
+
+  async function loadRecentMessages() {
     try {
       const res = await fetch('/api/chat/history')
       if (res.ok) {
@@ -186,6 +224,50 @@ export default function Chat({ onNoteCreated }: ChatProps) {
       console.error('Failed to load chat history:', e)
     } finally {
       setChatInitialized(true)
+    }
+  }
+
+  async function loadConversationMessages(conversationId: string) {
+    try {
+      const res = await fetch(`/api/chat/history?conversation_id=${conversationId}`)
+      if (res.ok) {
+        const data = await res.json()
+        const msgs = data.messages.map((m: ChatMessage) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          parts: [{ type: 'text' as const, text: m.content }],
+        }))
+        setMessages(msgs)
+        savedCountRef.current = msgs.length
+      }
+    } catch (e) {
+      console.error('Failed to load conversation:', e)
+    } finally {
+      setChatInitialized(true)
+    }
+  }
+
+  async function handleNewConversation() {
+    const id = genId()
+    setActiveConversationId(id)
+    setMessages([])
+    savedCountRef.current = 0
+    setTimedOut(false)
+    setShowSidebar(false)
+  }
+
+  async function handleSelectConversation(id: string) {
+    setActiveConversationId(id)
+    setShowSidebar(false)
+  }
+
+  async function handleDeleteConversation(id: string) {
+    await fetch(`/api/conversations?id=${id}`, { method: 'DELETE' })
+    setConversations(prev => prev.filter(c => c.id !== id))
+    if (activeConversationId === id) {
+      setActiveConversationId(null)
+      loadRecentMessages()
     }
   }
 
@@ -208,7 +290,11 @@ export default function Chat({ onNoteCreated }: ChatProps) {
     }
   }
 
-  function getMessageText(msg: typeof messages[0]): string {
+  function getPartText(part: { type: string; text?: string }): string {
+  return part.type === 'text' ? (part.text || '') : ''
+}
+
+function getMessageText(msg: typeof messages[0]): string {
     return msg.parts
       .filter((p) => p.type === 'text')
       .map((p) => (p as { text: string }).text)
@@ -248,6 +334,9 @@ export default function Chat({ onNoteCreated }: ChatProps) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (input.trim() && status === 'ready') {
+      if (!activeConversationId) {
+        handleNewConversation()
+      }
       setTimedOut(false)
       sendMessage({ text: input })
       setInput('')
@@ -265,154 +354,211 @@ export default function Chat({ onNoteCreated }: ChatProps) {
   const isLoading = status === 'streaming' || status === 'submitted'
 
   if (!chatInitialized) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    )
+    return <SkeletonChat />
   }
 
   return (
     <div className="flex h-full flex-col">
-      <ScrollArea ref={scrollRef} className="flex-1 p-4">
-        {messages.length === 0 && (
-          <div className="flex h-full items-center justify-center">
-            <div className="max-w-md text-center">
-              <Bot className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-              <h2 className="mb-2 text-lg font-semibold">你好！我是你的 AI 生活助手</h2>
-              <p className="text-sm text-muted-foreground">
-                你可以这样和我对话：
-              </p>
-              <div className="mt-4 space-y-2 text-left text-sm text-muted-foreground">
-                <div className="rounded-lg bg-muted p-3">
-                  &ldquo;明天下午3点和张三开会讨论项目进度&rdquo;
-                </div>
-                <div className="rounded-lg bg-muted p-3">
-                  &ldquo;提醒我今晚8点锻炼&rdquo;
-                </div>
-                <div className="rounded-lg bg-muted p-3">
-                  &ldquo;我想每天跑步&rdquo;
-                </div>
-              </div>
+      <div className="flex items-center gap-2 border-b px-4 py-2">
+        <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden" onClick={() => setShowSidebar(!showSidebar)}>
+          <MessageSquare className="h-4 w-4" />
+        </Button>
+        <div className="flex-1" />
+        <Button variant="outline" size="sm" onClick={handleNewConversation} className="gap-2">
+          <Plus className="h-4 w-4" />
+          <span className="hidden sm:inline">新对话</span>
+        </Button>
+      </div>
+
+      <div className="flex flex-1 overflow-hidden">
+        <div className={`${showSidebar ? 'block' : 'hidden'} md:block w-56 shrink-0 border-r bg-muted/30`}>
+          <div className="flex h-full flex-col">
+            <div className="flex items-center justify-between border-b px-3 py-2">
+              <span className="text-xs font-medium text-muted-foreground">对话历史</span>
+              <Button variant="ghost" size="icon" className="h-6 w-6 md:hidden" onClick={() => setShowSidebar(false)}>
+                <ChevronLeft className="h-3 w-3" />
+              </Button>
             </div>
-          </div>
-        )}
-
-        <div className="mx-auto max-w-2xl space-y-4">
-          {messages.map((msg, i) => {
-            const isUser = msg.role === 'user'
-            const text = getMessageText(msg)
-
-            if (isUser) {
-              return (
-                <div key={msg.id || i} className="flex justify-end">
-                  <div className="flex max-w-[80%] flex-row-reverse gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                      <User className="h-4 w-4" />
-                    </div>
-                    <Card className="bg-primary p-3 text-primary-foreground">
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed">{text}</p>
-                    </Card>
-                  </div>
+            <ScrollArea className="flex-1">
+              {loadingConversations ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 </div>
-              )
-            }
-
-            const summary = extractAISummary(text)
-            return (
-              <div key={msg.id || i} className="flex justify-start">
-                <div className="flex max-w-[80%] gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                    <Bot className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <Card className="group relative bg-card p-3">
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed">{summary}</p>
+              ) : conversations.length === 0 ? (
+                <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                  暂无对话记录
+                </div>
+              ) : (
+                <div className="space-y-0.5 p-2">
+                  {conversations.map((conv) => (
+                    <div
+                      key={conv.id}
+                      className={`group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm ${
+                        activeConversationId === conv.id
+                          ? 'bg-primary/10 text-primary'
+                          : 'hover:bg-accent'
+                      }`}
+                      onClick={() => handleSelectConversation(conv.id)}
+                    >
+                      <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                      <span className="min-w-0 flex-1 truncate text-xs">{conv.title}</span>
+                      <span className="shrink-0 text-[10px] text-muted-foreground">{conv.messageCount}</span>
                       <button
-                        onClick={() => handleCopy(text)}
-                        className="absolute right-2 top-2 hidden rounded p-1 text-muted-foreground hover:bg-accent group-hover:block"
-                        title="复制"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteConversation(conv.id) }}
+                        className="hidden shrink-0 text-destructive hover:text-destructive group-hover:block"
                       >
-                        <Copy className="h-3 w-3" />
+                        <Trash2 className="h-3 w-3" />
                       </button>
-                    </Card>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {getTypeBadge(getTypeFromContent(text))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+        </div>
+
+        <div className="flex flex-1 flex-col">
+          <ScrollArea ref={scrollRef} className="flex-1 p-4">
+            {messages.length === 0 && (
+              <div className="flex h-full items-center justify-center">
+                <div className="max-w-md text-center">
+                  <Bot className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+                  <h2 className="mb-2 text-lg font-semibold">你好！我是你的 AI 生活助手</h2>
+                  <p className="text-sm text-muted-foreground">
+                    你可以这样和我对话：
+                  </p>
+                  <div className="mt-4 space-y-2 text-left text-sm text-muted-foreground">
+                    <div className="rounded-lg bg-muted p-3">
+                      &ldquo;明天下午3点和张三开会讨论项目进度&rdquo;
+                    </div>
+                    <div className="rounded-lg bg-muted p-3">
+                      &ldquo;提醒我今晚8点锻炼&rdquo;
+                    </div>
+                    <div className="rounded-lg bg-muted p-3">
+                      &ldquo;我想每天跑步&rdquo;
                     </div>
                   </div>
                 </div>
               </div>
-            )
-          })}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="flex max-w-[80%] gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
-                  <Bot className="h-4 w-4" />
-                </div>
-                <div>
-                  <Card className="bg-card p-3">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm text-muted-foreground">思考中</span>
-                      <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground" />
-                      <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground" />
-                      <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground" />
-                    </div>
-                  </Card>
-                  {timedOut && (
-                    <p className="mt-1 flex items-center gap-1 text-xs text-amber-600">
-                      <Clock className="h-3 w-3" />
-                      DeepSeek 响应较慢，请稍候…
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-          {error && (
-            <div className="flex justify-center">
-              <Card className="flex items-center gap-2 bg-destructive/10 p-3 text-sm text-destructive">
-                <span>{error.message || '出错了'}</span>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleRetry}>
-                  <RefreshCw className="h-3 w-3" />
-                </Button>
-              </Card>
-            </div>
-          )}
-        </div>
-      </ScrollArea>
-
-      <div className="border-t p-4">
-        <form
-          onSubmit={handleSubmit}
-          className="mx-auto flex max-w-2xl gap-2"
-        >
-          <Textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => {
-              setInput(e.target.value)
-              const el = e.target
-              el.style.height = 'auto'
-              el.style.height = `${Math.min(el.scrollHeight, 200)}px`
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder="输入你想记录的内容…"
-            className="min-h-[44px] resize-none"
-            rows={1}
-            disabled={isLoading}
-          />
-          <Button type="submit" size="icon" className="h-[44px] w-[44px] shrink-0" disabled={isLoading || !input.trim()}>
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
             )}
-          </Button>
-        </form>
-        <p className="mt-1 text-center text-xs text-muted-foreground">
-          Enter 发送 · Shift+Enter 换行
-        </p>
+
+            <div className="mx-auto max-w-2xl space-y-4">
+              {messages.map((msg, i) => {
+                const isUser = msg.role === 'user'
+                const text = getMessageText(msg)
+
+                if (isUser) {
+                  return (
+                    <div key={msg.id || i} className="flex justify-end">
+                      <div className="flex max-w-[80%] flex-row-reverse gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          <User className="h-4 w-4" />
+                        </div>
+                        <Card className="bg-primary p-3 text-primary-foreground">
+                          <p className="whitespace-pre-wrap text-sm leading-relaxed">{text}</p>
+                        </Card>
+                      </div>
+                    </div>
+                  )
+                }
+
+                const summary = extractAISummary(text)
+                return (
+                  <div key={msg.id || i} className="flex justify-start">
+                    <div className="flex max-w-[80%] gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                        <Bot className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <Card className="group relative bg-card p-3">
+                          <p className="whitespace-pre-wrap text-sm leading-relaxed">{summary}</p>
+                          <button
+                            onClick={() => handleCopy(text)}
+                            className="absolute right-2 top-2 hidden rounded p-1 text-muted-foreground hover:bg-accent group-hover:block"
+                            title="复制"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </button>
+                        </Card>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {getTypeBadge(getTypeFromContent(text))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="flex max-w-[80%] gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                      <Bot className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <Card className="bg-card p-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm text-muted-foreground">思考中</span>
+                          <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+                          <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+                          <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+                        </div>
+                      </Card>
+                      {timedOut && (
+                        <p className="mt-1 flex items-center gap-1 text-xs text-amber-600">
+                          <Clock className="h-3 w-3" />
+                          DeepSeek 响应较慢，请稍候…
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {error && (
+                <div className="flex justify-center">
+                  <Card className="flex items-center gap-2 bg-destructive/10 p-3 text-sm text-destructive">
+                    <span>{error.message || '出错了'}</span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleRetry}>
+                      <RefreshCw className="h-3 w-3" />
+                    </Button>
+                  </Card>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+
+          <div className="border-t p-4">
+            <form
+              onSubmit={handleSubmit}
+              className="mx-auto flex max-w-2xl gap-2"
+            >
+              <Textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value)
+                  const el = e.target
+                  el.style.height = 'auto'
+                  el.style.height = `${Math.min(el.scrollHeight, 200)}px`
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="输入你想记录的内容…"
+                className="min-h-[44px] resize-none"
+                rows={1}
+                disabled={isLoading}
+              />
+              <Button type="submit" size="icon" className="h-[44px] w-[44px] shrink-0" disabled={isLoading || !input.trim()}>
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
+            </form>
+            <p className="mt-1 text-center text-xs text-muted-foreground">
+              Enter 发送 · Shift+Enter 换行
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   )

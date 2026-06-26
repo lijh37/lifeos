@@ -25,9 +25,9 @@ npm install
 
 ### 2. 配置环境变量
 
-```env
-DEEPSEEK_API_KEY=sk-your-key-here
-DATABASE_URL=file:./data/life.db
+```bash
+cp .env.example .env.local
+# 编辑 .env.local 填入你的 API Key
 ```
 
 ### 3. 启动开发服务器
@@ -64,94 +64,80 @@ bash scripts/tunnel.sh
 ## 功能
 
 ### 已实现
+
+**记录与管理**
 - [x] AI 对话式记录 — 自然语言输入，AI 自动解析为笔记/任务/事件/习惯
 - [x] 笔记管理 — 按类型筛选、搜索、标记完成、删除
 - [x] 任务管理 — 标记完成/未完成，按截止日期排序
+- [x] 批量操作 — 多选笔记 → 批量删除/归档/改标签
+- [x] 拖拽排序 — 笔记/任务卡片拖拽重排
 - [x] 预算管理 — 月度预算规划（固定/浮动支出），实际录入对比，超支/结余分析
 - [x] 习惯养成 — AI 创建习惯，每日打卡，连续天数 streak 徽章
 - [x] 日历视图 — 月历网格，彩色圆点标记条目类型，点击查看当日详情
 - [x] 全局搜索 — 跨笔记/习惯全文搜索，防抖 300ms
+- [x] 聊天持久化 — 对话多会话管理，自动保存，刷新恢复
+
+**数据分析与导出**
 - [x] 统计看板 — 数据概览、预算执行、热门标签、动态时间线
 - [x] 标签管理 — 查看/重命名/删除标签
 - [x] 数据导出 — Markdown / JSON / CSV（Excel 中文友好）
+- [x] 数据备份 — 手动 JSON 导入/导出 + 自动 localStorage 备份
+
+**界面与体验**
 - [x] 深色模式 — light/dark/system 三态切换
 - [x] 离线支持 — Service Worker + PWA 安装提示
-- [x] 数据管理 — 设置页：数据清除、备份导出/导入恢复
 - [x] 富文本编辑 — TipTap 编辑器（粗体/斜体/标题/列表/任务列表）
-- [x] UI 动效 — 页面过渡、骨架屏、交错入场、卡片悬浮
+- [x] UI 动效 — 页面过渡、骨架屏（3 种变体）、交错入场、卡片悬浮
 - [x] 通知提醒 — 到期任务/事件浏览器推送 + 内联提醒卡片
 - [x] 多端自适应 — PC 侧栏导航 + 手机底部 Tab
 
+**安全**
+- [x] 密码保护 — proxy.ts 中间件 + /login 页面
+- [x] API 鉴权 — Cookie / Bearer Token 双模式
+- [x] 速率限制 — /api/chat 20 req/min/IP
+- [x] XSS 防护 — DOMPurify 显式白名单配置
+
 ### 规划中
-- [ ] 饮食+锻炼追踪 — 拍照识食物，运动记录
+
 - [ ] 附件上传 — 笔记图片/文件附件
-- [ ] 聊天历史持久化 — 恢复对话上下文
+- [ ] E2E 测试持续集成
 
 ## 项目结构
 
 ```
 opencode-demo/
-├── app/
-│   ├── page.tsx              # AI 对话首页
-│   ├── notes/page.tsx        # 笔记列表
-│   ├── tasks/page.tsx        # 任务列表
-│   ├── expenses/page.tsx     # 预算管理页面
-│   ├── habits/page.tsx       # 习惯页面
-│   ├── calendar/page.tsx     # 日历视图
-│   ├── search/page.tsx       # 全局搜索
-│   ├── tags/page.tsx         # 标签管理
-│   ├── stats/page.tsx        # 统计看板
-│   ├── settings/page.tsx     # 设置
-│   ├── login/page.tsx        # 登录页
-│   └── api/
-│       ├── chat/route.ts     # DeepSeek 流式对话
-│       ├── notes/route.ts    # 笔记 CRUD
-│       ├── notes/[id]/route.ts # 单条笔记 GET/PATCH/DELETE
-│       ├── budgets/route.ts  # 预算 CRUD
-│       ├── habits/route.ts   # 习惯 CRUD（含 streaks）
-│       ├── export/route.ts   # 导出（MD/JSON/CSV）
-│       ├── search/route.ts   # 跨类型搜索
-│       ├── tags/route.ts     # 标签管理
-│       ├── settings/route.ts # 数据统计 + 清除
-│       ├── auth/route.ts     # 密码验证
-│       ├── import/route.ts   # JSON 备份导入
-│       └── stats/route.ts    # 聚合统计
+├── app/                   # Next.js App Router 页面和 API
+│   ├── api/               # API 端点（17 个）
+│   ├── notes/             # 笔记列表页
+│   ├── tasks/             # 任务列表页
+│   ├── habits/            # 习惯页面
+│   ├── calendar/          # 日历视图
+│   ├── search/            # 全局搜索
+│   ├── tags/              # 标签管理
+│   ├── stats/             # 统计看板
+│   ├── settings/          # 设置
+│   └── login/             # 登录页
 ├── components/
-│   ├── ui/                   # shadcn 组件
-│   ├── chat.tsx              # AI 对话组件
-│   ├── note-list.tsx         # 笔记/任务列表组件
-│   ├── rich-editor.tsx       # 富文本编辑器（基于 TipTap）
-│   ├── sidebar.tsx           # 导航组件（PC 侧栏 + 手机底栏）
-│   ├── fab-button.tsx        # 悬浮快捷按钮
-│   ├── export-button.tsx     # 导出按钮
-│   ├── theme-provider.tsx    # 主题上下文
-│   ├── theme-toggle.tsx      # 深色模式切换
-│   ├── pwa-handler.tsx       # PWA 安装管理 + 诊断面板
-│   ├── notification-manager.tsx # 通知提醒管理器
-│   ├── page-animation.tsx    # 页面过渡动效
-│   └── skeleton-card.tsx     # 骨架屏
+│   ├── ui/                # shadcn 组件
+│   ├── chat.tsx           # AI 对话组件
+│   ├── note-list.tsx      # 笔记/任务列表（批量操作+拖拽排序）
+│   ├── rich-editor.tsx    # 富文本编辑器
+│   ├── sidebar.tsx        # 导航组件
+│   ├── skeleton-card.tsx  # 骨架屏（3 种变体）
+│   ├── error-boundary.tsx # Error Boundary
+│   └── ...                # 其他组件
 ├── lib/
-│   ├── db.ts                 # 数据库操作（双模式：SQLite/Turso）
-│   ├── types.ts              # TypeScript 类型
-│   ├── prompts.ts            # AI 系统提示词
-│   ├── constants.ts          # 共享常量（类型颜色/分类标签映射）
-│   └── utils.ts              # cn() 工具函数
-├── store/
-│   └── index.ts              # Zustand 状态管理
-├── scripts/
-│   ├── https-setup.sh       # HTTPS 开发证书一键生成
-│   ├── migrate-to-turso.ts  # 本地→Turso 数据迁移
-│   ├── setup-turso.ts       # Turso 数据库创建 + 迁移
-│   ├── list-turso.ts        # Turso 数据列表
-│   └── tunnel.sh            # HTTPS 隧道（cloudflared/ngrok/localtunnel）
-├── data/
-│   └── schema.sql            # 数据库完整 DDL
-├── proxy.ts                  # Next.js 密码保护中间件
-├── vercel.json               # Vercel 部署配置
-└── public/
-    ├── manifest.json          # PWA 配置
-    ├── sw.js                  # Service Worker
-    └── icons/                 # 应用图标
+│   ├── db.ts              # 数据库操作
+│   ├── types.ts           # TypeScript 类型
+│   ├── prompts.ts         # AI 系统提示词
+│   ├── rate-limiter.ts    # 限流器
+│   └── utils.ts           # 工具函数
+├── store/                 # Zustand 状态管理
+├── scripts/               # 工具脚本
+├── e2e/                   # Playwright E2E 测试
+├── proxy.ts               # Next.js 16 中间件（密码保护）
+├── data/schema.sql        # 数据库完整 DDL
+└── vercel.json            # 部署配置
 ```
 
 ## 如何与 AI 对话
@@ -190,11 +176,7 @@ git push origin main
 | `TURSO_AUTH_TOKEN` | Turso 认证 Token |
 | `APP_PASSWORD` | 登录密码（默认 `demo`） |
 
-本地开发使用 SQLite（`data/life.db`），设置 `TURSO_DATABASE_URL` 时自动切换到 Turso 云数据库：
-
-```bash
-npm run migrate   # 本地数据迁移到 Turso
-```
+本地开发使用 SQLite（`data/life.db`），设置 `TURSO_DATABASE_URL` 时自动切换到 Turso 云数据库。
 
 ## WSL2 提示
 

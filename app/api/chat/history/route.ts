@@ -1,11 +1,18 @@
-import { getRecentChatMessages, saveChatMessage } from '@/lib/db'
+import { NextRequest } from 'next/server'
+import { getRecentChatMessages, getChatMessagesByConversation, saveChatMessage } from '@/lib/db'
 import type { ChatMessage } from '@/lib/types'
 
 export const runtime = 'nodejs'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const messages = await getRecentChatMessages(50)
+    const { searchParams } = new URL(req.url)
+    const conversationId = searchParams.get('conversation_id')
+
+    const messages = conversationId
+      ? await getChatMessagesByConversation(conversationId)
+      : await getRecentChatMessages(50)
+
     return Response.json({ messages })
   } catch (error) {
     console.error('Failed to load chat history:', error)

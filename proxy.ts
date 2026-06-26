@@ -23,16 +23,28 @@ export function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
-  const password = request.cookies.get(PASSWORD_COOKIE)?.value
   const expected = process.env.APP_PASSWORD
+  if (!expected) return NextResponse.next()
 
-  if (expected && password !== expected) {
-    const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('from', pathname)
-    return NextResponse.redirect(loginUrl)
+  const cookiePass = request.cookies.get(PASSWORD_COOKIE)?.value
+  if (cookiePass === expected) return NextResponse.next()
+
+  const authHeader = request.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7)
+    if (token === expected) return NextResponse.next()
   }
 
-  return NextResponse.next()
+  if (pathname.startsWith('/api/')) {
+    return new NextResponse(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
+
+  const loginUrl = new URL('/login', request.url)
+  loginUrl.searchParams.set('from', pathname)
+  return NextResponse.redirect(loginUrl)
 }
 
 export const config = {

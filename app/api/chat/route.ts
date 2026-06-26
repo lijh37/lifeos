@@ -2,6 +2,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { convertToModelMessages, streamText, type UIMessage } from 'ai'
 import { SYSTEM_PROMPT } from '@/lib/prompts'
 import { initDB } from '@/lib/db'
+import { chatRateLimiter } from '@/lib/rate-limiter'
 
 export const runtime = 'nodejs'
 
@@ -12,6 +13,16 @@ const deepseek = createOpenAI({
 
 export async function POST(req: Request) {
   try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || req.headers.get('x-real-ip')
+      || 'unknown'
+    if (!chatRateLimiter.check(ip)) {
+      return new Response(
+        JSON.stringify({ error: '请求过于频繁，请稍后再试' }),
+        { status: 429, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
     await initDB()
     const body = await req.json()
     const { messages }: { messages: UIMessage[] } = body

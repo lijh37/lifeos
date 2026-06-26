@@ -10,6 +10,7 @@ import TaskItem from '@tiptap/extension-task-item'
 import { useEffect, useRef } from 'react'
 import { Bold, Italic, Heading2, List } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import DOMPurify from 'dompurify'
 
 interface RichEditorProps {
   content: string
@@ -21,9 +22,25 @@ export function RichEditor({ content, onSave, placeholder = '开始写笔记...'
   const savedContent = useRef(content)
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
+  const sanitize = (html: string) =>
+    DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: [
+        'p', 'br', 'strong', 'em', 'u', 's', 'code', 'pre', 'blockquote',
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'ul', 'ol', 'li', 'a', 'img', 'span', 'div',
+        'table', 'thead', 'tbody', 'tr', 'th', 'td',
+        'hr', 'sub', 'sup', 'input',
+      ],
+      ALLOWED_ATTR: [
+        'href', 'target', 'rel', 'class', 'style', 'src', 'alt',
+        'width', 'height', 'type', 'checked', 'disabled',
+      ],
+    })
+
   const doSave = (html: string) => {
-    savedContent.current = html
-    try { Promise.resolve(onSave(html)).catch(() => {}) } catch {}
+    const clean = sanitize(html)
+    savedContent.current = clean
+    try { Promise.resolve(onSave(clean)).catch(() => {}) } catch {}
   }
 
   const editor = useEditor({

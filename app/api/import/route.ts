@@ -4,7 +4,7 @@ import type { Note } from '@/lib/types'
 
 export async function POST(req: NextRequest) {
   await initDB()
-  let body: any
+  let body: { notes?: unknown[]; budgets?: unknown[] }
   try {
     body = await req.json()
   } catch {
@@ -15,17 +15,18 @@ export async function POST(req: NextRequest) {
   let imported = 0
 
   if (Array.isArray(notes)) {
-    for (const n of notes) {
+    for (const item of notes) {
+      const n = item as Record<string, unknown>
       const note: Note = {
-        id: n.id || crypto.randomUUID(),
-        content: n.content || '',
-        title: n.title || null,
-        type: n.type || 'note',
-        tags: n.tags || [],
-        dueDate: n.dueDate || n.due_date || null,
-        done: n.done || false,
-        createdAt: n.createdAt || n.created_at || new Date().toISOString(),
-        updatedAt: n.updatedAt || n.updated_at || new Date().toISOString(),
+        id: (n.id as string) || crypto.randomUUID(),
+        content: (n.content as string) || '',
+        title: (n.title as string) || null,
+        type: (n.type as Note['type']) || 'note',
+        tags: (n.tags as string[]) || [],
+        dueDate: (n.dueDate as string) || (n.due_date as string) || null,
+        done: (n.done as boolean) || false,
+        createdAt: (n.createdAt as string) || (n.created_at as string) || new Date().toISOString(),
+        updatedAt: (n.updatedAt as string) || (n.updated_at as string) || new Date().toISOString(),
       }
       await createNote(note)
       imported++
@@ -33,15 +34,16 @@ export async function POST(req: NextRequest) {
   }
 
   if (Array.isArray(budgets)) {
-    for (const b of budgets) {
-      await upsertBudget(b.month, {
-        fixedBudget: b.fixedBudget ?? b.fixed_budget ?? 0,
-        variableBudget: b.variableBudget ?? b.variable_budget ?? 0,
-        fixedActual: b.fixedActual ?? b.fixed_actual ?? null,
-        variableActual: b.variableActual ?? b.variable_actual ?? null,
-        notes: b.notes ?? '',
-        isCompleted: b.isCompleted ?? b.is_completed ?? false,
-        savingsCompleted: b.savingsCompleted ?? b.savings_completed ?? false,
+    for (const item of budgets) {
+      const b = item as Record<string, unknown>
+      await upsertBudget(b.month as string, {
+        fixedBudget: (b.fixedBudget as number) ?? (b.fixed_budget as number) ?? 0,
+        variableBudget: (b.variableBudget as number) ?? (b.variable_budget as number) ?? 0,
+        fixedActual: (b.fixedActual as number) ?? (b.fixed_actual as number) ?? null,
+        variableActual: (b.variableActual as number) ?? (b.variable_actual as number) ?? null,
+        notes: (b.notes as string) ?? '',
+        isCompleted: (b.isCompleted as boolean) ?? (b.is_completed as boolean) ?? false,
+        savingsCompleted: (b.savingsCompleted as boolean) ?? (b.savings_completed as boolean) ?? false,
       })
       imported++
     }

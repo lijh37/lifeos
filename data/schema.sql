@@ -15,7 +15,15 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   role TEXT NOT NULL,
   content TEXT NOT NULL,
   related_note_id TEXT,
+  conversation_id TEXT,
   created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS conversations (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL DEFAULT '新对话',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS budgets (

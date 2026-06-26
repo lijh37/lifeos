@@ -1,7 +1,12 @@
 'use client'
 
 import { NoteList } from '@/components/note-list'
+import { ErrorBoundary } from '@/components/error-boundary'
 
 export default function TasksPage() {
-  return <NoteList defaultFilter="task" />
+  return (
+    <ErrorBoundary>
+      <NoteList defaultFilter="task" />
+    </ErrorBoundary>
+  )
 }

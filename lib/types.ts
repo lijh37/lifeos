@@ -13,6 +13,7 @@ export interface Note {
   updatedAt: string
 }
 
+
 export interface Budget {
   id: string
   month: string
@@ -48,7 +49,16 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   relatedNoteId: string | null
+  conversationId: string | null
   createdAt: string
+}
+
+export interface Conversation {
+  id: string
+  title: string
+  createdAt: string
+  updatedAt: string
+  messageCount: number
 }
 
 export interface AIResponse {
