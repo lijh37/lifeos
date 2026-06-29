@@ -1,5 +1,6 @@
 export class RateLimiter {
   private requests = new Map<string, { count: number; resetAt: number }>()
+  private checkCount = 0
 
   constructor(
     private maxRequests = 20,
@@ -7,6 +8,9 @@ export class RateLimiter {
   ) {}
 
   check(key: string): boolean {
+    // Periodic cleanup every 10 checks
+    if (++this.checkCount % 10 === 0) this.cleanup()
+
     const now = Date.now()
     const entry = this.requests.get(key)
 
@@ -25,6 +29,13 @@ export class RateLimiter {
     const entry = this.requests.get(key)
     if (!entry || Date.now() > entry.resetAt) return this.maxRequests
     return Math.max(0, this.maxRequests - entry.count)
+  }
+
+  private cleanup() {
+    const now = Date.now()
+    for (const [key, entry] of this.requests) {
+      if (now > entry.resetAt) this.requests.delete(key)
+    }
   }
 }
 

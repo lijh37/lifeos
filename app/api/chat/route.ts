@@ -1,15 +1,18 @@
 import { createOpenAI } from '@ai-sdk/openai'
 import { convertToModelMessages, streamText, type UIMessage } from 'ai'
 import { SYSTEM_PROMPT } from '@/lib/prompts'
+import { tools } from '@/lib/ai-tools'
 import { initDB } from '@/lib/db'
 import { chatRateLimiter } from '@/lib/rate-limiter'
 
 export const runtime = 'nodejs'
 
 const deepseek = createOpenAI({
-  baseURL: 'https://api.deepseek.com/v1',
+  baseURL: process.env.AI_BASE_URL || 'https://api.deepseek.com/v1',
   apiKey: process.env.DEEPSEEK_API_KEY,
 })
+
+const modelName = process.env.AI_MODEL || 'deepseek-chat'
 
 export async function POST(req: Request) {
   try {
@@ -32,11 +35,14 @@ export async function POST(req: Request) {
     }
 
     const modelMessages = await convertToModelMessages(messages)
+    const trimmedMessages = modelMessages.slice(-40)
 
     const result = streamText({
-      model: deepseek.chat('deepseek-v4-flash'),
-      system: SYSTEM_PROMPT,
-      messages: modelMessages,
+      model: deepseek.chat(modelName),
+      instructions: SYSTEM_PROMPT,
+      messages: trimmedMessages,
+      tools,
+      maxOutputTokens: 2048,
       abortSignal: AbortSignal.timeout(60000),
     })
 

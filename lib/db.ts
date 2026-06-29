@@ -1,16 +1,39 @@
 import { createClient } from '@libsql/client'
 import type { InValue } from '@libsql/client'
-import type { Note, NoteType, Budget, Habit, ChatMessage, Conversation } from './types'
+import type { Note, NoteType, Budget, Habit, ChatMessage, Conversation, Attachment } from './types'
+import { genId } from './utils'
 
-function genId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0
-    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
-  })
+async function syncNoteTags(noteId: string, tags: string[]): Promise<void> {
+  const db = getClient()
+  try {
+    await db.execute({ sql: 'DELETE FROM note_tags WHERE note_id = ?', args: [noteId] })
+    for (const tagName of tags) {
+      if (!tagName.trim()) continue
+      const existing = await db.execute({
+        sql: 'SELECT id FROM tags WHERE name = ?',
+        args: [tagName.trim()],
+      })
+      let tagId: string
+      if (existing.rows.length > 0) {
+        tagId = existing.rows[0].id as string
+      } else {
+        tagId = genId()
+        await db.execute({
+          sql: 'INSERT OR IGNORE INTO tags (id, name, created_at) VALUES (?, ?, ?)',
+          args: [tagId, tagName.trim(), new Date().toISOString()],
+        })
+      }
+      await db.execute({
+        sql: 'INSERT OR IGNORE INTO note_tags (note_id, tag_id) VALUES (?, ?)',
+        args: [noteId, tagId],
+      })
+    }
+  } catch { /* normalized tables may not exist yet */ }
 }
 
 let client: ReturnType<typeof createClient> | null = null
+let dbInitialized = false
+let fts5Available: boolean | undefined
 
 export function getClient() {
   if (client) return client
@@ -24,6 +47,7 @@ export function getClient() {
 }
 
 export async function initDB() {
+  if (dbInitialized) return
   const db = getClient()
   await db.execute(`
     CREATE TABLE IF NOT EXISTS notes (
@@ -81,6 +105,21 @@ export async function initDB() {
     )
   `)
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS attachments (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      url TEXT NOT NULL,
+      mime_type TEXT NOT NULL DEFAULT '',
+      file_size INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+    )
+  `)
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_attachments_note ON attachments(note_id)
+  `)
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS habits (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -120,6 +159,76 @@ export async function initDB() {
   try {
     await db.execute(`ALTER TABLE chat_messages ADD COLUMN conversation_id TEXT`)
   } catch {}
+  try {
+    await db.execute(`ALTER TABLE notes ADD COLUMN sort_order INTEGER DEFAULT 0`)
+  } catch {}
+
+  // FTS5 full-text search (graceful fallback if not available)
+  try {
+    await db.execute(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+        content, title, content=notes, content_rowid=rowid
+      )
+    `)
+    await db.execute(`
+      INSERT OR IGNORE INTO notes_fts(rowid, content, title)
+      SELECT rowid, content, title FROM notes
+    `)
+    await db.execute(`
+      CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes BEGIN
+        INSERT INTO notes_fts(rowid, content, title) VALUES (new.rowid, new.content, new.title);
+      END
+    `)
+    await db.execute(`
+      CREATE TRIGGER IF NOT EXISTS notes_ad AFTER DELETE ON notes BEGIN
+        INSERT INTO notes_fts(notes_fts, rowid, content, title) VALUES('delete', old.rowid, old.content, old.title);
+      END
+    `)
+    await db.execute(`
+      CREATE TRIGGER IF NOT EXISTS notes_au AFTER UPDATE ON notes BEGIN
+        INSERT INTO notes_fts(notes_fts, rowid, content, title) VALUES('delete', old.rowid, old.content, old.title);
+        INSERT INTO notes_fts(rowid, content, title) VALUES (new.rowid, new.content, new.title);
+      END
+    `)
+    fts5Available = true
+  } catch {
+    fts5Available = false
+  }
+
+  // Normalized tags tables
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS tags (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        created_at TEXT NOT NULL
+      )
+    `)
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS note_tags (
+        note_id TEXT NOT NULL,
+        tag_id TEXT NOT NULL,
+        PRIMARY KEY (note_id, tag_id)
+      )
+    `)
+    await db.execute(`
+      CREATE INDEX IF NOT EXISTS idx_note_tags_tag ON note_tags(tag_id)
+    `)
+  } catch {}
+
+  // Migrate existing JSON tags to normalized tables
+  try {
+    const migrationCheck = await db.execute('SELECT COUNT(*) as count FROM tags')
+    if ((migrationCheck.rows[0]?.count as number) === 0) {
+      const existingNotes = await db.execute('SELECT id, tags FROM notes')
+      for (const row of existingNotes.rows) {
+        const noteTags = JSON.parse(row.tags as string) as string[]
+        await syncNoteTags(row.id as string, noteTags)
+      }
+    }
+  } catch {}
+
+  dbInitialized = true
 }
 
 export async function createConversation(id: string, title: string): Promise<void> {
@@ -186,6 +295,7 @@ export async function createNote(note: Note): Promise<Note> {
       note.done ? 1 : 0, note.createdAt, note.updatedAt,
     ] as InValue[],
   })
+  try { await syncNoteTags(note.id, note.tags) } catch {}
   return note
 }
 
@@ -208,10 +318,15 @@ export async function updateNote(id: string, updates: Partial<Note>): Promise<vo
     sql: `UPDATE notes SET ${fields.join(', ')} WHERE id = ?`,
     args,
   })
+  if (updates.tags !== undefined) {
+    try { await syncNoteTags(id, updates.tags) } catch {}
+  }
 }
 
 export async function deleteNote(id: string): Promise<void> {
   const db = getClient()
+  await db.execute({ sql: 'DELETE FROM note_tags WHERE note_id = ?', args: [id] })
+  try { await deleteAttachmentsByNoteId(id) } catch {}
   await db.execute({ sql: 'DELETE FROM notes WHERE id = ?', args: [id] })
 }
 
@@ -223,10 +338,46 @@ export async function getNotes(type?: NoteType, limit = 200, offset = 0): Promis
     sql += ' WHERE type = ?'
     args.push(type)
   }
-  sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
+  sql += ' ORDER BY sort_order ASC, created_at DESC LIMIT ? OFFSET ?'
   args.push(limit, offset)
   const result = await db.execute({ sql, args })
   return result.rows.map(rowToNote)
+}
+
+export async function getNotesCursor(type?: NoteType, limit = 50, cursor?: string): Promise<{ notes: Note[]; nextCursor: string | null }> {
+  const db = getClient()
+  let sql = 'SELECT * FROM notes'
+  const args: InValue[] = []
+
+  const conditions: string[] = []
+  if (type) {
+    conditions.push('type = ?')
+    args.push(type)
+  }
+  if (cursor) {
+    // cursor is the created_at timestamp of the last item from previous page
+    conditions.push('created_at < ?')
+    args.push(cursor)
+  }
+
+  if (conditions.length > 0) {
+    sql += ' WHERE ' + conditions.join(' AND ')
+  }
+
+  sql += ' ORDER BY sort_order ASC, created_at DESC LIMIT ?'
+  // Fetch one extra to determine if there's a next page
+  args.push(limit + 1)
+
+  const result = await db.execute({ sql, args })
+  const rows = result.rows.map(rowToNote)
+
+  let nextCursor: string | null = null
+  if (rows.length > limit) {
+    rows.pop() // remove the extra item
+    nextCursor = rows[rows.length - 1].createdAt
+  }
+
+  return { notes: rows, nextCursor }
 }
 
 export async function getNotesByDateRange(startDate: string, endDate: string, type?: NoteType, limit = 200, offset = 0): Promise<Note[]> {
@@ -442,8 +593,28 @@ export async function getTodayCompletions(): Promise<Record<string, boolean>> {
 }
 
 export async function searchNotes(query: string): Promise<Note[]> {
-  const term = `%${query}%`
   const db = getClient()
+  const term = `%${query}%`
+
+  // Try FTS5 first, fall back to LIKE
+  if (fts5Available) {
+    try {
+      const ftsQuery = query.replace(/['"]/g, '').split(/\s+/).filter(Boolean).join(' AND ')
+      if (!ftsQuery) return []
+      const result = await db.execute({
+        sql: `SELECT n.* FROM notes n INNER JOIN notes_fts fts ON n.rowid = fts.rowid 
+              WHERE notes_fts MATCH ? ORDER BY rank LIMIT 50`,
+        args: [ftsQuery],
+      })
+      if (result.rows.length > 0) {
+        return result.rows.map(rowToNote)
+      }
+    } catch {
+      // FTS5 query failed — fall through to LIKE
+    }
+  }
+
+  // Fallback: LIKE search
   const result = await db.execute({
     sql: `SELECT * FROM notes WHERE content LIKE ? OR title LIKE ? ORDER BY created_at DESC LIMIT 50`,
     args: [term, term],
@@ -463,21 +634,48 @@ export async function searchHabits(query: string): Promise<Habit[]> {
 
 export async function getAllTags(): Promise<{ name: string; count: number }[]> {
   const db = getClient()
-  const result = await db.execute('SELECT tags FROM notes')
-  const tagCount: Record<string, number> = {}
-  for (const row of result.rows) {
-    const tags = JSON.parse(row.tags as string) as string[]
-    for (const tag of tags) {
-      if (tag) tagCount[tag] = (tagCount[tag] || 0) + 1
+  try {
+    const result = await db.execute(`
+      SELECT t.name, COUNT(nt.note_id) as count
+      FROM tags t
+      LEFT JOIN note_tags nt ON t.id = nt.tag_id
+      GROUP BY t.id
+      ORDER BY count DESC, t.name ASC
+    `)
+    return result.rows.map(r => ({
+      name: r.name as string,
+      count: r.count as number,
+    }))
+  } catch {
+    // Fallback to JSON parsing
+    const result = await db.execute('SELECT tags FROM notes')
+    const tagCount: Record<string, number> = {}
+    for (const row of result.rows) {
+      const tags = JSON.parse(row.tags as string) as string[]
+      for (const tag of tags) {
+        if (tag) tagCount[tag] = (tagCount[tag] || 0) + 1
+      }
     }
+    return Object.entries(tagCount)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
   }
-  return Object.entries(tagCount)
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count)
 }
 
 export async function renameTag(oldName: string, newName: string): Promise<void> {
+  if (oldName === newName) return
   const db = getClient()
+  try {
+    // Check if newName already exists — if so, merge tags
+    const existing = await db.execute({ sql: 'SELECT id FROM tags WHERE name = ?', args: [newName] })
+    if (existing.rows.length > 0) {
+      const newId = existing.rows[0].id as string
+      await db.execute({ sql: 'UPDATE note_tags SET tag_id = ? WHERE tag_id IN (SELECT id FROM tags WHERE name = ?) AND note_id NOT IN (SELECT note_id FROM note_tags WHERE tag_id = ?)', args: [newId, oldName, newId] })
+      await db.execute({ sql: 'DELETE FROM tags WHERE name = ?', args: [oldName] })
+    } else {
+      await db.execute({ sql: 'UPDATE tags SET name = ? WHERE name = ?', args: [newName, oldName] })
+    }
+  } catch {}
   const result = await db.execute('SELECT id, tags FROM notes')
   for (const row of result.rows) {
     const tags = JSON.parse(row.tags as string) as string[]
@@ -494,6 +692,10 @@ export async function renameTag(oldName: string, newName: string): Promise<void>
 
 export async function deleteTag(tagName: string): Promise<void> {
   const db = getClient()
+  try {
+    await db.execute({ sql: 'DELETE FROM note_tags WHERE tag_id IN (SELECT id FROM tags WHERE name = ?)', args: [tagName] })
+    await db.execute({ sql: 'DELETE FROM tags WHERE name = ?', args: [tagName] })
+  } catch {}
   const result = await db.execute('SELECT id, tags FROM notes')
   for (const row of result.rows) {
     const tags = JSON.parse(row.tags as string) as string[]
@@ -530,6 +732,78 @@ export async function getHabitsCount(): Promise<number> {
   const db = getClient()
   const result = await db.execute('SELECT COUNT(*) as count FROM habits')
   return result.rows[0]?.count as number || 0
+}
+
+export async function createAttachment(data: {
+  noteId: string
+  filename: string
+  url: string
+  mimeType: string
+  fileSize: number
+}): Promise<Attachment> {
+  const db = getClient()
+  const id = genId()
+  const now = new Date().toISOString()
+  await db.execute({
+    sql: 'INSERT INTO attachments (id, note_id, filename, url, mime_type, file_size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    args: [id, data.noteId, data.filename, data.url, data.mimeType, data.fileSize, now],
+  })
+  return {
+    id,
+    noteId: data.noteId,
+    filename: data.filename,
+    url: data.url,
+    mimeType: data.mimeType,
+    fileSize: data.fileSize,
+    createdAt: now,
+  }
+}
+
+export async function getAttachmentsByNoteId(noteId: string): Promise<Attachment[]> {
+  const db = getClient()
+  const result = await db.execute({
+    sql: 'SELECT * FROM attachments WHERE note_id = ? ORDER BY created_at ASC',
+    args: [noteId],
+  })
+  return result.rows.map(row => ({
+    id: row.id as string,
+    noteId: row.note_id as string,
+    filename: row.filename as string,
+    url: row.url as string,
+    mimeType: row.mime_type as string,
+    fileSize: row.file_size as number,
+    createdAt: row.created_at as string,
+  }))
+}
+
+export async function getAttachment(id: string): Promise<Attachment | null> {
+  const db = getClient()
+  const result = await db.execute({
+    sql: 'SELECT * FROM attachments WHERE id = ?',
+    args: [id],
+  })
+  if (result.rows.length === 0) return null
+  const row = result.rows[0]
+  return {
+    id: row.id as string,
+    noteId: row.note_id as string,
+    filename: row.filename as string,
+    url: row.url as string,
+    mimeType: row.mime_type as string,
+    fileSize: row.file_size as number,
+    createdAt: row.created_at as string,
+  }
+}
+
+export async function deleteAttachment(id: string): Promise<boolean> {
+  const db = getClient()
+  const result = await db.execute({ sql: 'DELETE FROM attachments WHERE id = ?', args: [id] })
+  return result.rowsAffected > 0
+}
+
+export async function deleteAttachmentsByNoteId(noteId: string): Promise<void> {
+  const db = getClient()
+  await db.execute({ sql: 'DELETE FROM attachments WHERE note_id = ?', args: [noteId] })
 }
 
 export async function saveChatMessage(msg: ChatMessage): Promise<void> {

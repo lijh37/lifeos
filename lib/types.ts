@@ -1,6 +1,16 @@
 export type NoteType = 'note' | 'task' | 'event'
 export type EntryType = NoteType | 'habit'
 
+export interface Attachment {
+  id: string
+  noteId: string
+  filename: string
+  url: string
+  mimeType: string
+  fileSize: number
+  createdAt: string
+}
+
 export interface Note {
   id: string
   content: string

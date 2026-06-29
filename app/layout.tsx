@@ -8,6 +8,7 @@ import { PageAnimation } from "@/components/page-animation"
 import { NotificationManager } from "@/components/notification-manager"
 import { FabButton } from "@/components/fab-button"
 import { AutoBackup } from "@/components/auto-backup"
+import CommandMenu from "@/components/command-menu"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -52,11 +53,12 @@ export default function RootLayout({
         <ThemeProvider>
           <PwaHandler />
           <NotificationManager />
+          <CommandMenu />
           <FabButton />
           <div className="flex h-full">
             <Sidebar />
             <PageAnimation>
-              <main className="flex-1 pb-16 md:pb-0">{children}</main>
+              <main className="flex-1 pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">{children}</main>
             </PageAnimation>
             <MobileNav />
           </div>

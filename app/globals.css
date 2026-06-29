@@ -185,12 +185,14 @@
 .card-hover {
   transition: all 0.2s ease;
 }
-.card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
-}
-.dark .card-hover:hover {
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+@media (hover: hover) {
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  }
+  .dark .card-hover:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
 }
 
 .skeleton-pulse {

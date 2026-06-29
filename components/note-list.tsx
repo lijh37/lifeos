@@ -56,7 +56,7 @@ interface NoteListProps {
 }
 
 export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
-  const { notes, setNotes, loading, setLoading, removeNote, updateNote } = useAppStore()
+  const { notes, setNotes, loading, setLoading, removeNote, updateNote, cursor, hasMore, setCursor, setHasMore, appendNotes } = useAppStore()
   const [filterType, setFilterType] = useState<NoteType | 'all'>(defaultFilter)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Note[] | null>(null)
@@ -66,18 +66,39 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const [showArchived, setShowArchived] = useState(false)
 
-  async function fetchNotes() {
+  async function fetchNotes(loadMore = false) {
     setLoading(true)
     try {
-      const res = await fetch('/api/notes')
+      const params = new URLSearchParams()
+      params.set('limit', '50')
+      if (loadMore && cursor) {
+        params.set('cursor', cursor)
+      }
+      const res = await fetch(`/api/notes?${params}`)
       const data = await res.json()
-      setNotes(data.notes)
+      if (loadMore) {
+        appendNotes(data.notes)
+      } else {
+        setNotes(data.notes)
+        setCursor(data.nextCursor || null)
+      }
+      setHasMore(!!data.nextCursor)
     } catch (e) {
       console.error('Failed to fetch notes:', e)
     } finally {
       setLoading(false)
     }
   }
+
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  const handleScroll = useCallback(() => {
+    if (!scrollRef.current || loading || !hasMore) return
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
+    if (scrollHeight - scrollTop - clientHeight < 200) {
+      fetchNotes(true)
+    }
+  }, [loading, hasMore, cursor])
 
   useEffect(() => {
     fetchNotes()
@@ -233,7 +254,7 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
     setDragOverId(id)
   }
 
-  function handleDrop(e: React.DragEvent, targetId: string) {
+  async function handleDrop(e: React.DragEvent, targetId: string) {
     e.preventDefault()
     if (!dragId || dragId === targetId) {
       setDragId(null)
@@ -254,6 +275,19 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
     const [moved] = reordered.splice(fromIdx, 1)
     reordered.splice(toIdx, 0, moved)
     setNotes(reordered)
+
+    // Persist new order (only in full-list mode, not search results)
+    if (!searchResults) {
+      try {
+        await fetch('/api/notes/reorder', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: reordered.map(n => n.id) }),
+        })
+      } catch (e) {
+        console.error('Failed to persist order:', e)
+      }
+    }
 
     setDragId(null)
     setDragOverId(null)
@@ -276,7 +310,7 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
             placeholder="搜索笔记…"
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
-            className="pl-9"
+            className="pl-9 text-base sm:text-sm"
           />
         </div>
         <div className="mt-3 flex items-center justify-between">
@@ -306,7 +340,7 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea ref={scrollRef} className="flex-1 p-4" onScroll={handleScroll}>
         {loading ? (
           <SkeletonNoteList count={5} />
         ) : displayNotes.length === 0 ? (
@@ -392,7 +426,7 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
       )}
 
       <Sheet open={!!editingNote} onOpenChange={(open) => { if (!open) setEditingNote(null) }}>
-        <SheetContent side="bottom" className="max-h-[85vh] sm:max-w-lg sm:mx-auto sm:rounded-t-xl">
+        <SheetContent side="bottom" className="max-h-[85vh] max-sm:max-h-[95vh] sm:max-w-lg sm:mx-auto sm:rounded-t-xl">
           <SheetHeader>
             <SheetTitle>
               {editingNote?.title || (editingNote ? stripHtml(editingNote.content).slice(0, 40) : '编辑')}
@@ -405,6 +439,7 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
                 content={editingNote.content}
                 onSave={async (html) => handleSaveContent(editingNote.id, html)}
                 placeholder="开始编辑..."
+                noteId={editingNote.id}
               />
             </div>
           )}

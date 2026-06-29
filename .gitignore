@@ -52,3 +52,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# deepwork session files
+.slim/deepwork/
+
+# uploaded attachments
+/public/uploads/*

@@ -12,16 +12,7 @@ import { Send, Bot, User, Loader2, Copy, RefreshCw, Clock, Plus, MessageSquare, 
 import { SkeletonChat } from '@/components/skeleton-card'
 import { typeLabels, typeColors } from '@/lib/constants'
 import type { AIResponse, Note, ChatMessage, Conversation } from '@/lib/types'
-
-function genId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID()
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0
-    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
-  })
-}
+import { genId } from '@/lib/utils'
 
 interface ChatProps {
   onNoteCreated?: (note: Note) => void
@@ -37,6 +28,7 @@ export default function Chat({ onNoteCreated }: ChatProps) {
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([])
   const [chatInitialized, setChatInitialized] = useState(false)
   const savedCountRef = useRef(0)
+  const activeConvIdRef = useRef<string | null>(null)
 
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
@@ -51,108 +43,107 @@ export default function Chat({ onNoteCreated }: ChatProps) {
       setTimedOut(false)
       if (isAbort || isError) return
 
-      const text = message.parts
-        .filter((p) => p.type === 'text')
-        .map((p) => (p as { text: string }).text)
-        .join('')
+      // Check if tools were used (server already saved the entry)
+      const hasToolResults = message.parts.some((p) => p.type === 'tool-result')
 
-      const userInputText = allMessages
-        .filter((m) => m.role === 'user')
-        .pop()
-        ?.parts?.filter((p) => p.type === 'text')
-        .map((p) => (p as { text: string }).text)
-        .join('')
+      if (!hasToolResults) {
+        // Fallback: parse JSON from text (for non-tool-calling scenarios)
+        const text = message.parts
+          .filter((p) => p.type === 'text')
+          .map((p) => (p as { text: string }).text)
+          .join('')
 
-      try {
-        const jsonMatch = text.match(/\{[\s\S]*\}/)
-        if (jsonMatch) {
-          const parsed: AIResponse = JSON.parse(jsonMatch[0])
-          if (parsed.isNewEntry && parsed.title !== undefined && parsed.title !== null) {
-            const now = new Date().toISOString()
-            const title = parsed.title || text.slice(0, 50).replace(/[{}"\n]/g, ' ').trim()
-
-            if (parsed.type === 'habit') {
-              const habitRes = await fetch('/api/habits', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  name: title,
-                  description: parsed.summary || '',
-                  frequency: 'daily',
-                }),
-              })
-              if (!habitRes.ok) {
-                console.error('Failed to save habit:', await habitRes.text())
-              }
-            } else {
-              const note: Note = {
-                id: genId(),
-                content: userInputText || text,
-                title,
-                type: parsed.type,
-                tags: parsed.tags,
-                dueDate: parsed.dueDate,
-                done: false,
-                createdAt: now,
-                updatedAt: now,
-              }
-              const res = await fetch('/api/notes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(note),
-              })
-              if (res.ok) {
-                const data = await res.json()
-                onNoteCreated?.(data.note)
+        try {
+          const jsonMatch = text.match(/\{[\s\S]*\}/)
+          if (jsonMatch) {
+            const parsed: AIResponse = JSON.parse(jsonMatch[0])
+            if (parsed.isNewEntry && parsed.title !== undefined && parsed.title !== null) {
+              if (parsed.type === 'habit') {
+                const habitRes = await fetch('/api/habits', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    name: parsed.title,
+                    description: parsed.summary || '',
+                    frequency: 'daily',
+                  }),
+                })
+                if (!habitRes.ok) {
+                  console.error('Failed to save habit:', await habitRes.text())
+                }
               } else {
-                console.error('Failed to save note:', await res.text())
+                const now = new Date().toISOString()
+                const noteBody = {
+                  id: genId(),
+                  content: text,
+                  title: parsed.title,
+                  type: parsed.type,
+                  tags: parsed.tags,
+                  dueDate: parsed.dueDate,
+                  done: false,
+                  createdAt: now,
+                  updatedAt: now,
+                }
+                const res = await fetch('/api/notes', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(noteBody),
+                })
+                if (res.ok) {
+                  const data = await res.json()
+                  onNoteCreated?.(data.note)
+                } else {
+                  console.error('Failed to save note:', await res.text())
+                }
               }
             }
           }
+        } catch (e) {
+          console.error('Failed to parse AI response:', e)
         }
+      }
 
-        const unsaved = allMessages.slice(savedCountRef.current)
-        if (unsaved.length > 0) {
-          for (const m of unsaved) {
-            const text = m.parts
-              .map((p: { type: string; text?: string }) => getPartText(p))
-              .join('')
-            try {
-              await fetch('/api/chat/history', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  id: m.id || genId(),
-                  role: m.role,
-                  content: text,
-                  relatedNoteId: null,
-                  conversationId: activeConversationId,
-                  createdAt: new Date().toISOString(),
-                }),
-              })
-            } catch (e) {
-              console.error('Failed to save chat message:', e)
-            }
-          }
-          savedCountRef.current = allMessages.length
-        }
-
-        if (activeConversationId) {
-          const firstUserMsg = allMessages.find(m => m.role === 'user')
-          if (firstUserMsg) {
-            const firstText = firstUserMsg.parts
-              .map((p: { type: string; text?: string }) => getPartText(p))
-              .join('')
-            const title = firstText.slice(0, 30) + (firstText.length > 30 ? '...' : '')
-            await fetch('/api/conversations', {
+      // Save chat messages (always, regardless of tool usage)
+      const unsaved = allMessages.slice(savedCountRef.current)
+      if (unsaved.length > 0) {
+        for (const m of unsaved) {
+          const text = m.parts
+            .map((p: { type: string; text?: string }) => getPartText(p))
+            .join('')
+          try {
+            await fetch('/api/chat/history', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: activeConversationId, title }),
+              body: JSON.stringify({
+                id: m.id || genId(),
+                role: m.role,
+                content: text,
+                relatedNoteId: null,
+                conversationId: activeConversationId,
+                createdAt: new Date().toISOString(),
+              }),
             })
+          } catch (e) {
+            console.error('Failed to save chat message:', e)
           }
         }
-      } catch (e) {
-        console.error('Failed to parse AI response:', e)
+        savedCountRef.current = allMessages.length
+      }
+
+      if (activeConversationId) {
+        const firstUserMsg = allMessages.find(m => m.role === 'user')
+        if (firstUserMsg) {
+          const firstText = firstUserMsg.parts
+            .map((p: { type: string; text?: string }) => getPartText(p))
+            .join('')
+          const title = firstText.slice(0, 30) + (firstText.length > 30 ? '...' : '')
+          await fetch('/api/conversations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: activeConversationId, title }),
+          })
+          loadConversations()
+        }
       }
     },
   })
@@ -228,18 +219,21 @@ export default function Chat({ onNoteCreated }: ChatProps) {
   }
 
   async function loadConversationMessages(conversationId: string) {
+    activeConvIdRef.current = conversationId
     try {
       const res = await fetch(`/api/chat/history?conversation_id=${conversationId}`)
       if (res.ok) {
         const data = await res.json()
-        const msgs = data.messages.map((m: ChatMessage) => ({
-          id: m.id,
-          role: m.role,
-          content: m.content,
-          parts: [{ type: 'text' as const, text: m.content }],
-        }))
-        setMessages(msgs)
-        savedCountRef.current = msgs.length
+        if (data.messages.length > 0) {
+          const msgs = data.messages.map((m: ChatMessage) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            parts: [{ type: 'text' as const, text: m.content }],
+          }))
+          setMessages(msgs)
+          savedCountRef.current = msgs.length
+        }
       }
     } catch (e) {
       console.error('Failed to load conversation:', e)
@@ -250,6 +244,7 @@ export default function Chat({ onNoteCreated }: ChatProps) {
 
   async function handleNewConversation() {
     const id = genId()
+    activeConvIdRef.current = id
     setActiveConversationId(id)
     setMessages([])
     savedCountRef.current = 0
@@ -258,6 +253,7 @@ export default function Chat({ onNoteCreated }: ChatProps) {
   }
 
   async function handleSelectConversation(id: string) {
+    activeConvIdRef.current = id
     setActiveConversationId(id)
     setShowSidebar(false)
   }
@@ -266,6 +262,7 @@ export default function Chat({ onNoteCreated }: ChatProps) {
     await fetch(`/api/conversations?id=${id}`, { method: 'DELETE' })
     setConversations(prev => prev.filter(c => c.id !== id))
     if (activeConversationId === id) {
+      activeConvIdRef.current = null
       setActiveConversationId(null)
       loadRecentMessages()
     }
@@ -301,17 +298,20 @@ function getMessageText(msg: typeof messages[0]): string {
       .join('')
   }
 
-  function extractAISummary(content: string): string {
+  function extractAISummary(msg: typeof messages[0]): string {
+    // If there are tool results, the text is already a clean summary
+    const text = getMessageText(msg)
     try {
-      const jsonMatch = content.match(/\{[\s\S]*\}/)
+      const clean = text.replace(/^`+json\s*|`+$/gm, '').trim()
+      const jsonMatch = clean.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         const parsed: AIResponse = JSON.parse(jsonMatch[0])
-        return parsed.summary || content
+        return parsed.summary || text
       }
     } catch {
       // ignore
     }
-    return content
+    return text
   }
 
   function getTypeFromContent(content: string): string | undefined {
@@ -334,7 +334,7 @@ function getMessageText(msg: typeof messages[0]): string {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (input.trim() && status === 'ready') {
-      if (!activeConversationId) {
+      if (!activeConvIdRef.current) {
         handleNewConversation()
       }
       setTimedOut(false)
@@ -462,7 +462,7 @@ function getMessageText(msg: typeof messages[0]): string {
                   )
                 }
 
-                const summary = extractAISummary(text)
+                const summary = extractAISummary(msg)
                 return (
                   <div key={msg.id || i} className="flex justify-start">
                     <div className="flex max-w-[80%] gap-3">
@@ -542,7 +542,7 @@ function getMessageText(msg: typeof messages[0]): string {
                 }}
                 onKeyDown={handleKeyDown}
                 placeholder="输入你想记录的内容…"
-                className="min-h-[44px] resize-none"
+                className="min-h-[44px] resize-none text-base sm:text-sm"
                 rows={1}
                 disabled={isLoading}
               />

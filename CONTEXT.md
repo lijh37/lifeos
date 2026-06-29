@@ -1,209 +1,59 @@
-# LifeOS - 项目上下文（会话恢复用）
+# LifeOS — 对话上下文
 
-## 项目概述
+> 每次会话开始时读取此文件获取上下文。每次会话结束时更新。
 
-个人 AI 生活助手应用，用户通过自然语言与 AI 对话，AI 自动解析为结构化笔记、任务、事件或习惯。支持手机端和 PC 端、深色模式、数据导出、PWA 离线、统计看板。
+## 项目概况
 
-## 当前状态（截至最新）
+LifeOS 是一个个人 AI 生活助手应用。用户通过自然语言与 AI 对话，AI 自动解析为结构化笔记、任务、事件或习惯。
 
-### ✅ 已实现（28 路由，11 页面 + 17 API）
+技术栈：Next.js 16 (App Router) + React 19 + Tailwind v4 + AI SDK v7 + @libsql/client + Zustand v5 + TipTap (富文本)
 
-**核心能力**
-- **AI 对话式记录**：DeepSeek 解析自然语言 → 自动创建笔记/任务/事件/习惯
-- **笔记/任务/事件** 三种类型，自动打标签，按类型筛选、搜索、标记完成
-- **批量操作**：多选 → 批量删除/归档/改标签
-- **拖拽排序**：HTML5 DnD API，卡片拖拽重排
-- **预算管理**：月度预算规划（固定/浮动支出），实际录入对比，超支/结余分析
-- **习惯养成**：AI 创建习惯 + 每日打卡 + 连续天数 streak + 趋势图表
-- **聊天持久化**：对话多会话管理，自动保存标题，刷新恢复历史
-- **数据备份自动化**：localStorage 自动备份（5 分钟间隔），手动一键恢复
-- **安全**：密码保护中间件 + Bearer Token API 鉴权 + /api/chat 限流（20 req/min） + XSS 防护（DOMPurify 显式白名单配置）
+## 已完成工作
 
-**页面（11 个）**
-- `/` AI 对话首页（流式聊天，打字动画，超时重试，复制按钮，多会话管理）
-- `/notes` 笔记列表（筛选/搜索/标记完成/删除/富文本编辑/批量操作/拖拽排序/归档过滤）
-- `/tasks` 任务列表（默认过滤 task 类型）
-- `/expenses` 预算管理（月度设定 + 实际录入 + 结算对比 + 历史记录）
-- `/habits` 习惯（每日打卡 + streak + 进度计数 + 趋势图表）
-- `/calendar` 日历（月历网格 + 彩色圆点标记 + 点击查看当日详情）
-- `/search` 全局搜索（跨笔记/预算/习惯，300ms 防抖，分组显示）
-- `/tags` 标签管理（列表 + 内联重命名 + 删除确认）
-- `/stats` 统计看板（摘要卡片 + 预算执行 + 热门标签 + 最近动态）
-- `/settings` 设置（数据概览/清除 + 备份导出/导入恢复 + 关于信息）
-- `/login` 登录页（密码保护）
+### 迭代 1 — 稳定性加固 (6/6)
+- chat.tsx 竞态条件修复、rate-limiter 内存泄漏、rich-editor 闭包陷阱
+- 拖拽排序持久化、initDB 缓存
 
-**API（17 个）**
-- `/api/chat` DeepSeek 流式对话（含限流）
-- `/api/chat/history` 聊天历史 CRUD（支持 conversation_id 过滤）
-- `/api/conversations` 对话管理（GET 列表 / POST 创建 / DELETE 删除）
-- `/api/notes` 笔记 CRUD（支持 type/q/startDate/endDate/limit/offset 参数）
-- `/api/notes/[id]` 单条笔记 GET/PATCH/DELETE
-- `/api/notes/batch` 批量操作 POST（action: delete/archive/tag）
-- `/api/budgets` 预算 CRUD（按月份查询/保存）
-- `/api/habits` 习惯 CRUD（含 streaks、今日完成、月趋势统计）
-- `/api/export` 导出（Markdown / JSON / CSV 含 BOM）
-- `/api/search` 跨类型搜索（notes + habits）
-- `/api/tags` 标签管理（GET 列表 / PATCH 重命名 / DELETE 删除）
-- `/api/settings` 数据统计 GET + 批量清除 DELETE
-- `/api/import` JSON 备份导入 POST
-- `/api/stats` 聚合统计（笔记数/预算/打卡/标签/动态/习惯趋势）
-- `/api/auth` 密码验证（POST）
+### 迭代 2 — 测试体系建设 (58 tests, 6 files)
+- Unit: rate-limiter(6), db(18), prompts(4), chat(13), note-list(9), chat-rendering(5)
+- CI: `.github/workflows/ci.yml`
 
-**体验增强**
-- **深色模式**：light/dark/system 三态切换（localStorage 持久化）
-- **PWA 安装**：`beforeinstallprompt` useRef 保存 + onPointerDown 同步触发，含诊断面板（右上角 Bug / `?debug=1`）
-- **通知提醒**：浏览器通知权限请求 + 到期检查（on mount + 每 5 分钟）+ 浏览器推送 + 内联降级提醒
-- **UI 动效**：页面 fadeIn 过渡、列表交错入场、卡片 hover 悬浮、骨架屏加载（3 种变体）
-- **导航**：PC 侧栏 + 手机底部 Tab（10 项：对话/笔记/任务/预算/习惯/搜索/标签/日历/统计/设置）
-- **数据导出**：Markdown / JSON / CSV（含 BOM，Excel 中文友好）
-- **数据备份自动化**：localStorage 自动备份，每次数据变更实时保存
-- **离线缓存**：SW 预缓存 + stale-while-revalidate 策略，关键页面离线可用
-- **富文本编辑**：基于 TipTap，支持粗体/斜体/标题/列表/任务列表，自动保存
+### 迭代 3 — 架构升级 (7/7)
+- 游标分页 + 无限滚动 + FTS5 搜索 + 标签规范化 + LRU 缓存 + AI 模型可配置
 
-**基础设施**
-- **生产部署**：Vercel `https://opencode-demo.vercel.app`，密码保护
-- **云端数据库**：Turso `aps1` 集群，5 表已迁移
-- **密码保护**：`proxy.ts`（Next.js 16 中间件）验证 `app_auth` cookie 或 Bearer Token，`/login` 登录页，`/api/auth` 接口
-- **PWA 配置**：manifest.json（192+512 PNG 图标，maskable + any）
-- **离线缓存**：Service Worker 预缓存静态资源 + stale-while-revalidate 策略
-- **TypeScript 零错误**，build 通过，vitest 9 项测试通过
+### 迭代 4 — AI 增强 (3/3)
+- AI SDK v6→v7 升级 (`ai` 7.0.4, `@ai-sdk/react` 4.0.2, `@ai-sdk/openai` 4.0.0)
+- Function Calling: createEntry + createHabit 服务端执行，客户端保留 JSON 回退
+- 上下文窗口裁剪 (last 40) + maxOutputTokens: 2048
 
-### ❌ 待办
+### AI 查询工具 (5 tools)
+- `searchNotesByKeyword` / `searchHabitsByKeyword` / `getNotesInDateRange`
+- `getHabitProgress` / `getBudgetInfo`
+- prompts.ts 更新为 7 工具模式 + 查询/创建规则
 
-| 优先级 | 功能 | 备注 |
-|---|---|---|
-| P3 | **迭代优化** | 附件上传、多端同步、E2E 持续集成 |
+### 命令菜单 Cmd+K
+- `components/command-menu.tsx` — Cmd+K 全局唤出，搜索+导航+快捷操作
+- 响应式: 桌面居中卡片，移动端全屏
+- 键盘导航 (↑↓/Enter/Escape)
 
-## 技术栈
+### 附件上传 (完成)
+- DB: `attachments` 表 (note_id, filename, url, mime_type, file_size)
+- API: POST/GET/DELETE `/api/upload`
+- 存储: `public/uploads/` 本地文件系统
+- UI: RichEditor 图片上传按钮 + TipTap ImageExtension + loading 状态
 
-| 层 | 选型 |
-|---|---|
-| 前端框架 | Next.js 16 (App Router) |
-| 语言 | TypeScript |
-| UI | Tailwind CSS + shadcn/ui |
-| AI | DeepSeek API (`deepseek-v4-flash`) |
-| AI SDK | `@ai-sdk/react` + `ai` (v6) |
-| 数据库 | `@libsql/client` SQLite + Turso |
-| 状态管理 | Zustand |
-| 日期处理 | date-fns v4 |
-| 图标 | lucide-react |
+### 移动端优化 (完成)
+- MobileNav: 10项→4主项+「更多」Sheet (3列网格)
+- 触控目标: min-h-[56px] (远超 44px)
+- 安全区域: `env(safe-area-inset-bottom)` 全路径覆盖
+- iOS 缩放: 所有输入框 `text-base` 最低字号
+- 卡片悬浮: `@media (hover: hover)` 避免滚动抖动
 
-## AI SDK v6 关键约定
+## Oracle 代码审查
+- 迭代 3: 7 问题，修复 3 个
+- 迭代 4: 14 项建议，全部采纳
 
-- `useChat` 从 `@ai-sdk/react` 导入（非 `ai/react`）
-- 服务端 API Route 使用 `convertToModelMessages`（async）和 `result.toUIMessageStreamResponse()`
-- 客户端使用 `DefaultChatTransport` 配置 API 端点
-- DeepSeek 需使用 `deepseek.chat('deepseek-v4-flash')`（.chat() 走 Chat Completions API）
-- 消息内容通过 `message.parts` 获取（而非 `message.content`）
-
-## 项目结构
-
-```
-opencode-demo/
-├── app/
-│   ├── layout.tsx              # 全局布局（侧栏 + 底栏 + PWA 处理 + 通知管理器 + 页面动效）
-│   ├── page.tsx                # AI 对话首页（dynamic import Chat）
-│   ├── notes/page.tsx          # 笔记列表
-│   ├── tasks/page.tsx          # 任务列表
-│   ├── habits/page.tsx         # 习惯（打卡 + streak + 趋势）
-│   ├── calendar/page.tsx       # 日历视图
-│   ├── search/page.tsx         # 全局搜索
-│   ├── tags/page.tsx           # 标签管理
-│   ├── stats/page.tsx          # 统计看板
-│   ├── settings/page.tsx       # 设置（数据管理 + 备份恢复）
-│   ├── login/page.tsx          # 登录页
-│   └── api/
-│       ├── chat/route.ts       # DeepSeek 流式对话（限流）
-│       ├── chat/history/route.ts # 聊天历史 CRUD
-│       ├── conversations/route.ts # 对话管理
-│       ├── notes/route.ts      # 笔记 CRUD（含日期范围/分页）
-│       ├── notes/[id]/route.ts # 单条笔记 GET/PATCH/DELETE
-│       ├── notes/batch/route.ts # 批量操作（delete/archive/tag）
-│       ├── habits/route.ts     # 习惯 CRUD（含 streaks、趋势）
-│       ├── export/route.ts     # 导出 MD/JSON/CSV
-│       ├── search/route.ts     # 跨类型搜索
-│       ├── tags/route.ts       # 标签管理
-│       ├── settings/route.ts   # 数据统计 + 批量清除
-│       ├── auth/route.ts       # 密码验证（POST）
-│       ├── import/route.ts     # JSON 备份导入
-│       └── stats/route.ts      # 聚合统计
-├── components/
-│   ├── ui/                     # shadcn 组件（Badge/Button/Card/Checkbox/Input/ScrollArea/Sheet/Textarea）
-│   ├── sidebar.tsx             # 导航（PC 侧栏 + 手机底部栏，10 项）
-│   ├── chat.tsx                # AI 对话组件（核心，含对话管理）
-│   ├── note-list.tsx           # 笔记/任务列表（批量操作+拖拽排序+归档过滤）
-│   ├── rich-editor.tsx         # 富文本编辑器（基于 TipTap，输出 XSS 净化）
-│   ├── export-button.tsx       # 导出按钮（MD/CSV/JSON）
-│   ├── auto-backup.tsx         # 自动备份钩子 + 管理面板
-│   ├── error-boundary.tsx      # React Error Boundary（notes/tasks/habits 页面）
-│   ├── fab-button.tsx          # 悬浮快捷按钮（可拖拽）
-│   ├── theme-provider.tsx      # 主题上下文
-│   ├── theme-toggle.tsx        # 深色模式切换
-│   ├── pwa-handler.tsx         # PWA 安装管理 + 诊断面板
-│   ├── notification-manager.tsx # 通知提醒管理器
-│   ├── page-animation.tsx      # 页面过渡动画容器
-│   └── skeleton-card.tsx       # 骨架屏组件（NoteList/Habits/Chat 三种变体）
-├── lib/
-│   ├── db.ts                   # 数据库操作（双模式 SQLite/Turso，含搜索/标签/统计/清除）
-│   ├── types.ts                # TypeScript 类型（Note/Budget/Habit/AIResponse/EntryType）
-│   ├── prompts.ts              # AI 系统提示词（4 种输出类型: note/task/event/habit）
-│   ├── constants.ts            # 共享常量（类型颜色/分类标签映射）
-│   ├── rate-limiter.ts         # 内存限流器（20 req/min/IP）
-│   └── utils.ts                # cn() 工具函数
-├── store/
-│   └── index.ts                # Zustand 全局状态
-├── scripts/
-│   ├── https-setup.sh          # HTTPS 开发证书一键生成（mkcert）
-│   ├── migrate-to-turso.ts     # 本地→Turso 数据迁移
-│   ├── setup-turso.ts          # Turso 数据库创建 + 数据迁移一键脚本
-│   ├── list-turso.ts           # Turso 数据列表演示
-│   └── tunnel.sh               # HTTPS 隧道（cloudflared/ngrok/localtunnel）
-├── proxy.ts                   # Next.js 16 中间件（密码保护，API 鉴权）
-├── data/
-│   └── schema.sql              # 完整 DDL（5 表 + 索引）
-├── vercel.json                 # Vercel 部署配置
-├── next.config.ts              # Next.js 配置
-├── .env.example                # 环境变量模板
-├── vitest.config.ts            # vitest 单元测试配置
-├── e2e/
-│   ├── playwright.config.ts    # Playwright E2E 配置
-│   └── core-flow.spec.ts       # 7 个核心流程测试
-└── public/
-    ├── manifest.json            # PWA 配置（192+512 图标，maskable）
-    ├── sw.js                    # Service Worker
-    └── icons/                   # 应用图标
-```
-
-## 数据库
-
-`@libsql/client` 直接操作（非 ORM），5 个表：
-
-**notes**（笔记/任务/事件）: id, content, title, type, tags(JSON), due_date, done, created_at, updated_at
-- 索引: type, created_at, due_date, idx_notes_type_due (type, due_date), idx_notes_done (type, done)
-
-**chat_messages**（聊天历史）: id, role, content, related_note_id, conversation_id, created_at
-- 索引: idx_chat_messages_conv (conversation_id, created_at)
-
-**conversations**（对话）: id, title, created_at, updated_at
-
-**habits**（习惯）: id, name, description, frequency, created_at
-
-**habit_completions**（打卡）: id, habit_id, date, completed, created_at
-- 唯一约束: (habit_id, date)
-
-## 安全审计现状
-
-- **API 鉴权**：proxy.ts 中间件检查 app_auth cookie + Bearer Token
-- **速率限制**：chatRateLimiter (20 req/min/IP) 在 /api/chat 入口
-- **XSS 防护**：DOMPurify 显式配置 ALLOWED_TAGS/ALLOWED_ATTR 白名单
-- **密码保护**：/login 页面 + APP_PASSWORD 环境变量
-
-## AI Prompt 设计
-
-`lib/prompts.ts` 的 SYSTEM_PROMPT 控制 AI 输出。AI 必须返回纯 JSON（无代码围栏）：
-
-```json
-{"type":"note|task|event|habit","title":"标题","tags":["标签"],"dueDate":"ISO日期|null","summary":"回复","isNewEntry":true|false}
-```
-
-支持 4 种类型：note（笔记）、task（任务）、event（事件）、habit（习惯）。
+## 剩余方向
+1. E2E 测试更新适配工具调用
+2. 跨对话记忆/RAG
+3. i18n
