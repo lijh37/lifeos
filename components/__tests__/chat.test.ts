@@ -40,18 +40,18 @@ describe('AI Response JSON Parsing', () => {
     })
 
     it('should handle JSON inside backtick fences', () => {
-      const input = '```json\n{"type":"task","title":"完成任务","tags":[],"dueDate":null,"summary":"已创建","isNewEntry":true}\n```'
+      const input = '```json\n{"type":"note","title":"测试笔记","tags":[],"dueDate":null,"summary":"已创建","isNewEntry":true}\n```'
       const result = extractJson(input)
       expect(result).not.toBeNull()
-      expect(result!.type).toBe('task')
+      expect(result!.type).toBe('note')
     })
 
     it('should handle JSON with surrounding text', () => {
-      const input = '好的，已为您创建。{"type":"event","title":"开会","tags":["工作"],"dueDate":"2026-06-30T14:00:00","summary":"已创建事件","isNewEntry":true}'
+      const input = '好的，已为您创建。{"type":"habit","title":"每天读书","tags":["学习"],"dueDate":null,"summary":"已创建习惯","isNewEntry":true}'
       const result = extractJson(input)
       expect(result).not.toBeNull()
-      expect(result!.type).toBe('event')
-      expect(result!.dueDate).toBe('2026-06-30T14:00:00')
+      expect(result!.type).toBe('habit')
+      expect(result!.summary).toBe('已创建习惯')
     })
 
     it('should handle mixed text before JSON', () => {
@@ -89,8 +89,8 @@ describe('AI Response JSON Parsing', () => {
 
   describe('extractType', () => {
     it('should return type from JSON', () => {
-      const input = '{"type":"task","title":"测试","tags":[],"dueDate":null,"summary":"ok","isNewEntry":true}'
-      expect(extractType(input)).toBe('task')
+      const input = '{"type":"note","title":"测试","tags":[],"dueDate":null,"summary":"ok","isNewEntry":true}'
+      expect(extractType(input)).toBe('note')
     })
 
     it('should return undefined for non-JSON', () => {
@@ -106,8 +106,8 @@ describe('AI Response JSON Parsing', () => {
       expect(result!.title).toBe('多行')
     })
 
-    it('should handle all 4 entry types', () => {
-      const types = ['note', 'task', 'event', 'habit']
+    it('should handle all entry types', () => {
+      const types = ['note', 'habit']
       for (const type of types) {
         const json = `{"type":"${type}","title":"test","tags":[],"dueDate":null,"summary":"","isNewEntry":true}`
         expect(extractType(json)).toBe(type)

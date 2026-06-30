@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { Bell, X, Clock, CheckSquare, Calendar } from 'lucide-react'
+import { Bell, X, Clock } from 'lucide-react'
 import { format, isPast, parseISO } from 'date-fns'
 import type { Note } from '@/lib/types'
 
@@ -46,7 +46,7 @@ export function NotificationManager() {
         for (const item of items) {
           if (notifiedRef.current.has(item.id)) continue
           notifiedRef.current.add(item.id)
-          const label = item.type === 'task' ? '任务' : item.type === 'event' ? '事件' : '条目'
+          const label = '条目'
           new Notification('LifeOS 提醒', {
             body: `${label}「${item.title}」今天截止`,
             icon: '/icons/icon-192.png',
@@ -96,7 +96,7 @@ export function NotificationManager() {
               <X className="h-4 w-4 text-muted-foreground" />
             </button>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">接收任务截止和事件提醒</p>
+          <p className="mt-1 text-xs text-muted-foreground">接收到期提醒</p>
           <div className="mt-2 flex gap-2">
             <button
               onClick={requestPermission}
@@ -130,7 +130,6 @@ export function NotificationManager() {
           <div className="mt-1.5 space-y-1">
             {dueItems.slice(0, 3).map(item => (
               <p key={item.id} className="truncate text-xs text-amber-700 dark:text-amber-300">
-                {item.type === 'task' ? <CheckSquare className="mr-1 inline h-3 w-3" /> : <Calendar className="mr-1 inline h-3 w-3" />}
                 {item.title}
               </p>
             ))}

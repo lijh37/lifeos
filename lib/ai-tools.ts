@@ -5,7 +5,7 @@ import { searchNotes, searchHabits, getNotesByDateRange, getHabits, getStreaks, 
 // --- Query tools ---
 
 export const searchNotesByKeyword = tool({
-  description: '搜索笔记、任务或事件。根据关键词搜索标题和内容，返回匹配的记录列表。',
+  description: '搜索笔记。根据关键词搜索标题和内容，返回匹配的记录列表。',
   inputSchema: z.object({
     query: z.string().min(1).describe('搜索关键词，如 "会议"、"跑步"、"项目"'),
   }),
@@ -54,11 +54,11 @@ export const searchHabitsByKeyword = tool({
 })
 
 export const getNotesInDateRange = tool({
-  description: '按日期范围查询笔记、任务或事件。查询一段时间内创建的记录。',
+  description: '按日期范围查询笔记。查询一段时间内创建的记录。',
   inputSchema: z.object({
     startDate: z.string().describe('开始日期，ISO 格式如 "2026-06-01"'),
     endDate: z.string().describe('结束日期，ISO 格式如 "2026-06-30"'),
-    type: z.enum(['note', 'task', 'event']).optional().describe('可选，过滤记录类型'),
+    type: z.enum(['note']).optional().describe('可选，过滤记录类型'),
   }),
   execute: async ({ startDate, endDate, type }) => {
     await initDB()

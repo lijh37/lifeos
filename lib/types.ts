@@ -1,4 +1,4 @@
-export type NoteType = 'note' | 'task' | 'event'
+export type NoteType = 'note'
 export type EntryType = NoteType | 'habit'
 
 export interface Attachment {

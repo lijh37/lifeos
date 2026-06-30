@@ -18,7 +18,7 @@ interface BudgetInfo {
 }
 
 interface StatsData {
-  counts: { note: number; task: number; event: number }
+  counts: { note: number }
   currentBudget: BudgetInfo | null
   habitCompletion7d: number
   habitTrend: { date: string; count: number }[]
@@ -48,7 +48,7 @@ export default function StatsPage() {
 
   if (!data) return null
 
-  const totalNotes = data.counts.note + data.counts.task + data.counts.event
+  const totalNotes = data.counts.note
   const budgetInfo = data.currentBudget
   const budgetText = budgetInfo
     ? `¥${(budgetInfo.fixedBudget + budgetInfo.variableBudget).toFixed(0)}`

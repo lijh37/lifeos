@@ -11,7 +11,7 @@ import { BackupManager } from '@/components/auto-backup'
 export default function SettingsPage() {
   const [stats, setStats] = useState<{
     notes: number
-    notesDetail: { note: number; task: number; event: number }
+    notesDetail: { note: number }
     budgets: number
     habits: number
   } | null>(null)
@@ -77,8 +77,6 @@ export default function SettingsPage() {
 
   const summary = stats ? [
     { label: '笔记', count: stats.notesDetail.note, type: 'notes', color: 'bg-blue-500' },
-    { label: '任务', count: stats.notesDetail.task, type: 'notes', color: 'bg-orange-500' },
-    { label: '事件', count: stats.notesDetail.event, type: 'notes', color: 'bg-purple-500' },
     { label: '预算', count: stats.budgets, type: 'budgets', color: 'bg-emerald-500' },
     { label: '习惯', count: stats.habits, type: 'habits', color: 'bg-rose-500' },
   ] : []
@@ -162,7 +160,7 @@ export default function SettingsPage() {
                 <input ref={fileRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                导出的 JSON 文件包含所有笔记、任务、事件和预算记录
+                导出的 JSON 文件包含所有笔记、预算和习惯记录
               </p>
             </CardContent>
           </Card>

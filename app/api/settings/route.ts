@@ -9,7 +9,7 @@ export async function GET() {
     getHabitsCount(),
   ])
   return NextResponse.json({
-    notes: notes.note + notes.task + notes.event,
+    notes: notes.note,
     notesDetail: notes,
     budgets,
     habits,

@@ -31,17 +31,10 @@ export async function GET(req: NextRequest) {
   let total: number
   let nextCursor: string | null = null
 
-  if (cursor) {
-    const result = await getNotesCursor(noteType, limit, cursor)
-    notes = result.notes
-    nextCursor = result.nextCursor
-    total = await getNotesCountByType(noteType)
-  } else {
-    [notes, total] = await Promise.all([
-      getNotes(noteType, limit, offset),
-      getNotesCountByType(noteType),
-    ])
-  }
+  const result = await getNotesCursor(noteType, limit, cursor || undefined)
+  notes = result.notes
+  nextCursor = result.nextCursor
+  total = await getNotesCountByType(noteType)
 
   return NextResponse.json({ notes: summary ? notes.map(stripContent) : notes, total, limit, offset, nextCursor })
 }

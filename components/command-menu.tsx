@@ -11,10 +11,8 @@ import type { Note, Habit } from '@/lib/types'
 import {
   Bot,
   Notebook,
-  CheckSquare,
   PiggyBank,
   Trophy,
-  CalendarDays,
   Search as SearchIcon,
   Settings,
   Tags,
@@ -31,12 +29,10 @@ import {
 const NAV_ITEMS: Array<{ href: string; label: string; icon: LucideIcon }> = [
   { href: '/', label: 'AI 对话', icon: Bot },
   { href: '/notes', label: '笔记', icon: Notebook },
-  { href: '/tasks', label: '任务', icon: CheckSquare },
   { href: '/expenses', label: '预算', icon: PiggyBank },
   { href: '/habits', label: '习惯', icon: Trophy },
   { href: '/search', label: '搜索', icon: SearchIcon },
   { href: '/tags', label: '标签', icon: Tags },
-  { href: '/calendar', label: '日历', icon: CalendarDays },
   { href: '/stats', label: '统计', icon: BarChart3 },
   { href: '/settings', label: '设置', icon: Settings },
 ]
@@ -52,7 +48,6 @@ interface QuickAction {
 
 const QUICK_ACTIONS: QuickAction[] = [
   { id: 'new-note', label: '新建笔记', icon: Notebook, kind: 'navigate', href: '/' },
-  { id: 'new-task', label: '新建任务', icon: CheckSquare, kind: 'navigate', href: '/tasks' },
   { id: 'new-habit', label: '新建习惯', icon: Trophy, kind: 'navigate', href: '/habits' },
   { id: 'toggle-theme', label: '切换主题', icon: Sun, kind: 'theme' },
 ]

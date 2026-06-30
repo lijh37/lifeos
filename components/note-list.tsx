@@ -12,13 +12,11 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Notebook,
   CheckSquare,
-  Calendar,
+  Square,
   Trash2,
   Search,
   Pencil,
   Plus,
-  CheckSquare as CheckboxIcon,
-  Square,
   Tags,
   Archive,
   GripVertical,
@@ -51,7 +49,7 @@ export function NoteList({ defaultFilter = 'note' }: NoteListProps) {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      params.set('limit', '100')
+      params.set('limit', '20')
       params.set('summary', 'true')
       if (loadMore && cursor) {
         params.set('cursor', cursor)
@@ -127,13 +125,11 @@ export function NoteList({ defaultFilter = 'note' }: NoteListProps) {
 
   const typeIcons: Record<string, typeof Notebook> = {
     note: Notebook,
-    task: CheckSquare,
-    event: Calendar,
   }
 
   const typeLabels: Record<string, string> = { ...typeLabelsFromConstants, all: '全部' }
 
-  const filters: (NoteType | 'all')[] = ['all', 'note', 'task', 'event']
+  const filters: (NoteType | 'all')[] = ['all', 'note']
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds(prev => {
@@ -327,7 +323,7 @@ export function NoteList({ defaultFilter = 'note' }: NoteListProps) {
           <>
             <div className="mb-2 flex items-center justify-between">
               <Button variant="ghost" size="sm" onClick={toggleSelectAll} className="text-xs gap-1">
-                {isSelectedAll ? <CheckboxIcon className="h-3.5 w-3.5" /> : <Square className="h-3.5 w-3.5" />}
+                {isSelectedAll ? <CheckSquare className="h-3.5 w-3.5" /> : <Square className="h-3.5 w-3.5" />}
                 {isSelectedAll ? '取消全选' : '全选'}
               </Button>
               <span className="text-xs text-muted-foreground">
@@ -449,7 +445,7 @@ function NoteCard({
                 className="shrink-0 text-muted-foreground hover:text-foreground"
               >
                 {isSelected ? (
-                  <CheckboxIcon className="h-4 w-4 text-primary" />
+                  <CheckSquare className="h-4 w-4 text-primary" />
                 ) : (
                   <Square className="h-4 w-4" />
                 )}

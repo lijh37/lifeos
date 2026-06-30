@@ -22,7 +22,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "LifeOS - AI 生活助手",
-  description: "你的个人 AI 生活助手，记录笔记、管理任务、追踪生活",
+  description: "你的个人 AI 生活助手，记录笔记、追踪习惯、管理预算",
   manifest: "/manifest.json",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "LifeOS" },
 }

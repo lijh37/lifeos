@@ -22,13 +22,11 @@ export async function GET() {
     c.execute(`SELECT COUNT(*) as count FROM habit_completions WHERE completed=1`),
   ])
 
-  let note = 0, task = 0, event = 0
+  let note = 0
   for (const r of noteCounts.rows) {
     const t = r.type as string
     const n = r.count as number
     if (t === 'note') note = n
-    else if (t === 'task') task = n
-    else if (t === 'event') event = n
   }
 
   const topTags: Record<string, number> = {}
@@ -53,7 +51,7 @@ export async function GET() {
   } : null
 
   return NextResponse.json({
-    counts: { note, task, event },
+    counts: { note },
     currentBudget,
     habitCompletion7d: (habitRate.rows[0]?.done as number) || 0,
     habitTrend: habitTrend.rows.map(r => ({

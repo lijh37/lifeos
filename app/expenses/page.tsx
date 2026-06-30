@@ -326,7 +326,7 @@ export default function BudgetPage() {
                     <>
                       <div className="mb-3 flex items-center gap-2">
                         <Sparkles className="h-4 w-4 text-green-500" />
-                        <h2 className="text-sm font-medium">月任务打卡</h2>
+                        <h2 className="text-sm font-medium">月度结算</h2>
                       </div>
                       <p className="mb-3 text-xs text-muted-foreground">恭喜！本月预算未超支，给自己点个赞吧 ✨</p>
                       <div className="space-y-3">
@@ -336,8 +336,8 @@ export default function BudgetPage() {
                             onCheckedChange={(checked) => saveBudgetData({ isCompleted: checked })}
                           />
                           <div>
-                            <p className="text-sm font-medium">完成月任务</p>
-                            <p className="text-xs text-muted-foreground">本月预算未超出预算，任务达成！</p>
+                            <p className="text-sm font-medium">预算达标</p>
+                            <p className="text-xs text-muted-foreground">本月实际支出未超出预算</p>
                           </div>
                         </label>
                         <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-accent transition-colors">

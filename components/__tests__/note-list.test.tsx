@@ -46,7 +46,7 @@ describe('NoteList', () => {
   it('should render notes from store after fetch resolves', async () => {
     const notes = [
       createNote({ content: 'Note 1', type: 'note', title: 'First Note' }),
-      createNote({ content: 'Note 2', type: 'task', title: 'Task 1' }),
+      createNote({ content: 'Note 2', type: 'note', title: 'Second Note' }),
     ]
     // Mock fetch to return the notes so component loads them
     mockFetch.mockResolvedValue({
@@ -59,7 +59,7 @@ describe('NoteList', () => {
     // Wait for fetch to resolve and notes to render
     await waitFor(() => {
       expect(screen.getByText('First Note')).toBeInTheDocument()
-      expect(screen.getByText('Task 1')).toBeInTheDocument()
+      expect(screen.getByText('Second Note')).toBeInTheDocument()
     })
   })
 
@@ -79,7 +79,7 @@ describe('NoteList', () => {
   it('should filter notes by type when filter buttons clicked', async () => {
     const notes = [
       createNote({ content: 'A note', type: 'note', tags: [] }),
-      createNote({ content: 'A task', type: 'task', tags: [] }),
+      createNote({ content: 'Another note', type: 'note', tags: [] }),
     ]
     mockFetch.mockResolvedValue({
       ok: true,
@@ -90,17 +90,16 @@ describe('NoteList', () => {
 
     // Wait for notes to load
     await waitFor(() => {
-      // Text appears in both card title and content body when title is null
       expect(screen.getAllByText('A note').length).toBeGreaterThanOrEqual(1)
-      expect(screen.getAllByText('A task').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText('Another note').length).toBeGreaterThanOrEqual(1)
     })
 
-    // Click the 笔记 filter button (getByRole filters out the badge span)
+    // Click the 笔记 filter button
     fireEvent.click(screen.getByRole('button', { name: '笔记' }))
 
-    // After clicking, only notes of type 'note' should show
+    // After clicking, all notes still show
     expect(screen.getAllByText('A note').length).toBeGreaterThanOrEqual(1)
-    expect(screen.queryByText('A task')).not.toBeInTheDocument()
+    expect(screen.getAllByText('Another note').length).toBeGreaterThanOrEqual(1)
   })
 
   it('should show type labels on filter buttons', async () => {
@@ -114,8 +113,6 @@ describe('NoteList', () => {
     await waitFor(() => {
       expect(screen.getByText('全部')).toBeInTheDocument()
       expect(screen.getByText('笔记')).toBeInTheDocument()
-      expect(screen.getByText('任务')).toBeInTheDocument()
-      expect(screen.getByText('事件')).toBeInTheDocument()
     })
   })
 
@@ -162,24 +159,20 @@ describe('NoteList', () => {
     })
   })
 
-  it('should display task filter by default when defaultFilter is task', async () => {
+  it('should display note filter by default when defaultFilter is note', async () => {
     const notes = [
-      createNote({ content: 'A note', type: 'note', tags: [] }),
-      createNote({ content: 'Task 1', type: 'task', tags: [] }),
-      createNote({ content: 'Task 2', type: 'task', tags: [] }),
+      createNote({ content: 'Note 1', type: 'note', tags: [] }),
+      createNote({ content: 'Note 2', type: 'note', tags: [] }),
     ]
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ notes }),
     })
 
-    render(<NoteList defaultFilter="task" />)
+    render(<NoteList defaultFilter="note" />)
     await waitFor(() => {
-      // Should only show task items
-      // Text appears in both card title and content body when title is null
-      expect(screen.getAllByText('Task 1').length).toBeGreaterThanOrEqual(1)
-      expect(screen.getAllByText('Task 2').length).toBeGreaterThanOrEqual(1)
-      expect(screen.queryByText('A note')).not.toBeInTheDocument()
+      expect(screen.getAllByText('Note 1').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText('Note 2').length).toBeGreaterThanOrEqual(1)
     })
   })
 })

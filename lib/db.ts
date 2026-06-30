@@ -709,17 +709,12 @@ export async function deleteTag(tagName: string): Promise<void> {
   }
 }
 
-export async function getNotesCount(): Promise<{ note: number; task: number; event: number }> {
+export async function getNotesCount(): Promise<{ note: number }> {
   const db = getClient()
   const result = await db.execute(
-    `SELECT type, COUNT(*) as count FROM notes GROUP BY type`
+    `SELECT COUNT(*) as count FROM notes WHERE type = 'note'`
   )
-  const counts = { note: 0, task: 0, event: 0 }
-  for (const row of result.rows) {
-    const t = row.type as NoteType
-    counts[t] = row.count as number
-  }
-  return counts
+  return { note: result.rows[0]?.count as number || 0 }
 }
 
 export async function getBudgetsCount(): Promise<number> {

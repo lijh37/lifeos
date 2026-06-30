@@ -68,7 +68,7 @@ function budgetsToMarkdown(budgets: Budget[]): string {
     lines.push(`- **浮动预算**: ¥${b.variableBudget.toFixed(2)}`)
     if (b.fixedActual !== null) lines.push(`- **固定实际**: ¥${b.fixedActual.toFixed(2)}`)
     if (b.variableActual !== null) lines.push(`- **浮动实际**: ¥${b.variableActual.toFixed(2)}`)
-    lines.push(`- **完成月任务**: ${b.isCompleted ? '是' : '否'}`)
+    lines.push(`- **预算达标**: ${b.isCompleted ? '是' : '否'}`)
     lines.push(`- **完成存储**: ${b.savingsCompleted ? '是' : '否'}`)
     if (b.notes) lines.push(`- **备注**: ${b.notes}`)
     lines.push('')
@@ -101,7 +101,7 @@ function toCSV(notes: Note[], budgets: Budget[]): string {
   if (notes.length > 0) {
     lines.push('类型,标题,内容,标签,截止日期,完成,创建时间')
     for (const n of notes) {
-      const typeLabel: Record<string, string> = { note: '笔记', task: '任务', event: '事件' }
+      const typeLabel: Record<string, string> = { note: '笔记' }
       lines.push([
         escapeCSV(typeLabel[n.type] || n.type),
         escapeCSV(n.title || ''),
@@ -116,7 +116,7 @@ function toCSV(notes: Note[], budgets: Budget[]): string {
   }
 
   if (budgets.length > 0) {
-    lines.push('月份,固定预算,浮动预算,固定实际,浮动实际,完成月任务,完成存储,备注')
+    lines.push('月份,固定预算,浮动预算,固定实际,浮动实际,预算达标,完成存储,备注')
     for (const b of budgets) {
       lines.push([
         escapeCSV(b.month),

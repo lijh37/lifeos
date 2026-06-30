@@ -5,9 +5,7 @@ const ASSET_CACHE = 'lifeos-assets-v1'
 const STATIC_URLS = [
   '/',
   '/notes',
-  '/tasks',
   '/habits',
-  '/calendar',
   '/search',
   '/tags',
   '/stats',
