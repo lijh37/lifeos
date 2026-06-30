@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { Bell, X, Clock } from 'lucide-react'
+import { Bell, X, Clock, CheckSquare, Calendar } from 'lucide-react'
 import { format, isPast, parseISO } from 'date-fns'
 import type { Note } from '@/lib/types'
 
@@ -130,7 +130,8 @@ export function NotificationManager() {
           <div className="mt-1.5 space-y-1">
             {dueItems.slice(0, 3).map(item => (
               <p key={item.id} className="truncate text-xs text-amber-700 dark:text-amber-300">
-                {item.type === 'task' ? '📋' : '📅'} {item.title}
+                {item.type === 'task' ? <CheckSquare className="mr-1 inline h-3 w-3" /> : <Calendar className="mr-1 inline h-3 w-3" />}
+                {item.title}
               </p>
             ))}
             {dueItems.length > 3 && (

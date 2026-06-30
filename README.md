@@ -136,7 +136,7 @@ opencode-demo/
 ├── scripts/               # 工具脚本
 ├── e2e/                   # Playwright E2E 测试
 ├── proxy.ts               # Next.js 16 中间件（密码保护）
-├── data/schema.sql        # 数据库完整 DDL
+├── data/                  # 本地 SQLite 数据目录（gitignored）
 └── vercel.json            # 部署配置
 ```
 

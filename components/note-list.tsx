@@ -32,6 +32,7 @@ import { RichEditor } from '@/components/rich-editor'
 import type { Note, NoteType } from '@/lib/types'
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
+import { typeLabels as typeLabelsFromConstants } from '@/lib/constants'
 
 const XSS_CONFIG = {
   ALLOWED_TAGS: [
@@ -156,12 +157,7 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
     event: Calendar,
   }
 
-  const typeLabels: Record<string, string> = {
-    note: '笔记',
-    task: '任务',
-    event: '事件',
-    all: '全部',
-  }
+  const typeLabels: Record<string, string> = { ...typeLabelsFromConstants, all: '全部' }
 
   const filters: (NoteType | 'all')[] = ['all', 'note', 'task', 'event']
 
