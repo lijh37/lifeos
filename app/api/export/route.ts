@@ -140,7 +140,7 @@ export async function GET(req: NextRequest) {
   const type = searchParams.get('type') || 'all'
   const format = searchParams.get('format') || 'md'
 
-  const notes = type === 'all' || type === 'notes' ? await getNotes() : []
+  const notes = type === 'all' || type === 'notes' ? await getNotes(undefined, 1000) : []
   const budgets = type === 'all' || type === 'budgets' ? await getBudgets() : []
 
   let content: string

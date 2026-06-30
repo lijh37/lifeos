@@ -51,7 +51,7 @@ export function NoteList({ defaultFilter = 'note' }: NoteListProps) {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      params.set('limit', '50')
+      params.set('limit', '100')
       if (loadMore && cursor) {
         params.set('cursor', cursor)
       }

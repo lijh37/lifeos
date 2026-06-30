@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { Note, NoteType } from '@/lib/types'
 
-const MAX_CACHED_NOTES = 200
+const MAX_CACHED_NOTES = 500
 
 interface AppState {
   notes: Note[]
