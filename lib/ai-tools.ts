@@ -1,67 +1,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { createNote, searchNotes, searchHabits, getNotesByDateRange, getHabits, getStreaks, getBudget, initDB } from './db'
-import { genId } from './utils'
-import type { NoteType } from './types'
-
-export const createEntry = tool({
-  description: '当用户请求创建笔记、任务或事件时使用。根据用户输入提取类型、标题、标签和日期，直接创建记录。',
-  inputSchema: z.object({
-    type: z.enum(['note', 'task', 'event']).describe('记录类型：note=笔记, task=任务, event=事件'),
-    title: z.string().min(1).describe('提取的简短标题'),
-    content: z.string().describe('用户的原始输入内容'),
-    tags: z.array(z.string()).describe('自动打标签，如 ["工作","会议"]、["健康","饮食"] 等'),
-    dueDate: z.string().nullable().describe('如果提到了具体时间，解析为 ISO 日期字符串，否则为 null'),
-  }),
-  execute: async ({ type, title, content, tags, dueDate }) => {
-    const now = new Date().toISOString()
-    const note = {
-      id: genId(),
-      content,
-      title,
-      type: type as NoteType,
-      tags,
-      dueDate,
-      done: false,
-      createdAt: now,
-      updatedAt: now,
-    }
-    await initDB()
-    const saved = await createNote(note)
-    return {
-      success: true,
-      id: saved.id,
-      type: saved.type,
-      title: saved.title,
-      summary: `已创建${type === 'task' ? '任务' : type === 'event' ? '事件' : '笔记'}：${title}`,
-    }
-  },
-})
-
-export const createHabit = tool({
-  description: '当用户请求创建习惯时使用。提取习惯名称、描述和频率。',
-  inputSchema: z.object({
-    name: z.string().min(1).describe('习惯名称，如 "每天跑步"、"读书30分钟"'),
-    description: z.string().describe('习惯的详细描述或用户原话'),
-    frequency: z.enum(['daily', 'weekly']).describe('习惯频率：daily=每天, weekly=每周'),
-    tags: z.array(z.string()).describe('习惯分类标签，如 ["健康"]、["学习"]'),
-  }),
-  execute: async ({ name, description, frequency, tags }) => {
-    const db = (await import('./db')).getClient()
-    const id = genId()
-    const now = new Date().toISOString()
-    await db.execute({
-      sql: 'INSERT INTO habits (id, name, description, frequency, created_at) VALUES (?, ?, ?, ?, ?)',
-      args: [id, name, description, frequency, now],
-    })
-    return {
-      success: true,
-      id,
-      name,
-      summary: `已创建习惯：${name}，记得${frequency === 'daily' ? '每天' : '每周'}打卡哦！`,
-    }
-  },
-})
+import { searchNotes, searchHabits, getNotesByDateRange, getHabits, getStreaks, getBudget, initDB } from './db'
 
 // --- Query tools ---
 
@@ -189,8 +128,6 @@ export const getBudgetInfo = tool({
 })
 
 export const tools = {
-  createEntry,
-  createHabit,
   searchNotesByKeyword,
   searchHabitsByKeyword,
   getNotesInDateRange,

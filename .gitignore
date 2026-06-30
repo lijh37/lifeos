@@ -36,6 +36,9 @@ yarn-error.log*
 # local database
 /data/
 
+# user data files
+/笔记.md
+
 # auto-generated scripts
 /port-forward.ps1
 

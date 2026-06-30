@@ -6,19 +6,13 @@ import { DefaultChatTransport, type UIMessage } from 'ai'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Send, Bot, User, Loader2, Copy, RefreshCw, Clock, Plus, MessageSquare, Trash2, ChevronLeft } from 'lucide-react'
 import { SkeletonChat } from '@/components/skeleton-card'
-import { typeLabels, typeColors } from '@/lib/constants'
-import type { AIResponse, Note, ChatMessage, Conversation } from '@/lib/types'
+import type { ChatMessage, Conversation } from '@/lib/types'
 import { genId } from '@/lib/utils'
 
-interface ChatProps {
-  onNoteCreated?: (note: Note) => void
-}
-
-export default function Chat({ onNoteCreated }: ChatProps) {
+export default function Chat() {
   const [input, setInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -39,71 +33,11 @@ export default function Chat({ onNoteCreated }: ChatProps) {
     transport: new DefaultChatTransport({ api: '/api/chat' }),
     messages: initialMessages.length > 0 ? initialMessages : undefined,
     onFinish: async (event) => {
-      const { message, messages: allMessages, isAbort, isError } = event
+      const { messages: allMessages, isAbort, isError } = event
       setTimedOut(false)
       if (isAbort || isError) return
 
-      // Check if tools were used (server already saved the entry)
-      const hasToolResults = message.parts.some((p) => p.type === 'tool-result')
-
-      if (!hasToolResults) {
-        // Fallback: parse JSON from text (for non-tool-calling scenarios)
-        const text = message.parts
-          .filter((p) => p.type === 'text')
-          .map((p) => (p as { text: string }).text)
-          .join('')
-
-        try {
-          const jsonMatch = text.match(/\{[\s\S]*\}/)
-          if (jsonMatch) {
-            const parsed: AIResponse = JSON.parse(jsonMatch[0])
-            if (parsed.isNewEntry && parsed.title !== undefined && parsed.title !== null) {
-              if (parsed.type === 'habit') {
-                const habitRes = await fetch('/api/habits', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    name: parsed.title,
-                    description: parsed.summary || '',
-                    frequency: 'daily',
-                  }),
-                })
-                if (!habitRes.ok) {
-                  console.error('Failed to save habit:', await habitRes.text())
-                }
-              } else {
-                const now = new Date().toISOString()
-                const noteBody = {
-                  id: genId(),
-                  content: text,
-                  title: parsed.title,
-                  type: parsed.type,
-                  tags: parsed.tags,
-                  dueDate: parsed.dueDate,
-                  done: false,
-                  createdAt: now,
-                  updatedAt: now,
-                }
-                const res = await fetch('/api/notes', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(noteBody),
-                })
-                if (res.ok) {
-                  const data = await res.json()
-                  onNoteCreated?.(data.note)
-                } else {
-                  console.error('Failed to save note:', await res.text())
-                }
-              }
-            }
-          }
-        } catch (e) {
-          console.error('Failed to parse AI response:', e)
-        }
-      }
-
-      // Save chat messages (always, regardless of tool usage)
+      // Save chat messages
       const unsaved = allMessages.slice(savedCountRef.current)
       if (unsaved.length > 0) {
         for (const m of unsaved) {
@@ -298,39 +232,6 @@ function getMessageText(msg: typeof messages[0]): string {
       .join('')
   }
 
-  function extractAISummary(msg: typeof messages[0]): string {
-    // If there are tool results, the text is already a clean summary
-    const text = getMessageText(msg)
-    try {
-      const clean = text.replace(/^`+json\s*|`+$/gm, '').trim()
-      const jsonMatch = clean.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        const parsed: AIResponse = JSON.parse(jsonMatch[0])
-        return parsed.summary || text
-      }
-    } catch {
-      // ignore
-    }
-    return text
-  }
-
-  function getTypeFromContent(content: string): string | undefined {
-    try {
-      const m = content.match(/\{[\s\S]*\}/)
-      if (m) return JSON.parse(m[0]).type
-    } catch { /* ignore */ }
-    return undefined
-  }
-
-  function getTypeBadge(type?: string) {
-    if (!type) return null
-    return (
-      <Badge className={typeColors[type] || ''} variant="outline">
-        {typeLabels[type] || type}
-      </Badge>
-    )
-  }
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (input.trim() && status === 'ready') {
@@ -429,13 +330,13 @@ function getMessageText(msg: typeof messages[0]): string {
                   </p>
                   <div className="mt-4 space-y-2 text-left text-sm text-muted-foreground">
                     <div className="rounded-lg bg-muted p-3">
-                      &ldquo;明天下午3点和张三开会讨论项目进度&rdquo;
+                      &ldquo;找一下关于电影方面的笔记&rdquo;
                     </div>
                     <div className="rounded-lg bg-muted p-3">
-                      &ldquo;提醒我今晚8点锻炼&rdquo;
+                      &ldquo;我上周写了什么&rdquo;
                     </div>
                     <div className="rounded-lg bg-muted p-3">
-                      &ldquo;我想每天跑步&rdquo;
+                      &ldquo;这个月的预算情况&rdquo;
                     </div>
                   </div>
                 </div>
@@ -462,7 +363,6 @@ function getMessageText(msg: typeof messages[0]): string {
                   )
                 }
 
-                const summary = extractAISummary(msg)
                 return (
                   <div key={msg.id || i} className="flex justify-start">
                     <div className="flex max-w-[80%] gap-3">
@@ -471,7 +371,7 @@ function getMessageText(msg: typeof messages[0]): string {
                       </div>
                       <div>
                         <Card className="group relative bg-card p-3">
-                          <p className="whitespace-pre-wrap text-sm leading-relaxed">{summary}</p>
+                          <p className="whitespace-pre-wrap text-sm leading-relaxed">{text}</p>
                           <button
                             onClick={() => handleCopy(text)}
                             className="absolute right-2 top-2 hidden rounded p-1 text-muted-foreground hover:bg-accent group-hover:block"
@@ -480,9 +380,6 @@ function getMessageText(msg: typeof messages[0]): string {
                             <Copy className="h-3 w-3" />
                           </button>
                         </Card>
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {getTypeBadge(getTypeFromContent(text))}
-                        </div>
                       </div>
                     </div>
                   </div>

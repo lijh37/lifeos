@@ -2,30 +2,52 @@ import { NextRequest } from 'next/server'
 import { getNotes, getBudgets, initDB } from '@/lib/db'
 import type { Note, Budget } from '@/lib/types'
 
+function toBeijingTime(iso: string): string {
+  return new Date(iso).toLocaleString('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).replace(/\//g, '-')
+}
+
 function notesToMarkdown(notes: Note[]): string {
   const lines: string[] = []
+  const now = toBeijingTime(new Date().toISOString())
+
   lines.push('# LifeOS 笔记导出')
   lines.push('')
-  lines.push(`导出时间: ${new Date().toISOString()}`)
-  lines.push(`总计: ${notes.length} 条`)
-  lines.push('')
-  lines.push('---')
+  lines.push(`导出时间: ${now} · 共 ${notes.length} 条`)
   lines.push('')
 
   for (const note of notes) {
-    const typeLabel: Record<string, string> = { note: '笔记', task: '任务', event: '事件' }
-    lines.push(`## ${note.title || '无标题'}`)
-    lines.push(`- **类型**: ${typeLabel[note.type] || note.type}`)
-    lines.push(`- **时间**: ${note.createdAt}`)
-    if (note.dueDate) lines.push(`- **截止**: ${note.dueDate}`)
-    if (note.tags.length > 0) lines.push(`- **标签**: ${note.tags.join(', ')}`)
-    if (note.type === 'task') lines.push(`- **状态**: ${note.done ? '已完成' : '未完成'}`)
-    lines.push('')
-    lines.push(`> ${note.content}`)
-    lines.push('')
     lines.push('---')
     lines.push('')
+
+    // 标题行
+    lines.push(`## 标题：${note.title || '无标题'}`)
+    lines.push('')
+
+    // 元信息
+    const meta: string[] = [`创建: ${toBeijingTime(note.createdAt)}`, `更新: ${toBeijingTime(note.updatedAt)}`]
+    if (note.tags.length > 0) meta.push(`标签: ${note.tags.join('、')}`)
+    if (note.dueDate) meta.push(`截止: ${note.dueDate.slice(0, 10)}`)
+    lines.push(meta.join(' · '))
+    lines.push('')
+
+    // 正文（将内容中的 --- 转为 <hr>，避免破坏文档结构）
+    if (note.content) {
+      lines.push(note.content.replace(/^---\s*$/gm, '<hr>'))
+    }
+
+    lines.push('')
   }
+
+  lines.push('---')
+  lines.push('')
 
   return lines.join('\n')
 }

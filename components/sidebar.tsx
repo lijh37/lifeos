@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bot, Notebook, CheckSquare, Plus, PiggyBank, Trophy, CalendarDays, Search, Settings, Tags, BarChart3, MoreHorizontal } from 'lucide-react'
+import { Notebook, Plus, PiggyBank, Trophy, Search, Settings, Tags, BarChart3, Bot, MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -10,15 +10,12 @@ import { cn } from '@/lib/utils'
 import { useState } from 'react'
 
 const navItems = [
-  { href: '/', label: 'AI 对话', icon: Bot },
   { href: '/notes', label: '笔记', icon: Notebook },
-  { href: '/tasks', label: '任务', icon: CheckSquare },
-
+  { href: '/search', label: '搜索', icon: Search },
+  { href: '/', label: 'AI 查询', icon: Bot },
   { href: '/expenses', label: '预算', icon: PiggyBank },
   { href: '/habits', label: '习惯', icon: Trophy },
-  { href: '/search', label: '搜索', icon: Search },
   { href: '/tags', label: '标签', icon: Tags },
-  { href: '/calendar', label: '日历', icon: CalendarDays },
   { href: '/stats', label: '统计', icon: BarChart3 },
   { href: '/settings', label: '设置', icon: Settings },
 ]
@@ -29,7 +26,7 @@ export function Sidebar() {
   return (
     <aside className="hidden w-56 border-r bg-card p-4 md:flex md:flex-col">
       <div className="mb-6 flex items-center gap-2">
-        <Bot className="h-6 w-6 text-primary" />
+        <Notebook className="h-6 w-6 text-primary" />
         <span className="text-lg font-bold">LifeOS</span>
       </div>
 
@@ -37,7 +34,7 @@ export function Sidebar() {
         {navItems.map((item) => {
           const isActive = pathname === item.href
           return (
-            <Link key={item.href} href={item.href} prefetch={['/', '/notes', '/tasks', '/habits'].includes(item.href)}>
+            <Link key={item.href} href={item.href} prefetch={['/notes', '/habits'].includes(item.href)}>
               <Button
                 variant={isActive ? 'secondary' : 'ghost'}
                 className={cn('w-full justify-start gap-3', isActive && 'font-medium')}
@@ -51,10 +48,10 @@ export function Sidebar() {
       </nav>
 
       <div className="mt-auto space-y-1">
-        <Link href="/">
+        <Link href="/notes">
           <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground">
             <Plus className="h-4 w-4" />
-            新建记录
+            新建笔记
           </Button>
         </Link>
         <div className="flex items-center justify-between px-2 py-1">
@@ -71,17 +68,14 @@ export function MobileNav() {
   const [moreOpen, setMoreOpen] = useState(false)
 
   const primaryItems = [
-    { href: '/', label: 'AI 对话', icon: Bot },
     { href: '/notes', label: '笔记', icon: Notebook },
-    { href: '/tasks', label: '任务', icon: CheckSquare },
+    { href: '/search', label: '搜索', icon: Search },
+    { href: '/expenses', label: '预算', icon: PiggyBank },
     { href: '/habits', label: '习惯', icon: Trophy },
   ]
 
   const moreItems = [
-    { href: '/expenses', label: '预算', icon: PiggyBank },
-    { href: '/search', label: '搜索', icon: Search },
     { href: '/tags', label: '标签', icon: Tags },
-    { href: '/calendar', label: '日历', icon: CalendarDays },
     { href: '/stats', label: '统计', icon: BarChart3 },
     { href: '/settings', label: '设置', icon: Settings },
   ]

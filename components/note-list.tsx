@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { format } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
@@ -13,10 +14,9 @@ import {
   CheckSquare,
   Calendar,
   Trash2,
-  Check,
-  Undo2,
   Search,
   Pencil,
+  Plus,
   CheckSquare as CheckboxIcon,
   Square,
   Tags,
@@ -26,42 +26,22 @@ import {
 import { Input } from '@/components/ui/input'
 import { ExportButton } from '@/components/export-button'
 import { SkeletonNoteList } from '@/components/skeleton-card'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import DOMPurify from 'dompurify'
-import { RichEditor } from '@/components/rich-editor'
+import { stripMarkdown } from '@/lib/markdown'
 import type { Note, NoteType } from '@/lib/types'
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
 import { typeLabels as typeLabelsFromConstants } from '@/lib/constants'
 
-const XSS_CONFIG = {
-  ALLOWED_TAGS: [
-    'p', 'br', 'strong', 'em', 'u', 's', 'code', 'pre', 'blockquote',
-    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'ul', 'ol', 'li',
-    'a', 'img', 'span', 'div',
-    'table', 'thead', 'tbody', 'tr', 'th', 'td',
-    'hr', 'sub', 'sup',
-    'input',
-  ],
-  ALLOWED_ATTR: [
-    'href', 'target', 'rel', 'class', 'style', 'src', 'alt',
-    'width', 'height', 'type', 'checked', 'disabled',
-    'data-type', 'id',
-  ],
-  ALLOW_DATA_ATTR: true,
-}
-
 interface NoteListProps {
   defaultFilter?: NoteType | 'all'
 }
 
-export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
+export function NoteList({ defaultFilter = 'note' }: NoteListProps) {
+  const router = useRouter()
   const { notes, setNotes, loading, setLoading, removeNote, updateNote, cursor, hasMore, setCursor, setHasMore, appendNotes } = useAppStore()
   const [filterType, setFilterType] = useState<NoteType | 'all'>(defaultFilter)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Note[] | null>(null)
-  const [editingNote, setEditingNote] = useState<Note | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [dragId, setDragId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
@@ -114,23 +94,18 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
     }
   }
 
-  async function handleToggleDone(id: string, done: boolean) {
-    await fetch(`/api/notes/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ done: !done }),
-    })
-    updateNote(id, { done: !done })
-  }
-
-  async function handleSaveContent(id: string, content: string) {
-    await fetch(`/api/notes/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
-    })
-    updateNote(id, { content })
-    setEditingNote(null)
+  async function handleCreateNote() {
+    try {
+      const res = await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'note', title: '', content: '', tags: [] }),
+      })
+      const data = await res.json()
+      router.push(`/notes/${data.note.id}`)
+    } catch (e) {
+      console.error('Failed to create note:', e)
+    }
   }
 
   async function handleSearch(q: string) {
@@ -143,8 +118,6 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
     const data = await res.json()
     setSearchResults(data.notes)
   }
-
-  const stripHtml = (html: string) => html.replace(/<[^>]*>/g, '')
 
   const baseNotes = searchResults ?? notes
   const displayNotes = baseNotes
@@ -332,7 +305,13 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
               归档
             </Button>
           </div>
-          <ExportButton type="notes" />
+          <div className="flex items-center gap-1">
+            <Button variant="default" size="sm" onClick={handleCreateNote} className="gap-1 text-xs">
+              <Plus className="h-3.5 w-3.5" />
+              新建
+            </Button>
+            <ExportButton type="notes" />
+          </div>
         </div>
       </div>
 
@@ -341,7 +320,7 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
           <SkeletonNoteList count={5} />
         ) : displayNotes.length === 0 ? (
           <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
-            {searchQuery ? '没有找到匹配的记录' : showArchived ? '没有归档记录' : '还没有任何记录，去 AI 对话页面创建吧'}
+            {searchQuery ? '没有找到匹配的记录' : showArchived ? '没有归档记录' : '还没有任何记录，点击上方 + 新建笔记'}
           </div>
         ) : (
           <>
@@ -357,12 +336,10 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
             {displayNotes.length > 200 ? (
               <VirtualNoteList
                 notes={displayNotes}
-                onEdit={setEditingNote}
+                onEdit={(note) => router.push(`/notes/${note.id}`)}
                 onDelete={handleDelete}
-                onToggleDone={handleToggleDone}
                 typeIcons={typeIcons}
                 typeLabels={typeLabels}
-                stripHtml={stripHtml}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
                 dragId={dragId}
@@ -377,12 +354,10 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
                 {displayNotes.map((note) => <NoteCard
                   key={note.id}
                   note={note}
-                  onEdit={setEditingNote}
+                  onEdit={(note) => router.push(`/notes/${note.id}`)}
                   onDelete={handleDelete}
-                  onToggleDone={handleToggleDone}
                   typeIcons={typeIcons}
                   typeLabels={typeLabels}
-                  stripHtml={stripHtml}
                   selectedIds={selectedIds}
                   onToggleSelect={toggleSelect}
                   dragId={dragId}
@@ -421,41 +396,20 @@ export function NoteList({ defaultFilter = 'all' }: NoteListProps) {
         </div>
       )}
 
-      <Sheet open={!!editingNote} onOpenChange={(open) => { if (!open) setEditingNote(null) }}>
-        <SheetContent side="bottom" className="max-h-[85vh] max-sm:max-h-[95vh] sm:max-w-lg sm:mx-auto sm:rounded-t-xl">
-          <SheetHeader>
-            <SheetTitle>
-              {editingNote?.title || (editingNote ? stripHtml(editingNote.content).slice(0, 40) : '编辑')}
-            </SheetTitle>
-          </SheetHeader>
-          {editingNote && (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-1">
-              <RichEditor
-                key={editingNote.id}
-                content={editingNote.content}
-                onSave={async (html) => handleSaveContent(editingNote.id, html)}
-                placeholder="开始编辑..."
-                noteId={editingNote.id}
-              />
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
+
     </div>
   )
 }
 
 function NoteCard({
-  note, onEdit, onDelete, onToggleDone, typeIcons, typeLabels, stripHtml,
-  selectedIds, onToggleSelect, dragId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd,
+  note, onEdit, onDelete, typeIcons, typeLabels, selectedIds, onToggleSelect,
+  dragId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd,
 }: {
   note: Note
   onEdit: (note: Note) => void
   onDelete: (id: string) => void
-  onToggleDone: (id: string, done: boolean) => void
   typeIcons: Record<string, typeof Notebook>
   typeLabels: Record<string, string>
-  stripHtml: (html: string) => string
   selectedIds?: Set<string>
   onToggleSelect?: (id: string) => void
   dragId?: string | null
@@ -466,7 +420,6 @@ function NoteCard({
   onDragEnd?: () => void
 }) {
   const Icon = typeIcons[note.type]
-  const isHtml = note.content.includes('<')
   const isSelected = selectedIds?.has(note.id) ?? false
   const isDragging = dragId === note.id
   const isDragOver = dragOverId === note.id
@@ -504,7 +457,7 @@ function NoteCard({
             <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/40" />
             <Icon className="h-4 w-4 text-muted-foreground" />
             <CardTitle className="text-sm font-medium" onClick={() => onEdit(note)}>
-              {note.title || stripHtml(note.content).slice(0, 40) || '无标题'}
+              {note.title || stripMarkdown(note.content, 60) || '无标题'}
             </CardTitle>
             <Badge variant="outline" className="text-[10px]">
               {typeLabels[note.type]}
@@ -519,20 +472,6 @@ function NoteCard({
             >
               <Pencil className="h-3 w-3" />
             </Button>
-            {note.type === 'task' && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => onToggleDone(note.id, note.done)}
-              >
-                {note.done ? (
-                  <Undo2 className="h-3 w-3" />
-                ) : (
-                  <Check className="h-3 w-3" />
-                )}
-              </Button>
-            )}
             <Button
               variant="ghost"
               size="icon"
@@ -545,15 +484,12 @@ function NoteCard({
         </div>
       </CardHeader>
       <CardContent className="p-3 pt-2" onClick={() => onEdit(note)}>
-        {isHtml ? (
-          <div
-            className="line-clamp-3 text-sm text-muted-foreground [&_h2]:text-base [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:mb-0.5"
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(note.content, XSS_CONFIG) }}
-          />
-        ) : (
+        {note.content ? (
           <p className="line-clamp-3 text-sm text-muted-foreground">
-            {note.content}
+            {stripMarkdown(note.content, 200)}
           </p>
+        ) : (
+          <p className="text-sm text-muted-foreground italic">空白笔记</p>
         )}
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           {note.tags.length > 0 && (
@@ -580,16 +516,14 @@ function NoteCard({
 }
 
 function VirtualNoteList({
-  notes, onEdit, onDelete, onToggleDone, typeIcons, typeLabels, stripHtml,
+  notes, onEdit, onDelete, typeIcons, typeLabels,
   selectedIds, onToggleSelect, dragId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd,
 }: {
   notes: Note[]
   onEdit: (note: Note) => void
   onDelete: (id: string) => void
-  onToggleDone: (id: string, done: boolean) => void
   typeIcons: Record<string, typeof Notebook>
   typeLabels: Record<string, string>
-  stripHtml: (html: string) => string
   selectedIds?: Set<string>
   onToggleSelect?: (id: string) => void
   dragId?: string | null
@@ -629,10 +563,8 @@ function VirtualNoteList({
                 note={note}
                 onEdit={onEdit}
                 onDelete={onDelete}
-                onToggleDone={onToggleDone}
                 typeIcons={typeIcons}
                 typeLabels={typeLabels}
-                stripHtml={stripHtml}
                 selectedIds={selectedIds}
                 onToggleSelect={onToggleSelect}
                 dragId={dragId}
