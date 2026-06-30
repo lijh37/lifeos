@@ -52,6 +52,7 @@ export function NoteList({ defaultFilter = 'note' }: NoteListProps) {
     try {
       const params = new URLSearchParams()
       params.set('limit', '100')
+      params.set('summary', 'true')
       if (loadMore && cursor) {
         params.set('cursor', cursor)
       }
@@ -114,7 +115,7 @@ export function NoteList({ defaultFilter = 'note' }: NoteListProps) {
       setSearchResults(null)
       return
     }
-    const res = await fetch(`/api/notes?q=${encodeURIComponent(q)}`)
+      const res = await fetch(`/api/notes?q=${encodeURIComponent(q)}&summary=true`)
     const data = await res.json()
     setSearchResults(data.notes)
   }

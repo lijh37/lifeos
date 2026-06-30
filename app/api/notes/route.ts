@@ -11,17 +11,18 @@ export async function GET(req: NextRequest) {
   const endDate = searchParams.get('endDate')
   const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '200'), 1), 500)
   const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0)
+  const summary = searchParams.get('summary') === 'true'
 
   if (q) {
     const notes = await searchNotes(q)
-    return NextResponse.json({ notes })
+    return NextResponse.json({ notes: summary ? notes.map(stripContent) : notes })
   }
 
   const noteType = type && type !== 'all' ? type as Note['type'] : undefined
 
   if (startDate && endDate) {
     const notes = await getNotesByDateRange(startDate, endDate, noteType, limit, offset)
-    return NextResponse.json({ notes })
+    return NextResponse.json({ notes: summary ? notes.map(stripContent) : notes })
   }
 
   const cursor = searchParams.get('cursor')
@@ -42,7 +43,12 @@ export async function GET(req: NextRequest) {
     ])
   }
 
-  return NextResponse.json({ notes, total, limit, offset, nextCursor })
+  return NextResponse.json({ notes: summary ? notes.map(stripContent) : notes, total, limit, offset, nextCursor })
+}
+
+function stripContent(note: Note): Note {
+  const preview = note.content ? note.content.slice(0, 80) : ''
+  return { ...note, content: preview }
 }
 
 export async function POST(req: NextRequest) {
