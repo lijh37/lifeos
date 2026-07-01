@@ -44,8 +44,7 @@ PWA 安装需要 HTTPS（localhost 除外）：
 
 ```bash
 # 推荐：局域网 HTTPS（地址不变，一劳永逸）
-bash scripts/https-setup.sh   # 首次生成证书，仅一次
-bash start.sh                 # 启动
+bash start.sh                 # 启动（含证书生成）
 # 手机 → https://<LAN-IP>:3000
 
 # 备选：HTTPS 隧道（无局域网时）
@@ -66,29 +65,26 @@ bash scripts/tunnel.sh
 ### 已实现
 
 **记录与管理**
-- [x] AI 对话式记录 — 自然语言输入，AI 自动解析为笔记/任务/事件/习惯
+- [x] AI 对话查询 — 自然语言提问，AI 搜索笔记/习惯/预算数据并回复
 - [x] 笔记管理 — 按类型筛选、搜索、标记完成、删除
-- [x] 任务管理 — 标记完成/未完成，按截止日期排序
-- [x] 批量操作 — 多选笔记 → 批量删除/归档/改标签
-- [x] 拖拽排序 — 笔记/任务卡片拖拽重排
+- [x] 批量操作 — 多选笔记 → 批量删除/改标签
+- [x] 拖拽排序 — 笔记卡片拖拽重排
 - [x] 预算管理 — 月度预算规划（固定/浮动支出），实际录入对比，超支/结余分析
-- [x] 习惯养成 — AI 创建习惯，每日打卡，连续天数 streak 徽章
-- [x] 日历视图 — 月历网格，彩色圆点标记条目类型，点击查看当日详情
+- [x] 习惯养成 — 每日打卡，连续天数 streak，7 天趋势图
 - [x] 全局搜索 — 跨笔记/习惯全文搜索，防抖 300ms
 - [x] 聊天持久化 — 对话多会话管理，自动保存，刷新恢复
 
 **数据分析与导出**
 - [x] 统计看板 — 数据概览、预算执行、热门标签、动态时间线
 - [x] 标签管理 — 查看/重命名/删除标签
-- [x] 数据导出 — Markdown / JSON / CSV（Excel 中文友好）
+- [x] 数据导出 — Markdown（阅读分享） / JSON（备份恢复）
 - [x] 数据备份 — 手动 JSON 导入/导出 + 自动 localStorage 备份
 
 **界面与体验**
 - [x] 深色模式 — light/dark/system 三态切换
 - [x] 离线支持 — Service Worker + PWA 安装提示
-- [x] 富文本编辑 — TipTap 编辑器（粗体/斜体/标题/列表/任务列表）
+- [x] Markdown 编辑 — 分栏编辑器（工具栏/自动保存/实时预览）
 - [x] UI 动效 — 页面过渡、骨架屏（3 种变体）、交错入场、卡片悬浮
-- [x] 通知提醒 — 到期任务/事件浏览器推送 + 内联提醒卡片
 - [x] 多端自适应 — PC 侧栏导航 + 手机底部 Tab
 
 **安全**
@@ -99,19 +95,18 @@ bash scripts/tunnel.sh
 
 ### 规划中
 
-- [ ] 附件上传 — 笔记图片/文件附件
-- [ ] E2E 测试持续集成
+- [ ] E2E 测试用例编写
+- [ ] 附件上传 — 笔记图片/文件附件（数据库层已完成，待前端集成）
 
 ## 项目结构
 
 ```
 opencode-demo/
 ├── app/                   # Next.js App Router 页面和 API
-│   ├── api/               # API 端点（17 个）
+│   ├── api/               # API 端点（16 个）
 │   ├── notes/             # 笔记列表页
-│   ├── tasks/             # 任务列表页
+│   ├── expenses/          # 月度预算页
 │   ├── habits/            # 习惯页面
-│   ├── calendar/          # 日历视图
 │   ├── search/            # 全局搜索
 │   ├── tags/              # 标签管理
 │   ├── stats/             # 统计看板
@@ -120,9 +115,10 @@ opencode-demo/
 ├── components/
 │   ├── ui/                # shadcn 组件
 │   ├── chat.tsx           # AI 对话组件
-│   ├── note-list.tsx      # 笔记/任务列表（批量操作+拖拽排序）
-│   ├── rich-editor.tsx    # 富文本编辑器
-│   ├── sidebar.tsx        # 导航组件
+│   ├── note-list.tsx      # 笔记列表（批量操作+拖拽排序+搜索）
+│   ├── markdown-editor.tsx # Markdown 编辑器（分栏编辑+工具栏+自动保存）
+│   ├── command-menu.tsx   # ⌘K 命令面板
+│   ├── sidebar.tsx        # 导航组件（PC 侧栏 + 手机底部栏）
 │   ├── skeleton-card.tsx  # 骨架屏（3 种变体）
 │   ├── error-boundary.tsx # Error Boundary
 │   └── ...                # 其他组件
@@ -142,20 +138,20 @@ opencode-demo/
 
 ## 如何与 AI 对话
 
-直接在输入框用自然语言描述，AI 会自动理解并记录：
+直接在输入框用自然语言提问，AI 会查询笔记/习惯/预算数据并回答：
 
 ```
-"明天下午3点和张三开会讨论项目进度"
-→ 创建事件
+"找一下关于电影的文章"
+→ 搜索笔记
 
-"我想每天跑步"
-→ 创建习惯
+"我的习惯打卡情况怎么样"
+→ 查询习惯进度
 
-"提醒我今晚8点锻炼"
-→ 创建任务 + 截止时间
+"这个月的预算还剩多少"
+→ 查询预算信息
 
 "最近一周做了什么"
-→ 查询历史并总结
+→ 按日期范围查询笔记并总结
 ```
 
 ## 部署
@@ -182,5 +178,5 @@ git push origin main
 
 WSL2 有独立虚拟 IP，局域网其他设备不能直接访问。
 - **PC 端**: Windows 浏览器 `http://localhost:3000`（自动转发到 WSL2）
-- **手机端**: 运行 `bash scripts/https-setup.sh` 后访问 `https://<LAN-IP>:3000`；或运行 `.\setup-wsl.ps1`（管理员 PowerShell）配合 `bash scripts/tunnel.sh` 创建隧道
+- **手机端**: 运行 `bash start.sh` 后访问 `https://<LAN-IP>:3000`；或运行 `.\setup-wsl.ps1`（管理员 PowerShell）配合 `bash scripts/tunnel.sh` 创建隧道
 - **生产**: `git push origin main` → Vercel 自动部署

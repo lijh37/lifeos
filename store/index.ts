@@ -1,16 +1,14 @@
 import { create } from 'zustand'
-import type { Note, NoteType } from '@/lib/types'
+import type { Note } from '@/lib/types'
 
 const MAX_CACHED_NOTES = 500
 
 interface AppState {
   notes: Note[]
-  filterType: NoteType | 'all'
   loading: boolean
   cursor: string | null
   hasMore: boolean
   setNotes: (notes: Note[]) => void
-  setFilterType: (type: NoteType | 'all') => void
   setLoading: (loading: boolean) => void
   addNote: (note: Note) => void
   removeNote: (id: string) => void
@@ -22,12 +20,10 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set) => ({
   notes: [],
-  filterType: 'all',
   loading: false,
   cursor: null,
   hasMore: true,
   setNotes: (notes) => set({ notes: notes.slice(0, MAX_CACHED_NOTES) }),
-  setFilterType: (filterType) => set({ filterType }),
   setLoading: (loading) => set({ loading }),
   addNote: (note) => set((state) => ({
     notes: [note, ...state.notes].slice(0, MAX_CACHED_NOTES),

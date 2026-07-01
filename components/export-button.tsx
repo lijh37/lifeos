@@ -2,13 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Download, FileText, FileJson, Table2 } from 'lucide-react'
+import { Download, FileText, FileJson } from 'lucide-react'
 
-interface ExportButtonProps {
-  type: 'notes' | 'budgets' | 'all'
-}
-
-export function ExportButton({ type }: ExportButtonProps) {
+export function ExportButton() {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -22,9 +18,9 @@ export function ExportButton({ type }: ExportButtonProps) {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  function download(format: 'md' | 'json' | 'csv') {
+  function download(format: 'md' | 'json') {
     const params = new URLSearchParams()
-    if (type) params.set('type', type)
+    params.set('type', 'notes')
     params.set('format', format)
     window.open(`/api/export?${params}`, '_blank')
     setOpen(false)
@@ -49,13 +45,6 @@ export function ExportButton({ type }: ExportButtonProps) {
           >
             <FileText className="h-4 w-4" />
             Markdown
-          </button>
-          <button
-            onClick={() => download('csv')}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
-          >
-            <Table2 className="h-4 w-4" />
-            CSV
           </button>
           <button
             onClick={() => download('json')}

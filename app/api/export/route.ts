@@ -94,26 +94,9 @@ function escapeCSV(val: string): string {
   return val
 }
 
-function toCSV(notes: Note[], budgets: Budget[]): string {
+function toCSV(budgets: Budget[]): string {
   const lines: string[] = []
   lines.push('\uFEFF')
-
-  if (notes.length > 0) {
-    lines.push('类型,标题,内容,标签,截止日期,完成,创建时间')
-    for (const n of notes) {
-      const typeLabel: Record<string, string> = { note: '笔记' }
-      lines.push([
-        escapeCSV(typeLabel[n.type] || n.type),
-        escapeCSV(n.title || ''),
-        escapeCSV(n.content),
-        escapeCSV(n.tags.join('; ')),
-        escapeCSV(n.dueDate || ''),
-        n.done ? '是' : '否',
-        escapeCSV(n.createdAt),
-      ].join(','))
-    }
-    lines.push('')
-  }
 
   if (budgets.length > 0) {
     lines.push('月份,固定预算,浮动预算,固定实际,浮动实际,预算达标,完成存储,备注')
@@ -152,7 +135,7 @@ export async function GET(req: NextRequest) {
     filename = `lifeos-export-${new Date().toISOString().slice(0, 10)}.json`
     contentType = 'application/json'
   } else if (format === 'csv') {
-    content = toCSV(notes, budgets)
+    content = toCSV(budgets)
     filename = `lifeos-export-${new Date().toISOString().slice(0, 10)}.csv`
     contentType = 'text/csv; charset=utf-8'
   } else {

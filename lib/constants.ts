@@ -8,7 +8,3 @@ export const typeColors: Record<string, string> = {
   habit: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300',
 }
 
-export const typeDotColors: Record<string, string> = {
-  note: 'bg-blue-500',
-  habit: 'bg-cyan-500',
-}

@@ -10,40 +10,33 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
-  Notebook,
   CheckSquare,
-  Square,
   Trash2,
   Search,
   Pencil,
   Plus,
+  Square,
   Tags,
-  Archive,
   GripVertical,
+  Loader2,
+  ChevronDown,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { ExportButton } from '@/components/export-button'
 import { SkeletonNoteList } from '@/components/skeleton-card'
 import { stripMarkdown } from '@/lib/markdown'
-import type { Note, NoteType } from '@/lib/types'
+import type { Note } from '@/lib/types'
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
-import { typeLabels as typeLabelsFromConstants } from '@/lib/constants'
 
-interface NoteListProps {
-  defaultFilter?: NoteType | 'all'
-}
-
-export function NoteList({ defaultFilter = 'note' }: NoteListProps) {
+export function NoteList() {
   const router = useRouter()
   const { notes, setNotes, loading, setLoading, removeNote, updateNote, cursor, hasMore, setCursor, setHasMore, appendNotes } = useAppStore()
-  const [filterType, setFilterType] = useState<NoteType | 'all'>(defaultFilter)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Note[] | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [dragId, setDragId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
-  const [showArchived, setShowArchived] = useState(false)
 
   async function fetchNotes(loadMore = false) {
     setLoading(true)
@@ -118,18 +111,7 @@ export function NoteList({ defaultFilter = 'note' }: NoteListProps) {
     setSearchResults(data.notes)
   }
 
-  const baseNotes = searchResults ?? notes
-  const displayNotes = baseNotes
-    .filter((n) => (filterType === 'all' || n.type === filterType))
-    .filter((n) => showArchived ? n.tags.includes('archived') : !n.tags.includes('archived'))
-
-  const typeIcons: Record<string, typeof Notebook> = {
-    note: Notebook,
-  }
-
-  const typeLabels: Record<string, string> = { ...typeLabelsFromConstants, all: '全部' }
-
-  const filters: (NoteType | 'all')[] = ['all', 'note']
+  const displayNotes = searchResults ?? notes
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds(prev => {
@@ -163,29 +145,6 @@ export function NoteList({ defaultFilter = 'note' }: NoteListProps) {
       clearSelection()
     } catch (e) {
       console.error('Batch delete failed:', e)
-    }
-  }
-
-  async function handleBatchArchive() {
-    if (selectedIds.size === 0) return
-    const ids = Array.from(selectedIds)
-    try {
-      await fetch('/api/notes/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'archive', ids }),
-      })
-      ids.forEach(id => {
-        const note = notes.find(n => n.id === id)
-        if (note) {
-          const tags = [...note.tags]
-          if (!tags.includes('archived')) tags.push('archived')
-          updateNote(id, { tags, done: true })
-        }
-      })
-      clearSelection()
-    } catch (e) {
-      console.error('Batch archive failed:', e)
     }
   }
 
@@ -279,35 +238,13 @@ export function NoteList({ defaultFilter = 'note' }: NoteListProps) {
             className="pl-9 text-base sm:text-sm"
           />
         </div>
-        <div className="mt-3 flex items-center justify-between">
-          <div className="flex gap-1">
-            {filters.map((f) => (
-              <Button
-                key={f}
-                variant={filterType === f ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setFilterType(f)}
-                className="text-xs"
-              >
-                {typeLabels[f]}
-              </Button>
-            ))}
-            <Button
-              variant={showArchived ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => setShowArchived(!showArchived)}
-              className="text-xs"
-            >
-              <Archive className="mr-1 h-3 w-3" />
-              归档
-            </Button>
-          </div>
+        <div className="mt-3 flex items-center justify-end">
           <div className="flex items-center gap-1">
             <Button variant="default" size="sm" onClick={handleCreateNote} className="gap-1 text-xs">
               <Plus className="h-3.5 w-3.5" />
               新建
             </Button>
-            <ExportButton type="notes" />
+            <ExportButton />
           </div>
         </div>
       </div>
@@ -317,7 +254,7 @@ export function NoteList({ defaultFilter = 'note' }: NoteListProps) {
           <SkeletonNoteList count={5} />
         ) : displayNotes.length === 0 ? (
           <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
-            {searchQuery ? '没有找到匹配的记录' : showArchived ? '没有归档记录' : '还没有任何记录，点击上方 + 新建笔记'}
+            {searchQuery ? '没有找到匹配的记录' : '还没有任何记录，点击上方 + 新建笔记'}
           </div>
         ) : (
           <>
@@ -335,8 +272,6 @@ export function NoteList({ defaultFilter = 'note' }: NoteListProps) {
                 notes={displayNotes}
                 onEdit={(note) => router.push(`/notes/${note.id}`)}
                 onDelete={handleDelete}
-                typeIcons={typeIcons}
-                typeLabels={typeLabels}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
                 dragId={dragId}
@@ -353,8 +288,6 @@ export function NoteList({ defaultFilter = 'note' }: NoteListProps) {
                   note={note}
                   onEdit={(note) => router.push(`/notes/${note.id}`)}
                   onDelete={handleDelete}
-                  typeIcons={typeIcons}
-                  typeLabels={typeLabels}
                   selectedIds={selectedIds}
                   onToggleSelect={toggleSelect}
                   dragId={dragId}
@@ -364,6 +297,24 @@ export function NoteList({ defaultFilter = 'note' }: NoteListProps) {
                   onDrop={handleDrop}
                   onDragEnd={handleDragEnd}
                 />)}
+              </div>
+            )}
+            {hasMore && !searchQuery && (
+              <div className="flex justify-center py-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fetchNotes(true)}
+                  disabled={loading}
+                  className="gap-1"
+                >
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                  {loading ? '加载中…' : '加载更多'}
+                </Button>
               </div>
             )}
           </>
@@ -378,10 +329,6 @@ export function NoteList({ defaultFilter = 'note' }: NoteListProps) {
               <Button variant="outline" size="sm" onClick={handleBatchTag} className="gap-1">
                 <Tags className="h-3.5 w-3.5" />
                 改标签
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleBatchArchive} className="gap-1">
-                <Archive className="h-3.5 w-3.5" />
-                归档
               </Button>
               <Button variant="destructive" size="sm" onClick={handleBatchDelete} className="gap-1">
                 <Trash2 className="h-3.5 w-3.5" />
@@ -399,14 +346,12 @@ export function NoteList({ defaultFilter = 'note' }: NoteListProps) {
 }
 
 function NoteCard({
-  note, onEdit, onDelete, typeIcons, typeLabels, selectedIds, onToggleSelect,
+  note, onEdit, onDelete, selectedIds, onToggleSelect,
   dragId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd,
 }: {
   note: Note
   onEdit: (note: Note) => void
   onDelete: (id: string) => void
-  typeIcons: Record<string, typeof Notebook>
-  typeLabels: Record<string, string>
   selectedIds?: Set<string>
   onToggleSelect?: (id: string) => void
   dragId?: string | null
@@ -416,7 +361,6 @@ function NoteCard({
   onDrop?: (e: React.DragEvent, id: string) => void
   onDragEnd?: () => void
 }) {
-  const Icon = typeIcons[note.type]
   const isSelected = selectedIds?.has(note.id) ?? false
   const isDragging = dragId === note.id
   const isDragOver = dragOverId === note.id
@@ -452,13 +396,9 @@ function NoteCard({
               </button>
             )}
             <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/40" />
-            <Icon className="h-4 w-4 text-muted-foreground" />
             <CardTitle className="text-sm font-medium" onClick={() => onEdit(note)}>
               {note.title || stripMarkdown(note.content, 60) || '无标题'}
             </CardTitle>
-            <Badge variant="outline" className="text-[10px]">
-              {typeLabels[note.type]}
-            </Badge>
           </div>
           <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
             <Button
@@ -513,14 +453,12 @@ function NoteCard({
 }
 
 function VirtualNoteList({
-  notes, onEdit, onDelete, typeIcons, typeLabels,
+  notes, onEdit, onDelete,
   selectedIds, onToggleSelect, dragId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd,
 }: {
   notes: Note[]
   onEdit: (note: Note) => void
   onDelete: (id: string) => void
-  typeIcons: Record<string, typeof Notebook>
-  typeLabels: Record<string, string>
   selectedIds?: Set<string>
   onToggleSelect?: (id: string) => void
   dragId?: string | null
@@ -560,8 +498,6 @@ function VirtualNoteList({
                 note={note}
                 onEdit={onEdit}
                 onDelete={onDelete}
-                typeIcons={typeIcons}
-                typeLabels={typeLabels}
                 selectedIds={selectedIds}
                 onToggleSelect={onToggleSelect}
                 dragId={dragId}

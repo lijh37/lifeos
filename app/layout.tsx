@@ -5,7 +5,6 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Sidebar, MobileNav } from "@/components/sidebar"
 import { PwaHandler } from "@/components/pwa-handler"
 import { PageAnimation } from "@/components/page-animation"
-import { NotificationManager } from "@/components/notification-manager"
 import { FabButton } from "@/components/fab-button"
 import { AutoBackup } from "@/components/auto-backup"
 import CommandMenu from "@/components/command-menu"
@@ -52,7 +51,6 @@ export default function RootLayout({
       <body className="h-full">
         <ThemeProvider>
           <PwaHandler />
-          <NotificationManager />
           <CommandMenu />
           <FabButton />
           <div className="flex h-full">

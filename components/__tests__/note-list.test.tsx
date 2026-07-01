@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { NoteList } from '@/components/note-list'
 import { useAppStore } from '@/store'
 import type { Note } from '@/lib/types'
+
+// Mock next/navigation
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}))
 
 // Mock global fetch
 const mockFetch = vi.fn()
@@ -29,7 +34,6 @@ describe('NoteList', () => {
     // Reset store to initial state
     useAppStore.setState({
       notes: [],
-      filterType: 'all',
       loading: false,
     })
     mockFetch.mockReset()
@@ -76,46 +80,6 @@ describe('NoteList', () => {
     })
   })
 
-  it('should filter notes by type when filter buttons clicked', async () => {
-    const notes = [
-      createNote({ content: 'A note', type: 'note', tags: [] }),
-      createNote({ content: 'Another note', type: 'note', tags: [] }),
-    ]
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ notes }),
-    })
-
-    render(<NoteList />)
-
-    // Wait for notes to load
-    await waitFor(() => {
-      expect(screen.getAllByText('A note').length).toBeGreaterThanOrEqual(1)
-      expect(screen.getAllByText('Another note').length).toBeGreaterThanOrEqual(1)
-    })
-
-    // Click the 笔记 filter button
-    fireEvent.click(screen.getByRole('button', { name: '笔记' }))
-
-    // After clicking, all notes still show
-    expect(screen.getAllByText('A note').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText('Another note').length).toBeGreaterThanOrEqual(1)
-  })
-
-  it('should show type labels on filter buttons', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ notes: [] }),
-    })
-
-    render(<NoteList />)
-
-    await waitFor(() => {
-      expect(screen.getByText('全部')).toBeInTheDocument()
-      expect(screen.getByText('笔记')).toBeInTheDocument()
-    })
-  })
-
   it('should show search input', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
@@ -159,20 +123,4 @@ describe('NoteList', () => {
     })
   })
 
-  it('should display note filter by default when defaultFilter is note', async () => {
-    const notes = [
-      createNote({ content: 'Note 1', type: 'note', tags: [] }),
-      createNote({ content: 'Note 2', type: 'note', tags: [] }),
-    ]
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ notes }),
-    })
-
-    render(<NoteList defaultFilter="note" />)
-    await waitFor(() => {
-      expect(screen.getAllByText('Note 1').length).toBeGreaterThanOrEqual(1)
-      expect(screen.getAllByText('Note 2').length).toBeGreaterThanOrEqual(1)
-    })
-  })
 })

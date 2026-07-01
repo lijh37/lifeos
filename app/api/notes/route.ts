@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createNote, getNotes, getNotesCursor, deleteNote, searchNotes, getNotesByDateRange, getNotesCountByType, initDB } from '@/lib/db'
+import { createNote, getNotesCursor, deleteNote, searchNotes, getNotesByDateRange, getNotesCountByType, initDB } from '@/lib/db'
 import type { Note } from '@/lib/types'
 
 export async function GET(req: NextRequest) {

@@ -35,6 +35,9 @@ let client: ReturnType<typeof createClient> | null = null
 let dbInitialized = false
 let fts5Available: boolean | undefined
 
+/**
+ * 获取数据库客户端实例（单例），优先使用 Turso 远程数据库，否则回退到本地 SQLite 文件。
+ */
 export function getClient() {
   if (client) return client
   const tursoUrl = process.env.TURSO_DATABASE_URL
@@ -46,6 +49,11 @@ export function getClient() {
   return client
 }
 
+/**
+ * 初始化数据库：创建所有必要的表和索引，包括 notes、chat_messages、conversations、budgets、
+ * attachments、habits、habit_completions，以及 FTS5 全文索引和规范化标签表。
+ * 首次调用后自动跳过重复初始化。
+ */
 export async function initDB() {
   if (dbInitialized) return
   const db = getClient()
@@ -231,6 +239,11 @@ export async function initDB() {
   dbInitialized = true
 }
 
+/**
+ * 创建或替换一个对话会话。
+ * @param id - 会话 ID
+ * @param title - 会话标题
+ */
 export async function createConversation(id: string, title: string): Promise<void> {
   const db = getClient()
   const now = new Date().toISOString()
@@ -240,6 +253,10 @@ export async function createConversation(id: string, title: string): Promise<voi
   })
 }
 
+/**
+ * 获取所有对话会话列表，按更新时间降序排列，附带每条对话的消息数。
+ * @returns 对话数组，包含 id、标题、时间戳和消息计数
+ */
 export async function getConversations(): Promise<{ id: string; title: string; createdAt: string; updatedAt: string; messageCount: number }[]> {
   const db = getClient()
   const result = await db.execute(`
@@ -256,12 +273,21 @@ export async function getConversations(): Promise<{ id: string; title: string; c
   }))
 }
 
+/**
+ * 删除指定对话及其所有关联的聊天消息。
+ * @param id - 要删除的对话 ID
+ */
 export async function deleteConversation(id: string): Promise<void> {
   const db = getClient()
   await db.execute({ sql: 'DELETE FROM conversations WHERE id = ?', args: [id] })
   await db.execute({ sql: 'DELETE FROM chat_messages WHERE conversation_id = ?', args: [id] })
 }
 
+/**
+ * 更新指定对话的标题和更新时间。
+ * @param id - 对话 ID
+ * @param title - 新标题
+ */
 export async function updateConversationTitle(id: string, title: string): Promise<void> {
   const db = getClient()
   await db.execute({
@@ -284,6 +310,11 @@ function rowToNote(row: Record<string, unknown>): Note {
   }
 }
 
+/**
+ * 创建一条新笔记，同时同步其标签到规范化标签表。
+ * @param note - 完整的笔记对象
+ * @returns 创建后的笔记对象
+ */
 export async function createNote(note: Note): Promise<Note> {
   const db = getClient()
   await db.execute({
@@ -299,6 +330,12 @@ export async function createNote(note: Note): Promise<Note> {
   return note
 }
 
+/**
+ * 更新指定笔记的部分字段（内容、标题、类型、标签、截止日期、完成状态）。
+ * 如果更新包含标签，同时同步到规范化标签表。
+ * @param id - 笔记 ID
+ * @param updates - 包含要更新字段的部分笔记对象
+ */
 export async function updateNote(id: string, updates: Partial<Note>): Promise<void> {
   const db = getClient()
   const fields: string[] = []
@@ -323,6 +360,10 @@ export async function updateNote(id: string, updates: Partial<Note>): Promise<vo
   }
 }
 
+/**
+ * 删除指定笔记及其关联的标签和附件。
+ * @param id - 要删除的笔记 ID
+ */
 export async function deleteNote(id: string): Promise<void> {
   const db = getClient()
   await db.execute({ sql: 'DELETE FROM note_tags WHERE note_id = ?', args: [id] })
@@ -330,6 +371,13 @@ export async function deleteNote(id: string): Promise<void> {
   await db.execute({ sql: 'DELETE FROM notes WHERE id = ?', args: [id] })
 }
 
+/**
+ * 获取笔记列表，可按类型过滤，支持分页。按 sort_order 升序、创建时间降序排列。
+ * @param type - 可选，笔记类型筛选
+ * @param limit - 返回条数上限（默认 200）
+ * @param offset - 分页偏移量（默认 0）
+ * @returns 笔记对象数组
+ */
 export async function getNotes(type?: NoteType, limit = 200, offset = 0): Promise<Note[]> {
   const db = getClient()
   let sql = 'SELECT * FROM notes'
@@ -344,6 +392,13 @@ export async function getNotes(type?: NoteType, limit = 200, offset = 0): Promis
   return result.rows.map(rowToNote)
 }
 
+/**
+ * 基于游标分页获取笔记列表，支持按类型过滤。用于无限滚动场景。
+ * @param type - 可选，笔记类型筛选
+ * @param limit - 每页条数（默认 50，实际多取一条判断下一页）
+ * @param cursor - 上一页最后一条的 created_at 时间戳
+ * @returns 包含笔记数组和下一页游标的对象
+ */
 export async function getNotesCursor(type?: NoteType, limit = 50, cursor?: string): Promise<{ notes: Note[]; nextCursor: string | null }> {
   const db = getClient()
   let sql = 'SELECT * FROM notes'
@@ -380,6 +435,15 @@ export async function getNotesCursor(type?: NoteType, limit = 50, cursor?: strin
   return { notes: rows, nextCursor }
 }
 
+/**
+ * 按截止日期范围查询笔记，可按类型过滤，支持分页。
+ * @param startDate - 起始日期（ISO 字符串）
+ * @param endDate - 结束日期（ISO 字符串）
+ * @param type - 可选，笔记类型筛选
+ * @param limit - 返回条数上限（默认 200）
+ * @param offset - 分页偏移量（默认 0）
+ * @returns 匹配日期范围的笔记数组
+ */
 export async function getNotesByDateRange(startDate: string, endDate: string, type?: NoteType, limit = 200, offset = 0): Promise<Note[]> {
   const db = getClient()
   let sql = 'SELECT * FROM notes WHERE due_date >= ? AND due_date <= ?'
@@ -394,6 +458,11 @@ export async function getNotesByDateRange(startDate: string, endDate: string, ty
   return result.rows.map(rowToNote)
 }
 
+/**
+ * 统计笔记数量，可按类型过滤。
+ * @param type - 可选，笔记类型筛选
+ * @returns 笔记总数
+ */
 export async function getNotesCountByType(type?: NoteType): Promise<number> {
   const db = getClient()
   let sql = 'SELECT COUNT(*) as count FROM notes'
@@ -406,6 +475,11 @@ export async function getNotesCountByType(type?: NoteType): Promise<number> {
   return result.rows[0]?.count as number || 0
 }
 
+/**
+ * 根据 ID 获取单条笔记。
+ * @param id - 笔记 ID
+ * @returns 笔记对象，未找到时返回 null
+ */
 export async function getNote(id: string): Promise<Note | null> {
   const db = getClient()
   const result = await db.execute({ sql: 'SELECT * FROM notes WHERE id = ?', args: [id] })
@@ -429,6 +503,11 @@ function rowToBudget(row: Record<string, unknown>): Budget {
   }
 }
 
+/**
+ * 获取指定月份的预算记录。
+ * @param month - 月份字符串（如 "2024-01"）
+ * @returns 预算对象，未找到时返回 null
+ */
 export async function getBudget(month: string): Promise<Budget | null> {
   const db = getClient()
   const result = await db.execute({
@@ -439,12 +518,22 @@ export async function getBudget(month: string): Promise<Budget | null> {
   return rowToBudget(result.rows[0])
 }
 
+/**
+ * 获取所有预算记录，按月降序排列。
+ * @returns 预算对象数组
+ */
 export async function getBudgets(): Promise<Budget[]> {
   const db = getClient()
   const result = await db.execute('SELECT * FROM budgets ORDER BY month DESC')
   return result.rows.map(rowToBudget)
 }
 
+/**
+ * 创建或更新指定月份的预算。如果已存在则更新部分字段，否则创建新预算记录。
+ * @param month - 月份字符串（如 "2024-01"）
+ * @param data - 预算的部分字段数据
+ * @returns 更新后的完整预算对象
+ */
 export async function upsertBudget(month: string, data: Partial<Budget>): Promise<Budget> {
   const db = getClient()
   const existing = await getBudget(month)
@@ -504,6 +593,11 @@ function rowToHabit(row: Record<string, unknown>): Habit {
   }
 }
 
+/**
+ * 创建一条新习惯记录。
+ * @param habit - 完整的习惯对象
+ * @returns 创建后的习惯对象
+ */
 export async function createHabit(habit: Habit): Promise<Habit> {
   const db = getClient()
   await db.execute({
@@ -513,18 +607,32 @@ export async function createHabit(habit: Habit): Promise<Habit> {
   return habit
 }
 
+/**
+ * 获取所有习惯记录，按创建时间降序排列。
+ * @returns 习惯对象数组
+ */
 export async function getHabits(): Promise<Habit[]> {
   const db = getClient()
   const result = await db.execute('SELECT * FROM habits ORDER BY created_at DESC')
   return result.rows.map(rowToHabit)
 }
 
+/**
+ * 删除指定习惯及其所有打卡记录。
+ * @param id - 要删除的习惯 ID
+ */
 export async function deleteHabit(id: string): Promise<void> {
   const db = getClient()
   await db.execute({ sql: 'DELETE FROM habits WHERE id = ?', args: [id] })
   await db.execute({ sql: 'DELETE FROM habit_completions WHERE habit_id = ?', args: [id] })
 }
 
+/**
+ * 切换习惯在指定日期的打卡状态（已完成/未完成）。如果当天无记录则新建打卡。
+ * @param habitId - 习惯 ID
+ * @param date - 日期字符串（YYYY-MM-DD）
+ * @returns 切换后的完成状态（true 为已完成）
+ */
 export async function toggleCompletion(habitId: string, date: string): Promise<boolean> {
   const db = getClient()
   const existing = await db.execute({
@@ -548,6 +656,10 @@ export async function toggleCompletion(habitId: string, date: string): Promise<b
   }
 }
 
+/**
+ * 计算每个习惯的连续打卡天数，从今天开始向前追溯最多 365 天。
+ * @returns 以 habit_id 为键、连续打卡天数为值的映射
+ */
 export async function getStreaks(): Promise<Record<string, number>> {
   const db = getClient()
   const rows = (await db.execute(
@@ -578,6 +690,10 @@ export async function getStreaks(): Promise<Record<string, number>> {
   return streaks
 }
 
+/**
+ * 获取所有习惯在今天（按本地日期）的打卡状态。
+ * @returns 以 habit_id 为键、完成状态为值的映射
+ */
 export async function getTodayCompletions(): Promise<Record<string, boolean>> {
   const today = new Date().toISOString().slice(0, 10)
   const db = getClient()
@@ -592,6 +708,12 @@ export async function getTodayCompletions(): Promise<Record<string, boolean>> {
   return map
 }
 
+/**
+ * 按关键词搜索笔记，优先使用 FTS5 全文索引，失败时回退到 LIKE 模糊匹配。
+ * 支持标题和内容搜索，返回最多 50 条结果。
+ * @param query - 搜索关键词
+ * @returns 匹配的笔记数组
+ */
 export async function searchNotes(query: string): Promise<Note[]> {
   const db = getClient()
   const term = `%${query}%`
@@ -622,6 +744,11 @@ export async function searchNotes(query: string): Promise<Note[]> {
   return result.rows.map(rowToNote)
 }
 
+/**
+ * 按关键词搜索习惯（名称或描述），返回最多 50 条结果。
+ * @param query - 搜索关键词
+ * @returns 匹配的习惯数组
+ */
 export async function searchHabits(query: string): Promise<Habit[]> {
   const term = `%${query}%`
   const db = getClient()
@@ -632,6 +759,11 @@ export async function searchHabits(query: string): Promise<Habit[]> {
   return result.rows.map(rowToHabit)
 }
 
+/**
+ * 获取所有标签及其关联的笔记数量，按数量降序排列。
+ * 优先从规范化标签表查询，失败时回退到 JSON 字段解析。
+ * @returns 标签名和对应计数对象的数组
+ */
 export async function getAllTags(): Promise<{ name: string; count: number }[]> {
   const db = getClient()
   try {
@@ -662,6 +794,12 @@ export async function getAllTags(): Promise<{ name: string; count: number }[]> {
   }
 }
 
+/**
+ * 重命名标签。如果新名称已存在则合并标签（将旧标签的笔记关联到新标签）。
+ * 同时更新 notes 表中 JSON 格式的 tags 字段。
+ * @param oldName - 原标签名
+ * @param newName - 新标签名
+ */
 export async function renameTag(oldName: string, newName: string): Promise<void> {
   if (oldName === newName) return
   const db = getClient()
@@ -690,6 +828,10 @@ export async function renameTag(oldName: string, newName: string): Promise<void>
   }
 }
 
+/**
+ * 删除指定标签。从规范化标签表和 notes 的 JSON 标签字段中移除该标签。
+ * @param tagName - 要删除的标签名
+ */
 export async function deleteTag(tagName: string): Promise<void> {
   const db = getClient()
   try {
@@ -709,6 +851,10 @@ export async function deleteTag(tagName: string): Promise<void> {
   }
 }
 
+/**
+ * 获取类型为 note 的笔记总数。
+ * @returns 包含 note 计数的对象
+ */
 export async function getNotesCount(): Promise<{ note: number }> {
   const db = getClient()
   const result = await db.execute(
@@ -717,18 +863,31 @@ export async function getNotesCount(): Promise<{ note: number }> {
   return { note: result.rows[0]?.count as number || 0 }
 }
 
+/**
+ * 获取预算记录总数。
+ * @returns 预算数量
+ */
 export async function getBudgetsCount(): Promise<number> {
   const db = getClient()
   const result = await db.execute('SELECT COUNT(*) as count FROM budgets')
   return result.rows[0]?.count as number || 0
 }
 
+/**
+ * 获取习惯记录总数。
+ * @returns 习惯数量
+ */
 export async function getHabitsCount(): Promise<number> {
   const db = getClient()
   const result = await db.execute('SELECT COUNT(*) as count FROM habits')
   return result.rows[0]?.count as number || 0
 }
 
+/**
+ * 创建一条附件记录，关联到指定笔记。
+ * @param data - 包含 noteId、filename、url、mimeType、fileSize 的对象
+ * @returns 创建的附件对象
+ */
 export async function createAttachment(data: {
   noteId: string
   filename: string
@@ -754,6 +913,11 @@ export async function createAttachment(data: {
   }
 }
 
+/**
+ * 获取指定笔记的所有附件，按创建时间升序排列。
+ * @param noteId - 笔记 ID
+ * @returns 附件对象数组
+ */
 export async function getAttachmentsByNoteId(noteId: string): Promise<Attachment[]> {
   const db = getClient()
   const result = await db.execute({
@@ -771,6 +935,11 @@ export async function getAttachmentsByNoteId(noteId: string): Promise<Attachment
   }))
 }
 
+/**
+ * 根据 ID 获取单个附件。
+ * @param id - 附件 ID
+ * @returns 附件对象，未找到时返回 null
+ */
 export async function getAttachment(id: string): Promise<Attachment | null> {
   const db = getClient()
   const result = await db.execute({
@@ -790,17 +959,30 @@ export async function getAttachment(id: string): Promise<Attachment | null> {
   }
 }
 
+/**
+ * 删除指定附件。
+ * @param id - 要删除的附件 ID
+ * @returns 是否成功删除（存在且被删除返回 true）
+ */
 export async function deleteAttachment(id: string): Promise<boolean> {
   const db = getClient()
   const result = await db.execute({ sql: 'DELETE FROM attachments WHERE id = ?', args: [id] })
   return result.rowsAffected > 0
 }
 
+/**
+ * 删除指定笔记的所有附件。
+ * @param noteId - 笔记 ID
+ */
 export async function deleteAttachmentsByNoteId(noteId: string): Promise<void> {
   const db = getClient()
   await db.execute({ sql: 'DELETE FROM attachments WHERE note_id = ?', args: [noteId] })
 }
 
+/**
+ * 保存一条聊天消息到数据库（插入或替换）。
+ * @param msg - 聊天消息对象
+ */
 export async function saveChatMessage(msg: ChatMessage): Promise<void> {
   const db = getClient()
   await db.execute({
@@ -809,6 +991,11 @@ export async function saveChatMessage(msg: ChatMessage): Promise<void> {
   })
 }
 
+/**
+ * 获取最近的聊天消息，按时间升序排列。
+ * @param limit - 返回条数上限（默认 50）
+ * @returns 聊天消息数组
+ */
 export async function getRecentChatMessages(limit = 50): Promise<ChatMessage[]> {
   const db = getClient()
   const result = await db.execute({
@@ -825,6 +1012,11 @@ export async function getRecentChatMessages(limit = 50): Promise<ChatMessage[]> 
   }))
 }
 
+/**
+ * 获取指定对话的所有聊天消息，按时间升序排列。
+ * @param conversationId - 对话 ID
+ * @returns 聊天消息数组
+ */
 export async function getChatMessagesByConversation(conversationId: string): Promise<ChatMessage[]> {
   const db = getClient()
   const result = await db.execute({
@@ -841,11 +1033,19 @@ export async function getChatMessagesByConversation(conversationId: string): Pro
   }))
 }
 
+/**
+ * 清空所有聊天消息记录。
+ */
 export async function clearChatMessages(): Promise<void> {
   const db = getClient()
   await db.execute('DELETE FROM chat_messages')
 }
 
+/**
+ * 清空指定表的所有数据（仅限白名单表：notes、budgets、habits、habit_completions、chat_messages）。
+ * @param table - 表名
+ * @throws 如果表名不在白名单中则抛出错误
+ */
 export async function clearTable(table: string): Promise<void> {
   const db = getClient()
   const allowed = ['notes', 'budgets', 'habits', 'habit_completions', 'chat_messages']
