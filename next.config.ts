@@ -3,6 +3,11 @@ import type { NextConfig } from "next";
 let nextConfig: NextConfig = {
   allowedDevOrigins: ['*'],
   serverExternalPackages: ['@libsql/client'],
+  modularizeImports: {
+    'lucide-react': {
+      transform: 'lucide-react/dist/esm/icons/{{kebabCase member}}',
+    },
+  },
 };
 
 if (process.env.ANALYZE === 'true') {
