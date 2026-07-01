@@ -3,6 +3,8 @@ import type { Note } from '@/lib/types'
 
 const MAX_CACHED_NOTES = 500
 
+// ─── Notes store (cursor-paginated cache) ──────────────────────────────────
+
 interface AppState {
   notes: Note[]
   loading: boolean
@@ -40,4 +42,22 @@ export const useAppStore = create<AppState>((set) => ({
     notes: [...state.notes, ...notes].slice(0, MAX_CACHED_NOTES),
     cursor: notes.length > 0 ? notes[notes.length - 1].createdAt : state.cursor,
   })),
+}))
+
+// ─── UI store (shared cross-page state) ────────────────────────────────────
+
+interface UIState {
+  /** Global search query (persisted across tab navigation) */
+  globalSearchQuery: string
+  setGlobalSearchQuery: (q: string) => void
+  /** Mobile sidebar / sheet visibility */
+  isMobileMenuOpen: boolean
+  setMobileMenuOpen: (open: boolean) => void
+}
+
+export const useUIStore = create<UIState>((set) => ({
+  globalSearchQuery: '',
+  setGlobalSearchQuery: (globalSearchQuery) => set({ globalSearchQuery }),
+  isMobileMenuOpen: false,
+  setMobileMenuOpen: (isMobileMenuOpen) => set({ isMobileMenuOpen }),
 }))

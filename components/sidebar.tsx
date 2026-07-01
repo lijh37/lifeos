@@ -2,23 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Notebook, Plus, PiggyBank, Trophy, Search, Settings, Tags, BarChart3, Bot, MoreHorizontal } from 'lucide-react'
+import { Notebook, Plus, MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
-
-const navItems = [
-  { href: '/notes', label: '笔记', icon: Notebook },
-  { href: '/search', label: '搜索', icon: Search },
-  { href: '/', label: 'AI 查询', icon: Bot },
-  { href: '/expenses', label: '预算', icon: PiggyBank },
-  { href: '/habits', label: '习惯', icon: Trophy },
-  { href: '/tags', label: '标签', icon: Tags },
-  { href: '/stats', label: '统计', icon: BarChart3 },
-  { href: '/settings', label: '设置', icon: Settings },
-]
+import { NAV_ITEMS, PRIMARY_MOBILE_NAV, MORE_MOBILE_NAV } from '@/lib/navigation'
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -31,7 +21,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-col gap-1">
-        {navItems.map((item) => {
+        {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href
           return (
             <Link key={item.href} href={item.href} prefetch={['/notes', '/habits'].includes(item.href)}>
@@ -47,13 +37,15 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-auto space-y-1">
-        <Link href="/notes">
-          <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground">
-            <Plus className="h-4 w-4" />
-            新建笔记
-          </Button>
-        </Link>
+      <div className="mt-auto space-y-2">
+        <div className="border-t pt-2">
+          <Link href="/notes">
+            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground">
+              <Plus className="h-4 w-4" />
+              新建笔记
+            </Button>
+          </Link>
+        </div>
         <div className="flex items-center justify-between px-2 py-1">
           <span className="text-xs text-muted-foreground">主题</span>
           <ThemeToggle />
@@ -67,30 +59,17 @@ export function MobileNav() {
   const pathname = usePathname()
   const [moreOpen, setMoreOpen] = useState(false)
 
-  const primaryItems = [
-    { href: '/notes', label: '笔记', icon: Notebook },
-    { href: '/search', label: '搜索', icon: Search },
-    { href: '/expenses', label: '预算', icon: PiggyBank },
-    { href: '/habits', label: '习惯', icon: Trophy },
-  ]
-
-  const moreItems = [
-    { href: '/tags', label: '标签', icon: Tags },
-    { href: '/stats', label: '统计', icon: BarChart3 },
-    { href: '/settings', label: '设置', icon: Settings },
-  ]
-
   return (
     <>
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center border-t bg-background pb-[env(safe-area-inset-bottom)] md:hidden">
-        {primaryItems.map((item) => {
+        {PRIMARY_MOBILE_NAV.map((item) => {
           const isActive = pathname === item.href
           return (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                'flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[10px] min-h-[56px]',
+                'flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[11px] leading-tight min-h-[56px]',
                 isActive ? 'text-primary' : 'text-muted-foreground'
               )}
             >
@@ -114,7 +93,7 @@ export function MobileNav() {
             <SheetTitle>所有功能</SheetTitle>
           </SheetHeader>
           <div className="grid grid-cols-3 gap-3 p-4">
-            {moreItems.map((item) => {
+            {MORE_MOBILE_NAV.map((item) => {
               const isActive = pathname === item.href
               return (
                 <Link

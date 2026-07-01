@@ -83,7 +83,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b p-4">
+      <div className="border-b px-4 py-3">
         <div className="flex items-center gap-2">
           <Settings className="h-5 w-5 text-primary" />
           <h1 className="text-lg font-semibold">设置</h1>
@@ -125,7 +125,7 @@ export default function SettingsPage() {
                     </div>
                   ))}
                   {stats && (stats.notes + stats.budgets + stats.habits) > 0 && (
-                    <div className="flex items-center gap-3 pt-2">
+                    <div className="flex items-center gap-3 border-t pt-3 mt-3">
                       <AlertTriangle className="h-4 w-4 text-destructive" />
                       <Button
                         variant="destructive"
@@ -148,13 +148,13 @@ export default function SettingsPage() {
           <Card>
             <CardContent className="p-4">
               <h2 className="mb-3 text-sm font-medium text-muted-foreground">手动导出/导入</h2>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <Button variant="outline" size="sm" className="flex-1" onClick={handleExport}>
-                  <Download className="mr-1 h-4 w-4" />
+                  <Download className="mr-1.5 h-4 w-4" />
                   导出备份
                 </Button>
                 <Button variant="outline" size="sm" className="flex-1" onClick={() => fileRef.current?.click()} disabled={importing}>
-                  {importing ? <div className="mr-1 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Upload className="mr-1 h-4 w-4" />}
+                  {importing ? <div className="mr-1.5 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Upload className="mr-1.5 h-4 w-4" />}
                   导入恢复
                 </Button>
                 <input ref={fileRef} type="file" accept=".json" onChange={handleImport} className="hidden" />

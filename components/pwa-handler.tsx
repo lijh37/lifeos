@@ -5,6 +5,11 @@ import { Download, Bug, RefreshCw, Loader2, Check } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+}
+
 export function PwaHandler() {
   const [isOffline, setIsOffline] = useState(false)
   const [showInstall, setShowInstall] = useState(false)
@@ -15,16 +20,15 @@ export function PwaHandler() {
   const [installed, setInstalled] = useState(false)
   const [installState, setInstallState] = useState<'idle' | 'installing' | 'done' | 'error'>('idle')
 
-  const deferredPromptRef = useRef<Event | null>(null)
+  const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null)
   const handleInstallRef = useRef<() => void>(() => {})
 
   handleInstallRef.current = () => {
-    const prompt = deferredPromptRef.current
-    if (!prompt) return
-    const p = prompt as any
-    p.prompt()
+    const ev = deferredPromptRef.current
+    if (!ev) return
+    ev.prompt()
     setInstallState('installing')
-    p.userChoice.then(({ outcome }: { outcome: string }) => {
+    ev.userChoice.then(({ outcome }) => {
       if (outcome === 'accepted') {
         setInstalled(true)
         setShowInstall(false)
@@ -64,7 +68,7 @@ export function PwaHandler() {
 
     const handler = (e: Event) => {
       e.preventDefault()
-      deferredPromptRef.current = e
+      deferredPromptRef.current = e as BeforeInstallPromptEvent
       setShowInstall(true)
     }
     window.addEventListener('beforeinstallprompt', handler)

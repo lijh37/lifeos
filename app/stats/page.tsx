@@ -63,7 +63,7 @@ export default function StatsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b p-4">
+      <div className="border-b px-4 py-3">
         <div className="flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-primary" />
           <h1 className="text-lg font-semibold">统计</h1>
@@ -72,7 +72,7 @@ export default function StatsPage() {
 
       <ScrollArea className="flex-1">
         <div className="space-y-4 p-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {summaryCards.map(card => (
               <Card key={card.label}>
                 <CardContent className="p-4">

@@ -94,7 +94,7 @@ export function FabButton() {
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
-        className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-shadow"
+        className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200"
         style={{ touchAction: 'none' }}
       >
         {open ? <X className="h-6 w-6" /> : <Plus className="h-6 w-6" />}

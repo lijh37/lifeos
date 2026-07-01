@@ -62,7 +62,7 @@ export default function TagsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b p-4">
+      <div className="border-b px-4 py-3">
         <div className="flex items-center gap-2">
           <Tags className="h-5 w-5 text-primary" />
           <h1 className="text-lg font-semibold">标签管理</h1>
@@ -85,7 +85,7 @@ export default function TagsPage() {
             <SkeletonCard count={5} />
           </div>
         ) : tags.length === 0 ? (
-          <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+          <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
             还没有标签，去 AI 对话页面创建笔记吧
           </div>
         ) : (

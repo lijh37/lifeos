@@ -38,13 +38,15 @@ export class ErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) return this.props.fallback
 
       return (
-        <div className="flex h-full items-center justify-center p-4">
-          <Card className="max-w-md">
-            <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
-              <AlertTriangle className="h-10 w-10 text-destructive" />
+        <div className="flex h-full items-center justify-center p-6">
+          <Card className="w-full max-w-sm">
+            <CardContent className="flex flex-col items-center gap-4 py-8 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+                <AlertTriangle className="h-6 w-6 text-destructive" />
+              </div>
               <div>
-                <h3 className="text-lg font-semibold">页面出错了</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <h3 className="text-base font-semibold">页面出错了</h3>
+                <p className="mt-1.5 text-sm text-muted-foreground">
                   {this.state.error?.message || '发生了意外错误'}
                 </p>
               </div>

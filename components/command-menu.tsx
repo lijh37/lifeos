@@ -8,15 +8,10 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { typeLabels, typeColors } from '@/lib/constants'
 import type { Note, Habit } from '@/lib/types'
+import { NAV_ITEMS, QUICK_ACTIONS } from '@/lib/navigation'
+import type { QuickAction } from '@/lib/navigation'
 import {
-  Bot,
-  Notebook,
-  PiggyBank,
-  Trophy,
-  Search as SearchIcon,
-  Settings,
-  Tags,
-  BarChart3,
+  Search,
   Sun,
   Moon,
   Monitor,
@@ -24,33 +19,6 @@ import {
   Command,
   type LucideIcon,
 } from 'lucide-react'
-
-// ─── Navigation items (mirrors sidebar.tsx) ───
-const NAV_ITEMS: Array<{ href: string; label: string; icon: LucideIcon }> = [
-  { href: '/', label: 'AI 对话', icon: Bot },
-  { href: '/notes', label: '笔记', icon: Notebook },
-  { href: '/expenses', label: '预算', icon: PiggyBank },
-  { href: '/habits', label: '习惯', icon: Trophy },
-  { href: '/search', label: '搜索', icon: SearchIcon },
-  { href: '/tags', label: '标签', icon: Tags },
-  { href: '/stats', label: '统计', icon: BarChart3 },
-  { href: '/settings', label: '设置', icon: Settings },
-]
-
-// ─── Quick actions ───
-interface QuickAction {
-  id: string
-  label: string
-  icon: LucideIcon
-  kind: 'navigate' | 'theme'
-  href?: string
-}
-
-const QUICK_ACTIONS: QuickAction[] = [
-  { id: 'new-note', label: '新建笔记', icon: Notebook, kind: 'navigate', href: '/' },
-  { id: 'new-habit', label: '新建习惯', icon: Trophy, kind: 'navigate', href: '/habits' },
-  { id: 'toggle-theme', label: '切换主题', icon: Sun, kind: 'theme' },
-]
 
 const NEXT_THEME: Record<string, 'light' | 'dark' | 'system'> = {
   light: 'dark',
@@ -153,7 +121,8 @@ export default function CommandMenu() {
         const data: { notes: Note[]; habits: Habit[] } = await res.json()
         // Guard against stale responses — only update if query hasn't changed
         setResults(data)
-      } catch {
+      } catch (e) {
+        console.warn('[search] 搜索请求失败:', e)
         setResults({ notes: [], habits: [] })
       } finally {
         setSearching(false)
@@ -345,7 +314,7 @@ export default function CommandMenu() {
       >
         {/* ── Search input ── */}
         <div className="flex shrink-0 items-center gap-2.5 border-b px-4 py-3.5">
-          <SearchIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
           <input
             ref={inputRef}
             value={query}
@@ -382,7 +351,7 @@ export default function CommandMenu() {
             {/* Empty state */}
             {!searching && hasQuery && !hasResults && (
               <div className="flex flex-col items-center gap-1 py-16 text-center">
-                <SearchIcon className="h-8 w-8 text-muted-foreground/30" />
+                <Search className="h-8 w-8 text-muted-foreground/30" />
                 <p className="text-sm text-muted-foreground">未找到结果</p>
                 <p className="text-xs text-muted-foreground/50">
                   尝试其他关键词

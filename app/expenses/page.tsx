@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, memo } from 'react'
 import { format, subMonths, addMonths } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { Card, CardContent } from '@/components/ui/card'
@@ -13,17 +13,159 @@ import { SkeletonCard } from '@/components/skeleton-card'
 import { ChevronLeft, ChevronRight, PiggyBank, CheckCircle2, AlertCircle, Target, Sparkles, Loader2 } from 'lucide-react'
 import type { Budget } from '@/lib/types'
 
+const ProgressBar = memo(function ProgressBar({ label, budget: b, actual }: { label: string; budget: number; actual: number | null }) {
+  if (actual === null) return null
+  const ratio = b > 0 ? actual / b : 0
+  const pct = Math.min(ratio * 100, 100)
+  const diff = actual - b
+  const over = diff > 0
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted-foreground">{label}</span>
+                <span className={over ? 'text-red-500 font-medium whitespace-nowrap' : 'text-green-500 font-medium whitespace-nowrap'}>
+                  ¥{actual.toFixed(0)} / ¥{b.toFixed(0)}
+          {over ? ` (+¥${diff.toFixed(0)})` : ` (-¥${Math.abs(diff).toFixed(0)})`}
+        </span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${
+            over ? 'bg-red-500' : ratio > 0.85 ? 'bg-amber-500' : 'bg-green-500'
+          }`}
+          style={{ width: `${Math.max(pct, 2)}%` }}
+        />
+      </div>
+    </div>
+  )
+})
+ProgressBar.displayName = 'ProgressBar'
+
+const BudgetCard = memo(function BudgetCard({ budget, currentMonth, onEdit, onDelete }: { budget: Budget; currentMonth: string; onEdit?: (b: Budget) => void; onDelete?: (id: string) => void }) {
+  const tb = budget.fixedBudget + budget.variableBudget
+  const ta = (budget.fixedActual ?? 0) + (budget.variableActual ?? 0)
+  const over = budget.fixedActual !== null && budget.variableActual !== null && ta > tb
+  return (
+    <div
+      className={`flex items-center justify-between max-sm:flex-col max-sm:items-start max-sm:gap-1 rounded-lg border p-3 text-sm transition-all duration-200 ${
+        budget.month === currentMonth ? 'border-primary/50 bg-primary/5' : 'hover:border-border/80'
+      }`}
+    >
+      <div>
+        <p className="font-medium">
+          {format(new Date(budget.month + '-01'), 'yyyy年M月', { locale: zhCN })}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          预算 ¥{tb.toFixed(0)}
+          {budget.fixedActual !== null && ` · 实际 ¥${ta.toFixed(0)}`}
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        {budget.fixedActual !== null && (
+          <span className={`text-xs font-medium ${over ? 'text-red-500' : 'text-green-500'}`}>
+            {over ? '超支' : '达标'}
+          </span>
+        )}
+        {budget.isCompleted && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+        {budget.savingsCompleted && (
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-[10px] text-green-700 dark:bg-green-900 dark:text-green-300">
+            ¥
+          </span>
+        )}
+      </div>
+    </div>
+  )
+})
+BudgetCard.displayName = 'BudgetCard'
+
+function BudgetForm({ budget, onSave }: { budget: Budget | null; onSave: (data: Record<string, unknown>) => void }) {
+  const [fixedBudgetInput, setFixedBudgetInput] = useState('')
+  const [variableBudgetInput, setVariableBudgetInput] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setFixedBudgetInput(budget ? String(budget.fixedBudget) : '')
+    setVariableBudgetInput(budget ? String(budget.variableBudget) : '')
+  }, [budget])
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await onSave({
+        fixedBudget: fixedBudgetInput ? parseFloat(fixedBudgetInput) : 0,
+        variableBudget: variableBudgetInput ? parseFloat(variableBudgetInput) : 0,
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <Target className="h-4 w-4 text-primary" />
+          <h2 className="text-sm font-medium">预算设定</h2>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">
+              固定支出预算 <span className="text-[10px]">（住房/房贷/租房/电话费等）</span>
+            </label>
+            <div className="relative">
+              <Input
+                type="number"
+                value={fixedBudgetInput}
+                onChange={(e) => setFixedBudgetInput(e.target.value)}
+                placeholder="例: 3200"
+                className="pr-8"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">¥</span>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">
+              浮动支出预算 <span className="text-[10px]">（交通/饮食/衣服/聚餐等）</span>
+            </label>
+            <div className="relative">
+              <Input
+                type="number"
+                value={variableBudgetInput}
+                onChange={(e) => setVariableBudgetInput(e.target.value)}
+                placeholder="例: 1600"
+                className="pr-8"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">¥</span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <span className="rounded-lg bg-muted px-3 py-1.5 text-sm">
+              总预算：<span className="font-bold">
+                ¥{((fixedBudgetInput ? parseFloat(fixedBudgetInput) : 0) + (variableBudgetInput ? parseFloat(variableBudgetInput) : 0)).toFixed(0)}
+              </span>
+            </span>
+            <Button size="sm" onClick={handleSave} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {saving ? '保存中...' : '保存预算'}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Export for testing
+export { ProgressBar, BudgetCard }
+
 export default function BudgetPage() {
   const now = new Date()
   const [currentMonth, setCurrentMonth] = useState(now.toISOString().slice(0, 7))
   const [budget, setBudget] = useState<Budget | null>(null)
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [loading, setLoading] = useState(true)
-  const [savingBudget, setSavingBudget] = useState(false)
   const [savingActual, setSavingActual] = useState(false)
 
-  const [fixedBudgetInput, setFixedBudgetInput] = useState('')
-  const [variableBudgetInput, setVariableBudgetInput] = useState('')
   const [fixedActualInput, setFixedActualInput] = useState('')
   const [variableActualInput, setVariableActualInput] = useState('')
 
@@ -39,8 +181,6 @@ export default function BudgetPage() {
   const isFutureMonth = currentMonth > now.toISOString().slice(0, 7)
 
   const syncInputs = useCallback((b: Budget | null) => {
-    setFixedBudgetInput(b ? String(b.fixedBudget) : '')
-    setVariableBudgetInput(b ? String(b.variableBudget) : '')
     setFixedActualInput(b?.fixedActual !== null && b?.fixedActual !== undefined ? String(b.fixedActual) : '')
     setVariableActualInput(b?.variableActual !== null && b?.variableActual !== undefined ? String(b.variableActual) : '')
   }, [])
@@ -78,18 +218,6 @@ export default function BudgetPage() {
     }
   }
 
-  async function handleSaveBudget() {
-    setSavingBudget(true)
-    try {
-      await saveBudgetData({
-        fixedBudget: fixedBudgetInput ? parseFloat(fixedBudgetInput) : 0,
-        variableBudget: variableBudgetInput ? parseFloat(variableBudgetInput) : 0,
-      })
-    } finally {
-      setSavingBudget(false)
-    }
-  }
-
   async function handleSaveActual() {
     setSavingActual(true)
     try {
@@ -111,36 +239,9 @@ export default function BudgetPage() {
 
   const monthLabel = format(new Date(currentMonth + '-01'), 'yyyy年M月', { locale: zhCN })
 
-  function ProgressBar({ label, budget: b, actual }: { label: string; budget: number; actual: number | null }) {
-    if (actual === null) return null
-    const ratio = b > 0 ? actual / b : 0
-    const pct = Math.min(ratio * 100, 100)
-    const diff = actual - b
-    const over = diff > 0
-    return (
-      <div className="space-y-1">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">{label}</span>
-                  <span className={over ? 'text-red-500 font-medium whitespace-nowrap' : 'text-green-500 font-medium whitespace-nowrap'}>
-                    ¥{actual.toFixed(0)} / ¥{b.toFixed(0)}
-            {over ? ` (+¥${diff.toFixed(0)})` : ` (-¥${Math.abs(diff).toFixed(0)})`}
-          </span>
-        </div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${
-              over ? 'bg-red-500' : ratio > 0.85 ? 'bg-amber-500' : 'bg-green-500'
-            }`}
-            style={{ width: `${Math.max(pct, 2)}%` }}
-          />
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b p-4">
+      <div className="border-b px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <PiggyBank className="h-5 w-5 text-primary" />
@@ -148,7 +249,7 @@ export default function BudgetPage() {
           </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-center gap-4">
+        <div className="mt-3 flex items-center justify-center gap-4">
           <Button variant="outline" size="icon" className="h-8 w-8" onClick={handlePrev}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -176,57 +277,7 @@ export default function BudgetPage() {
           </div>
         ) : (
           <div className="space-y-3 p-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="mb-3 flex items-center gap-2">
-                  <Target className="h-4 w-4 text-primary" />
-                  <h2 className="text-sm font-medium">预算设定</h2>
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <label className="mb-1 block text-xs text-muted-foreground">
-                      固定支出预算 <span className="text-[10px]">（住房/房贷/租房/电话费等）</span>
-                    </label>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        value={fixedBudgetInput}
-                        onChange={(e) => setFixedBudgetInput(e.target.value)}
-                        placeholder="例: 3200"
-                        className="pr-8"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">¥</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs text-muted-foreground">
-                      浮动支出预算 <span className="text-[10px]">（交通/饮食/衣服/聚餐等）</span>
-                    </label>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        value={variableBudgetInput}
-                        onChange={(e) => setVariableBudgetInput(e.target.value)}
-                        placeholder="例: 1600"
-                        className="pr-8"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">¥</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <span className="rounded-lg bg-muted px-3 py-1.5 text-sm">
-                      总预算：<span className="font-bold">
-                        ¥{((fixedBudgetInput ? parseFloat(fixedBudgetInput) : 0) + (variableBudgetInput ? parseFloat(variableBudgetInput) : 0)).toFixed(0)}
-                      </span>
-                    </span>
-                    <Button size="sm" onClick={handleSaveBudget} disabled={savingBudget}>
-                      {savingBudget ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                      {savingBudget ? '保存中...' : '保存预算'}
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <BudgetForm budget={budget} onSave={saveBudgetData} />
 
             <Card>
               <CardContent className="p-4">
@@ -365,42 +416,9 @@ export default function BudgetPage() {
                     <h2 className="text-sm font-medium text-muted-foreground">历史记录</h2>
                   </div>
                   <div className="space-y-2">
-                    {budgets.map((b) => {
-                      const tb = b.fixedBudget + b.variableBudget
-                      const ta = (b.fixedActual ?? 0) + (b.variableActual ?? 0)
-                      const over = b.fixedActual !== null && b.variableActual !== null && ta > tb
-                      return (
-                        <div
-                          key={b.id}
-                          className={`flex items-center justify-between max-sm:flex-col max-sm:items-start max-sm:gap-1 rounded-lg border p-3 text-sm transition-colors ${
-                            b.month === currentMonth ? 'border-primary/50 bg-primary/5' : ''
-                          }`}
-                        >
-                          <div>
-                            <p className="font-medium">
-                              {format(new Date(b.month + '-01'), 'yyyy年M月', { locale: zhCN })}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              预算 ¥{tb.toFixed(0)}
-                              {b.fixedActual !== null && ` · 实际 ¥${ta.toFixed(0)}`}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {b.fixedActual !== null && (
-                              <span className={`text-xs font-medium ${over ? 'text-red-500' : 'text-green-500'}`}>
-                                {over ? '超支' : '达标'}
-                              </span>
-                            )}
-                            {b.isCompleted && <CheckCircle2 className="h-4 w-4 text-green-500" />}
-                            {b.savingsCompleted && (
-                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-[10px] text-green-700 dark:bg-green-900 dark:text-green-300">
-                                ¥
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
+                    {budgets.map((b) => (
+                      <BudgetCard key={b.id} budget={b} currentMonth={currentMonth} />
+                    ))}
                   </div>
                 </CardContent>
               </Card>

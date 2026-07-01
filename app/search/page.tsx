@@ -56,8 +56,8 @@ export default function SearchPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b p-4">
-        <div className="flex items-center gap-3 rounded-lg border bg-muted/50 px-3 py-2">
+      <div className="border-b px-4 py-3">
+        <div className="flex items-center gap-3 rounded-lg border bg-muted/50 px-3 py-2 transition-colors focus-within:border-primary/50 focus-within:bg-muted/80">
           <Search className="h-5 w-5 text-muted-foreground shrink-0" />
           <input
             ref={inputRef}
@@ -70,7 +70,7 @@ export default function SearchPage() {
           {query && (
             <button
               onClick={() => setQuery('')}
-              className="text-xs text-muted-foreground hover:text-foreground"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               清除
             </button>
@@ -84,8 +84,8 @@ export default function SearchPage() {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : searched && total === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-sm text-muted-foreground">
-            <Search className="mb-2 h-8 w-8" />
+          <div className="flex flex-col items-center justify-center py-20 text-sm text-muted-foreground">
+            <Search className="mb-3 h-10 w-10 text-muted-foreground/40" />
             没有找到「{query}」相关的结果
           </div>
         ) : searched ? (
@@ -93,7 +93,7 @@ export default function SearchPage() {
             {notes.length > 0 && (
               <Section title={`笔记 (${notes.length})`}>
                 {notes.map(n => (
-                  <Card key={n.id}>
+                  <Card key={n.id} className="card-hover">
                     <CardContent className="flex items-center gap-3 p-3">
                       <Badge className={typeColors[n.type]}>{typeLabels[n.type]}</Badge>
                       <div className="min-w-0 flex-1">
@@ -115,7 +115,7 @@ export default function SearchPage() {
             {habits.length > 0 && (
               <Section title={`习惯 (${habits.length})`}>
                 {habits.map(h => (
-                  <Card key={h.id}>
+                  <Card key={h.id} className="card-hover">
                     <CardContent className="flex items-center gap-3 p-3">
                       <Trophy className="h-5 w-5 text-orange-500 shrink-0" />
                       <div className="min-w-0 flex-1">

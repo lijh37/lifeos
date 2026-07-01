@@ -159,6 +159,7 @@
 
 .animate-fade-in {
   animation: fadeIn 0.35s ease-out both;
+  will-change: transform, opacity;
 }
 .animate-slide-up {
   animation: slideUp 0.4s ease-out both;
@@ -184,19 +185,22 @@
 
 .card-hover {
   transition: all 0.2s ease;
+  transition-property: transform, box-shadow, border-color;
 }
 @media (hover: hover) {
   .card-hover:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    border-color: hsl(var(--border) / 0.8);
   }
   .dark .card-hover:hover {
     box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    border-color: hsl(var(--border) / 0.3);
   }
 }
 
 .skeleton-pulse {
-  background: linear-gradient(90deg, var(--muted) 25%, color-mix(in oklch, var(--muted) 70%, var(--muted-foreground)) 50%, var(--muted) 75%);
+  background: linear-gradient(90deg, var(--muted) 25%, color-mix(in oklch, var(--muted) 60%, var(--muted-foreground)) 50%, var(--muted) 75%);
   background-size: 200% 100%;
   animation: pulse-soft 1.8s ease-in-out infinite;
 }

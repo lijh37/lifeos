@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, memo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -10,6 +10,61 @@ import { SkeletonHabits } from '@/components/skeleton-card'
 import { format } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import type { Habit } from '@/lib/types'
+
+const HabitRow = memo(function HabitRow({
+  habit,
+  done,
+  streak,
+  today,
+  onToggle,
+  onDelete,
+}: {
+  habit: Habit
+  done: boolean
+  streak: number
+  today: string
+  onToggle: (habitId: string, date: string) => void
+  onDelete: (id: string) => void
+}) {
+  return (
+    <Card className="card-hover">
+      <CardContent className="flex items-center gap-3 p-3">
+        <button onClick={() => onToggle(habit.id, today)} className="shrink-0">
+          {done ? (
+            <CheckCircle className="h-6 w-6 text-green-500" />
+          ) : (
+            <Circle className="h-6 w-6 text-muted-foreground" />
+          )}
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className={`text-sm font-medium ${done ? 'line-through text-muted-foreground' : ''}`}>
+              {habit.name}
+            </p>
+            {streak > 0 && (
+              <span className="flex items-center gap-0.5 text-xs text-orange-500">
+                <Flame className="h-3 w-3" />
+                {streak}天
+              </span>
+            )}
+          </div>
+          {habit.description && (
+            <p className="text-xs text-muted-foreground">{habit.description}</p>
+          )}
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-destructive"
+          onClick={() => onDelete(habit.id)}
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
+      </CardContent>
+    </Card>
+  )
+})
+HabitRow.displayName = 'HabitRow'
 
 interface HabitStats {
   monthlyRate: number
@@ -90,7 +145,7 @@ function HabitsPageInner() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b p-4">
+      <div className="border-b px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-primary" />
@@ -103,7 +158,7 @@ function HabitsPageInner() {
         </div>
 
         {showInput && (
-          <div className="mt-3 flex gap-2">
+          <div className="mt-2 flex gap-2 animate-slide-up">
             <input
               autoFocus
               value={newName}
@@ -121,15 +176,15 @@ function HabitsPageInner() {
         {loading ? (
           <SkeletonHabits count={4} />
         ) : habits.length === 0 ? (
-          <div className="flex h-32 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
-            <Trophy className="h-8 w-8" />
+          <div className="flex h-48 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Trophy className="h-10 w-10 text-muted-foreground/50" />
             <p>还没有习惯，去 AI 对话或点新建添加</p>
           </div>
         ) : (
           <div className="space-y-4 p-4">
             {stats && (
-              <div className="grid grid-cols-4 gap-2">
-                <div className="rounded-lg bg-card p-3 text-center">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="rounded-lg bg-card p-3 text-center card-hover">
                   <Flame className="mx-auto mb-1 h-4 w-4 text-orange-500" />
                   <p className="text-lg font-bold">{completedCount}/{habits.length}</p>
                   <p className="text-[10px] text-muted-foreground">今日</p>
@@ -178,45 +233,11 @@ function HabitsPageInner() {
               </div>
             )}
 
-            <div className="animate-stagger space-y-1">
+            <div className="animate-stagger space-y-2">
               {habits.map((habit) => {
                 const done = todayMap[habit.id] ?? false
                 return (
-                  <Card key={habit.id} className="card-hover">
-                    <CardContent className="flex items-center gap-3 p-3">
-                      <button onClick={() => handleToggle(habit.id, today)} className="shrink-0">
-                        {done ? (
-                          <CheckCircle className="h-6 w-6 text-green-500" />
-                        ) : (
-                          <Circle className="h-6 w-6 text-muted-foreground" />
-                        )}
-                      </button>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className={`text-sm font-medium ${done ? 'line-through text-muted-foreground' : ''}`}>
-                            {habit.name}
-                          </p>
-                          {streaks[habit.id] > 0 && (
-                            <span className="flex items-center gap-0.5 text-xs text-orange-500">
-                              <Flame className="h-3 w-3" />
-                              {streaks[habit.id]}天
-                            </span>
-                          )}
-                        </div>
-                        {habit.description && (
-                          <p className="text-xs text-muted-foreground">{habit.description}</p>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive"
-                        onClick={() => handleDelete(habit.id)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </CardContent>
-                  </Card>
+                  <HabitRow key={habit.id} habit={habit} done={done} streak={streaks[habit.id] ?? 0} today={today} onToggle={handleToggle} onDelete={handleDelete} />
                 )
               })}
             </div>
@@ -226,6 +247,9 @@ function HabitsPageInner() {
     </div>
   )
 }
+
+// Export for testing
+export { HabitRow }
 
 export default function HabitsPage() {
   return (

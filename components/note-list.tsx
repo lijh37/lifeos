@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, memo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { format } from 'date-fns'
@@ -77,16 +77,16 @@ export function NoteList() {
     fetchNotes()
   }, [])
 
-  async function handleDelete(id: string) {
+  const handleDelete = useCallback(async (id: string) => {
     try {
       await fetch(`/api/notes/${id}`, { method: 'DELETE' })
       removeNote(id)
     } catch (e) {
       console.error('Failed to delete note:', e)
     }
-  }
+  }, [removeNote])
 
-  async function handleCreateNote() {
+  const handleCreateNote = useCallback(async () => {
     try {
       const res = await fetch('/api/notes', {
         method: 'POST',
@@ -98,9 +98,9 @@ export function NoteList() {
     } catch (e) {
       console.error('Failed to create note:', e)
     }
-  }
+  }, [router])
 
-  async function handleSearch(q: string) {
+  const handleSearch = useCallback(async (q: string) => {
     setSearchQuery(q)
     if (!q.trim()) {
       setSearchResults(null)
@@ -109,7 +109,7 @@ export function NoteList() {
       const res = await fetch(`/api/notes?q=${encodeURIComponent(q)}&summary=true`)
     const data = await res.json()
     setSearchResults(data.notes)
-  }
+  }, [])
 
   const displayNotes = searchResults ?? notes
 
@@ -132,7 +132,7 @@ export function NoteList() {
 
   const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
 
-  async function handleBatchDelete() {
+  const handleBatchDelete = useCallback(async () => {
     if (selectedIds.size === 0) return
     const ids = Array.from(selectedIds)
     try {
@@ -146,9 +146,9 @@ export function NoteList() {
     } catch (e) {
       console.error('Batch delete failed:', e)
     }
-  }
+  }, [selectedIds, removeNote, clearSelection])
 
-  async function handleBatchTag() {
+  const handleBatchTag = useCallback(async () => {
     const tag = prompt('输入要添加的标签名称：')
     if (!tag || selectedIds.size === 0) return
     const ids = Array.from(selectedIds)
@@ -168,18 +168,18 @@ export function NoteList() {
     } catch (e) {
       console.error('Batch tag failed:', e)
     }
-  }
+  }, [notes, updateNote, clearSelection, selectedIds])
 
-  function handleDragStart(id: string) {
+  const handleDragStart = useCallback((id: string) => {
     setDragId(id)
-  }
+  }, [])
 
-  function handleDragOver(e: React.DragEvent, id: string) {
+  const handleDragOver = useCallback((e: React.DragEvent, id: string) => {
     e.preventDefault()
     setDragOverId(id)
-  }
+  }, [])
 
-  async function handleDrop(e: React.DragEvent, targetId: string) {
+  const handleDrop = useCallback(async (e: React.DragEvent, targetId: string) => {
     e.preventDefault()
     if (!dragId || dragId === targetId) {
       setDragId(null)
@@ -216,19 +216,19 @@ export function NoteList() {
 
     setDragId(null)
     setDragOverId(null)
-  }
+  }, [dragId, searchResults, notes, setNotes])
 
-  function handleDragEnd() {
+  const handleDragEnd = useCallback(() => {
     setDragId(null)
     setDragOverId(null)
-  }
+  }, [])
 
   const isSelectedAll = displayNotes.length > 0 && selectedIds.size === displayNotes.length
   const showBatchBar = selectedIds.size > 0
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b p-4">
+      <div className="border-b px-4 py-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -238,7 +238,7 @@ export function NoteList() {
             className="pl-9 text-base sm:text-sm"
           />
         </div>
-        <div className="mt-3 flex items-center justify-end">
+        <div className="mt-2 flex items-center justify-end">
           <div className="flex items-center gap-1">
             <Button variant="default" size="sm" onClick={handleCreateNote} className="gap-1 text-xs">
               <Plus className="h-3.5 w-3.5" />
@@ -253,7 +253,7 @@ export function NoteList() {
         {loading ? (
           <SkeletonNoteList count={5} />
         ) : displayNotes.length === 0 ? (
-          <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+          <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
             {searchQuery ? '没有找到匹配的记录' : '还没有任何记录，点击上方 + 新建笔记'}
           </div>
         ) : (
@@ -322,30 +322,21 @@ export function NoteList() {
       </ScrollArea>
 
       {showBatchBar && (
-        <div className="sticky bottom-0 border-t bg-background p-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm text-muted-foreground">已选 {selectedIds.size} 项</span>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleBatchTag} className="gap-1">
-                <Tags className="h-3.5 w-3.5" />
-                改标签
-              </Button>
-              <Button variant="destructive" size="sm" onClick={handleBatchDelete} className="gap-1">
-                <Trash2 className="h-3.5 w-3.5" />
-                删除
-              </Button>
-              <Button variant="ghost" size="sm" onClick={clearSelection}>取消</Button>
-            </div>
-          </div>
-        </div>
+        <BatchActionsBar
+          selectedIds={selectedIds}
+          onDelete={handleBatchDelete}
+          onTag={handleBatchTag}
+          onClearSelection={clearSelection}
+        />
       )}
-
 
     </div>
   )
 }
 
-function NoteCard({
+// ─── NoteCard ────────────────────────────────────────────────────────────────
+
+const NoteCard = memo(function NoteCard({
   note, onEdit, onDelete, selectedIds, onToggleSelect,
   dragId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd,
 }: {
@@ -369,7 +360,7 @@ function NoteCard({
     <Card
       className={cn(
         'card-hover',
-        note.done && 'opacity-60',
+        note.done && 'opacity-50',
         isDragging && 'opacity-30',
         isDragOver && 'ring-2 ring-primary',
         isSelected && 'ring-2 ring-primary/50',
@@ -395,7 +386,7 @@ function NoteCard({
                 )}
               </button>
             )}
-            <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/40" />
+            <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors" />
             <CardTitle className="text-sm font-medium" onClick={() => onEdit(note)}>
               {note.title || stripMarkdown(note.content, 60) || '无标题'}
             </CardTitle>
@@ -450,9 +441,13 @@ function NoteCard({
       </CardContent>
     </Card>
   )
-}
+})
 
-function VirtualNoteList({
+NoteCard.displayName = 'NoteCard'
+
+// ─── VirtualNoteList ─────────────────────────────────────────────────────────
+
+const VirtualNoteList = memo(function VirtualNoteList({
   notes, onEdit, onDelete,
   selectedIds, onToggleSelect, dragId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd,
 }: {
@@ -510,6 +505,41 @@ function VirtualNoteList({
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+})
+
+VirtualNoteList.displayName = 'VirtualNoteList'
+
+// ─── BatchActionsBar ─────────────────────────────────────────────────────────
+
+function BatchActionsBar({
+  selectedIds,
+  onDelete,
+  onTag,
+  onClearSelection,
+}: {
+  selectedIds: Set<string>
+  onDelete: () => void
+  onTag: () => void
+  onClearSelection: () => void
+}) {
+  return (
+    <div className="sticky bottom-0 border-t bg-background p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm text-muted-foreground">已选 {selectedIds.size} 项</span>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={onTag} className="gap-1">
+            <Tags className="h-3.5 w-3.5" />
+            改标签
+          </Button>
+          <Button variant="destructive" size="sm" onClick={onDelete} className="gap-1">
+            <Trash2 className="h-3.5 w-3.5" />
+            删除
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onClearSelection}>取消</Button>
+        </div>
       </div>
     </div>
   )

@@ -119,7 +119,7 @@ export default function NoteDetailPage() {
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
           placeholder="笔记标题"
-          className="flex-1 bg-transparent text-lg font-semibold focus:outline-none placeholder:text-muted-foreground/50"
+          className="flex-1 bg-transparent text-lg font-semibold focus:outline-none focus:text-foreground placeholder:text-muted-foreground/50"
         />
         <button
           onClick={handleDelete}
@@ -143,11 +143,12 @@ export default function NoteDetailPage() {
       {/* Tags bar */}
       <div className="flex flex-wrap items-center gap-1.5 border-t px-4 py-2 shrink-0">
         {note.tags.map((tag) => (
-          <Badge key={tag} variant="secondary" className="gap-1 text-[11px]">
+          <Badge key={tag} variant="secondary" className="gap-1 pl-2 pr-1 text-[11px]">
             {tag}
             <button
               onClick={() => handleRemoveTag(tag)}
-              className="hover:text-destructive transition-colors"
+              className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-sm text-muted-foreground/50 hover:bg-destructive/20 hover:text-destructive transition-colors"
+              aria-label={`移除标签 ${tag}`}
             >
               ×
             </button>
