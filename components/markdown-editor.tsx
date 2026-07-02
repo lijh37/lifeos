@@ -11,6 +11,7 @@ import {
   Code,
   Eye,
   Edit3,
+  Columns2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -35,6 +36,7 @@ export function MarkdownEditor({ content: initialContent, onSave, placeholder = 
   const [content, setContent] = useState(initialContent)
   const [showingPreview, setShowingPreview] = useState(false)
   const [isDesktop, setIsDesktop] = useState(true)
+  const [viewMode, setViewMode] = useState<'split' | 'edit' | 'preview'>('split')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const savedContent = useRef(initialContent)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -156,8 +158,14 @@ export function MarkdownEditor({ content: initialContent, onSave, placeholder = 
     }
   }
 
-  // Desktop: split view
+  // Desktop: split view with view mode toggle
   if (isDesktop) {
+    const viewModes = [
+      { mode: 'edit' as const, icon: Edit3, title: '编辑' },
+      { mode: 'split' as const, icon: Columns2, title: '分栏' },
+      { mode: 'preview' as const, icon: Eye, title: '预览' },
+    ]
+
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex items-center gap-1 border-b bg-muted/30 px-2 py-1.5">
@@ -172,7 +180,25 @@ export function MarkdownEditor({ content: initialContent, onSave, placeholder = 
               <Icon className="h-4 w-4" />
             </button>
           ))}
-          <span className="ml-auto text-[10px] text-muted-foreground">自动保存</span>
+          <div className="ml-auto flex items-center gap-0.5">
+            {viewModes.map(({ mode, icon: Icon, title }) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setViewMode(mode)}
+                title={title}
+                className={cn(
+                  'flex h-7 w-7 items-center justify-center rounded-md transition-colors',
+                  viewMode === mode
+                    ? 'bg-accent text-accent-foreground'
+                    : 'text-muted-foreground hover:bg-accent'
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+              </button>
+            ))}
+            <span className="ml-1 text-[10px] text-muted-foreground">自动保存</span>
+          </div>
         </div>
         <div className="flex min-h-0 flex-1">
           <textarea
@@ -180,10 +206,17 @@ export function MarkdownEditor({ content: initialContent, onSave, placeholder = 
             value={content}
             onChange={handleChange}
             placeholder={placeholder}
-            className="flex-1 resize-none border-r bg-background px-4 py-3 font-mono text-sm leading-relaxed focus:outline-none"
+            className={cn(
+              'flex-1 resize-none bg-background px-4 py-3 font-mono text-sm leading-relaxed focus:outline-none',
+              viewMode === 'split' && 'border-r',
+              viewMode === 'preview' && 'hidden',
+            )}
             spellCheck={false}
           />
-          <div className="flex-1 overflow-y-auto px-4 py-3">
+          <div className={cn(
+            'flex-1 overflow-y-auto px-4 py-3',
+            viewMode === 'edit' && 'hidden',
+          )}>
             {content ? (
               <MarkdownRenderer content={content} />
             ) : (
