@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createNote, getNotesCursor, deleteNote, searchNotes, getNotesByDateRange, getNotesCountByType, initDB } from '@/lib/db'
+import { createNote, getNotesCursor, deleteNote, searchNotes, getNotesByDateRange, initDB } from '@/lib/db'
 import type { Note } from '@/lib/types'
 
 export async function GET(req: NextRequest) {
@@ -27,16 +27,11 @@ export async function GET(req: NextRequest) {
 
   const cursor = searchParams.get('cursor')
 
-  let notes: Note[]
-  let total: number
-  let nextCursor: string | null = null
-
   const result = await getNotesCursor(noteType, limit, cursor || undefined)
-  notes = result.notes
-  nextCursor = result.nextCursor
-  total = await getNotesCountByType(noteType)
+  const notes = summary ? result.notes.map(stripContent) : result.notes
+  const nextCursor = result.nextCursor
 
-  return NextResponse.json({ notes: summary ? notes.map(stripContent) : notes, total, limit, offset, nextCursor })
+  return NextResponse.json({ notes, nextCursor })
 }
 
 function stripContent(note: Note): Note {
@@ -56,6 +51,7 @@ export async function POST(req: NextRequest) {
     tags: body.tags || [],
     dueDate: body.dueDate || null,
     done: false,
+    pinned: false,
     createdAt: now,
     updatedAt: now,
   }

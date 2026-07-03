@@ -167,15 +167,15 @@ export function MarkdownEditor({ content: initialContent, onSave, placeholder = 
     ]
 
     return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center gap-1 border-b bg-muted/30 px-2 py-1.5">
+      <div className="flex min-h-0 flex-1 flex-col min-w-0">
+        <div className="flex items-center gap-1 bg-muted/30 px-2 py-2">
           {TOOLBAR_ITEMS.map(({ action, icon: Icon, title }) => (
             <button
               key={action}
               type="button"
               onClick={() => handleToolbar(action)}
               title={title}
-              className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground active:bg-accent/70 transition-colors"
             >
               <Icon className="h-4 w-4" />
             </button>
@@ -188,16 +188,16 @@ export function MarkdownEditor({ content: initialContent, onSave, placeholder = 
                 onClick={() => setViewMode(mode)}
                 title={title}
                 className={cn(
-                  'flex h-7 w-7 items-center justify-center rounded-md transition-colors',
+                  'flex h-8 w-8 items-center justify-center rounded-md transition-colors',
                   viewMode === mode
                     ? 'bg-accent text-accent-foreground'
                     : 'text-muted-foreground hover:bg-accent'
                 )}
               >
-                <Icon className="h-3.5 w-3.5" />
+                <Icon className="h-4 w-4" />
               </button>
             ))}
-            <span className="ml-1 text-[10px] text-muted-foreground">自动保存</span>
+            <span className="ml-2 text-[11px] text-muted-foreground/60">自动保存</span>
           </div>
         </div>
         <div className="flex min-h-0 flex-1">
@@ -207,20 +207,22 @@ export function MarkdownEditor({ content: initialContent, onSave, placeholder = 
             onChange={handleChange}
             placeholder={placeholder}
             className={cn(
-              'flex-1 resize-none bg-background px-4 py-3 font-mono text-sm leading-relaxed focus:outline-none',
+              'flex-1 resize-none bg-background px-4 py-3 font-mono text-sm leading-relaxed focus:outline-none min-w-0',
               viewMode === 'split' && 'border-r',
               viewMode === 'preview' && 'hidden',
             )}
             spellCheck={false}
           />
           <div className={cn(
-            'flex-1 overflow-y-auto px-4 py-3',
+            'flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 min-w-0',
             viewMode === 'edit' && 'hidden',
           )}>
             {content ? (
               <MarkdownRenderer content={content} />
             ) : (
-              <p className="text-sm text-muted-foreground">预览</p>
+              <div className="flex items-center justify-center h-full">
+                <p className="text-sm text-muted-foreground/50">预览区域</p>
+              </div>
             )}
           </div>
         </div>
@@ -230,15 +232,15 @@ export function MarkdownEditor({ content: initialContent, onSave, placeholder = 
 
   // Mobile: tab toggle
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-1 border-b bg-muted/30 px-2 py-1.5">
+    <div className="flex min-h-0 flex-1 flex-col min-w-0">
+      <div className="flex items-center gap-1 bg-muted/30 px-2 py-2">
         {TOOLBAR_ITEMS.map(({ action, icon: Icon, title }) => (
           <button
             key={action}
             type="button"
             onClick={() => handleToolbar(action)}
             title={title}
-            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground active:bg-accent/70 transition-colors"
           >
             <Icon className="h-4 w-4" />
           </button>
@@ -270,7 +272,7 @@ export function MarkdownEditor({ content: initialContent, onSave, placeholder = 
       </div>
       <div className="flex min-h-0 flex-1">
         {showingPreview ? (
-          <div className="flex-1 overflow-y-auto px-4 py-3">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 min-w-0">
             {content ? (
               <MarkdownRenderer content={content} />
             ) : (
@@ -283,7 +285,7 @@ export function MarkdownEditor({ content: initialContent, onSave, placeholder = 
             value={content}
             onChange={handleChange}
             placeholder={placeholder}
-            className="flex-1 resize-none bg-background px-4 py-3 font-mono text-sm leading-relaxed focus:outline-none"
+            className="flex-1 resize-none bg-background px-4 py-3 font-mono text-sm leading-relaxed focus:outline-none min-w-0"
             spellCheck={false}
           />
         )}

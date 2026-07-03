@@ -159,7 +159,6 @@
 
 .animate-fade-in {
   animation: fadeIn 0.35s ease-out both;
-  will-change: transform, opacity;
 }
 .animate-slide-up {
   animation: slideUp 0.4s ease-out both;

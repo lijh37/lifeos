@@ -48,7 +48,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-512.png" />
         <meta name="theme-color" content="#ffffff" id="theme-color" />
       </head>
-      <body className="h-full">
+      <body className="h-full overflow-x-hidden">
         <ThemeProvider>
           <PwaHandler />
           <CommandMenu />
@@ -56,7 +56,7 @@ export default function RootLayout({
           <div className="flex h-full">
             <Sidebar />
             <PageAnimation>
-              <main className="flex-1 pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">{children}</main>
+              <main className="pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">{children}</main>
             </PageAnimation>
             <MobileNav />
           </div>

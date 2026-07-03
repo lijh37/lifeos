@@ -69,7 +69,7 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
   async function handleDelete() {
     if (!confirm('确定删除这条笔记？')) return
     await fetch(`/api/notes/${note.id}`, { method: 'DELETE' })
-    router.push('/notes')
+    router.replace('/notes')
   }
 
   return (
@@ -88,7 +88,7 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
           placeholder="笔记标题"
-          className="flex-1 bg-transparent text-lg font-semibold focus:outline-none focus:text-foreground placeholder:text-muted-foreground/50"
+          className="flex-1 bg-transparent text-lg font-semibold focus:outline-none focus:text-foreground placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring/20 focus:rounded-sm"
         />
         <button
           onClick={handleDelete}
@@ -134,7 +134,7 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
             }
           }}
           placeholder={note.tags.length === 0 ? '添加标签...' : ''}
-          className="h-7 min-w-[80px] flex-1 bg-transparent text-xs focus:outline-none placeholder:text-muted-foreground/50"
+          className="h-7 min-w-[80px] flex-1 bg-transparent text-xs focus:outline-none placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring/20 focus:rounded-sm"
         />
       </div>
     </div>

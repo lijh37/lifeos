@@ -137,7 +137,7 @@ export async function initDB() {
     await db.execute(`ALTER TABLE chat_messages ADD COLUMN conversation_id TEXT`)
   } catch { /* column may already exist */ }
   try {
-    await db.execute(`ALTER TABLE notes ADD COLUMN sort_order INTEGER DEFAULT 0`)
+    await db.execute(`ALTER TABLE notes ADD COLUMN pinned INTEGER DEFAULT 0`)
   } catch { /* column may already exist */ }
 
   // FTS5 full-text search (graceful fallback if not available)

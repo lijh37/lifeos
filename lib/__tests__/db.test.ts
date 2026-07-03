@@ -17,6 +17,7 @@ function makeNote(overrides: Partial<Note> = {}): Note {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     ...overrides,
+    pinned: overrides.pinned ?? false,
   }
 }
 
@@ -268,5 +269,76 @@ describe('Database - Search and Tags', () => {
 
     // Should be sorted by count desc
     expect(tags[0].count).toBeGreaterThanOrEqual(tags[1].count)
+  })
+
+  it('should rename a tag', async () => {
+    const { createNote, renameTag, getAllTags, getNote } = await import('@/lib/db')
+    const note = makeNote({ tags: ['work', 'urgent'] })
+    await createNote(note)
+
+    await renameTag('work', 'job')
+    const tags = await getAllTags()
+    expect(tags.find(t => t.name === 'work')).toBeUndefined()
+    expect(tags.find(t => t.name === 'job')!.count).toBe(1)
+    // urgent should be unchanged
+    expect(tags.find(t => t.name === 'urgent')!.count).toBe(1)
+
+    // JSON column should also be updated
+    const updated = await getNote(note.id)
+    expect(updated!.tags).toContain('job')
+    expect(updated!.tags).not.toContain('work')
+    expect(updated!.tags).toContain('urgent')
+  })
+
+  it('should merge tags when renaming to existing name', async () => {
+    const { createNote, renameTag, getAllTags, getNote } = await import('@/lib/db')
+    const note1 = makeNote({ tags: ['work', 'urgent'] })
+    const note2 = makeNote({ tags: ['important', 'urgent'] })
+    await createNote(note1)
+    await createNote(note2)
+
+    // Merge 'important' into 'urgent'
+    await renameTag('important', 'urgent')
+    const tags = await getAllTags()
+    const urgentTag = tags.find(t => t.name === 'urgent')
+    expect(urgentTag!.count).toBe(2) // appears in both notes
+    expect(tags.find(t => t.name === 'important')).toBeUndefined()
+
+    const updated1 = await getNote(note1.id)
+    expect(updated1!.tags).toEqual(['work', 'urgent'])
+    const updated2 = await getNote(note2.id)
+    expect(updated2!.tags).toEqual(['urgent'])
+  })
+
+  it('should not create duplicates in JSON column when merging tags', async () => {
+    const { createNote, renameTag, getNote } = await import('@/lib/db')
+    // Note already has both 'work' and 'job' — renaming 'work' → 'job' should not create [job, job]
+    const note = makeNote({ tags: ['work', 'job', 'urgent'] })
+    await createNote(note)
+
+    await renameTag('work', 'job')
+    const updated = await getNote(note.id)
+    expect(updated!.tags).toEqual(['job', 'urgent']) // no duplicates
+  })
+
+  it('should delete a tag', async () => {
+    const { createNote, deleteTag, getAllTags, getNote } = await import('@/lib/db')
+    const note = makeNote({ tags: ['work', 'urgent', 'personal'] })
+    await createNote(note)
+
+    await deleteTag('urgent')
+    const tags = await getAllTags()
+    expect(tags.find(t => t.name === 'urgent')).toBeUndefined()
+    expect(tags.find(t => t.name === 'work')!.count).toBe(1)
+    expect(tags.find(t => t.name === 'personal')!.count).toBe(1)
+
+    // JSON column should be updated
+    const updated = await getNote(note.id)
+    expect(updated!.tags).toEqual(['work', 'personal'])
+  })
+
+  it('should delete non-existent tag without error', async () => {
+    const { deleteTag } = await import('@/lib/db')
+    await expect(deleteTag('nonexistent')).resolves.toBeUndefined()
   })
 })

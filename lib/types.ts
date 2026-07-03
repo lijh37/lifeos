@@ -35,6 +35,8 @@ export interface Note {
   dueDate: string | null
   /** 是否已完成 */
   done: boolean
+  /** 是否已置顶 */
+  pinned: boolean
   /** 创建时间（ISO 8601） */
   createdAt: string
   /** 最后更新时间（ISO 8601） */

@@ -13,6 +13,7 @@ function rowToNote(row: Record<string, unknown>): Note {
     tags: JSON.parse(row.tags as string) as string[],
     dueDate: row.due_date as string | null,
     done: (row.done as number) === 1,
+    pinned: (row.pinned as number) === 1,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   }
@@ -26,12 +27,12 @@ function rowToNote(row: Record<string, unknown>): Note {
 export async function createNote(note: Note): Promise<Note> {
   const db = getClient()
   await db.execute({
-    sql: `INSERT INTO notes (id, content, title, type, tags, due_date, done, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO notes (id, content, title, type, tags, due_date, done, pinned, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       note.id, note.content, note.title, note.type,
       JSON.stringify(note.tags), note.dueDate,
-      note.done ? 1 : 0, note.createdAt, note.updatedAt,
+      note.done ? 1 : 0, note.pinned ? 1 : 0, note.createdAt, note.updatedAt,
     ] as InValue[],
   })
   try { await syncNoteTags(note.id, note.tags) } catch (e) { console.warn('[tags] 笔记标签同步失败(createNote):', e) }
@@ -55,6 +56,7 @@ export async function updateNote(id: string, updates: Partial<Note>): Promise<vo
   if (updates.tags !== undefined) { fields.push('tags = ?'); args.push(JSON.stringify(updates.tags)) }
   if (updates.dueDate !== undefined) { fields.push('due_date = ?'); args.push(updates.dueDate) }
   if (updates.done !== undefined) { fields.push('done = ?'); args.push(updates.done ? 1 : 0) }
+  if (updates.pinned !== undefined) { fields.push('pinned = ?'); args.push(updates.pinned ? 1 : 0) }
   fields.push('updated_at = ?')
   args.push(new Date().toISOString())
   args.push(id)
@@ -80,7 +82,7 @@ export async function deleteNote(id: string): Promise<void> {
 }
 
 /**
- * 获取笔记列表，可按类型过滤，支持分页。按 sort_order 升序、创建时间降序排列。
+ * 获取笔记列表，可按类型过滤，支持分页。置顶优先，再按创建时间降序。
  * @param type - 可选，笔记类型筛选
  * @param limit - 返回条数上限（默认 200）
  * @param offset - 分页偏移量（默认 0）
@@ -94,7 +96,7 @@ export async function getNotes(type?: NoteType, limit = 200, offset = 0): Promis
     sql += ' WHERE type = ?'
     args.push(type)
   }
-  sql += ' ORDER BY sort_order ASC, created_at DESC LIMIT ? OFFSET ?'
+  sql += ' ORDER BY pinned DESC, created_at DESC LIMIT ? OFFSET ?'
   args.push(limit, offset)
   const result = await db.execute({ sql, args })
   return result.rows.map(rowToNote)
@@ -118,29 +120,42 @@ export async function getNotesCursor(type?: NoteType, limit = 50, cursor?: strin
     args.push(type)
   }
   if (cursor) {
-    // cursor is the created_at timestamp of the last item from previous page
-    conditions.push('created_at < ?')
-    args.push(cursor)
+    // cursor is JSON: {"p": pinned, "c": createdAt} or legacy plain createdAt
+    let pinned = 0
+    let createdAt = ''
+    try {
+      const parsed = JSON.parse(cursor)
+      pinned = parsed.p ?? 0
+      createdAt = parsed.c ?? ''
+    } catch {
+      // Legacy cursor format (plain createdAt string)
+      createdAt = cursor
+    }
+    conditions.push('(pinned < ? OR (pinned = ? AND created_at < ?))')
+    args.push(pinned, pinned, createdAt)
   }
 
   if (conditions.length > 0) {
     sql += ' WHERE ' + conditions.join(' AND ')
   }
 
-  sql += ' ORDER BY sort_order ASC, created_at DESC LIMIT ?'
+  sql += ' ORDER BY pinned DESC, created_at DESC LIMIT ?'
   // Fetch one extra to determine if there's a next page
   args.push(limit + 1)
 
   const result = await db.execute({ sql, args })
-  const rows = result.rows.map(rowToNote)
+  const rawRows = result.rows
+  const notes = rawRows.map(rowToNote)
 
   let nextCursor: string | null = null
-  if (rows.length > limit) {
-    rows.pop() // remove the extra item
-    nextCursor = rows[rows.length - 1].createdAt
+  if (rawRows.length > limit) {
+    rawRows.pop()
+    notes.pop()
+    const last = rawRows[rawRows.length - 1]
+    nextCursor = JSON.stringify({ p: (Number(last.pinned ?? 0)), c: last.created_at as string })
   }
 
-  return { notes: rows, nextCursor }
+  return { notes, nextCursor }
 }
 
 /**

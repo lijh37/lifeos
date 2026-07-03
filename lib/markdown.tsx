@@ -84,7 +84,7 @@ interface MarkdownRendererProps {
 
 export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
   return (
-    <div className={`break-words ${className || ''}`.trim()}>
+    <div className={`break-words min-w-0 ${className || ''}`.trim()}>
       <ReactMarkdown
         remarkPlugins={[remarkBreaks, remarkGfm]}
         rehypePlugins={[rehypeSanitize]}

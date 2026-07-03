@@ -26,6 +26,7 @@ function createNote(overrides: Partial<Note> = {}): Note {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     ...overrides,
+    pinned: overrides.pinned ?? false,
   }
 }
 
@@ -34,13 +35,14 @@ describe('NoteList', () => {
     // Reset store to initial state
     useAppStore.setState({
       notes: [],
-      loading: false,
+      initialLoading: false,
+      loadingMore: false,
     })
     mockFetch.mockReset()
   })
 
-  it('should render loading skeleton initially when loading is true', () => {
-    useAppStore.setState({ loading: true, notes: [] })
+  it('should render loading skeleton initially when initialLoading is true', () => {
+    useAppStore.setState({ initialLoading: true, notes: [] })
     render(<NoteList />)
     // The SkeletonNoteList should render when loading
     // Check that no note content is shown

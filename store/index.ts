@@ -7,11 +7,13 @@ const MAX_CACHED_NOTES = 500
 
 interface AppState {
   notes: Note[]
-  loading: boolean
+  initialLoading: boolean
+  loadingMore: boolean
   cursor: string | null
   hasMore: boolean
   setNotes: (notes: Note[]) => void
-  setLoading: (loading: boolean) => void
+  setInitialLoading: (loading: boolean) => void
+  setLoadingMore: (loading: boolean) => void
   addNote: (note: Note) => void
   removeNote: (id: string) => void
   updateNote: (id: string, updates: Partial<Note>) => void
@@ -22,11 +24,13 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set) => ({
   notes: [],
-  loading: false,
+  initialLoading: false,
+  loadingMore: false,
   cursor: null,
   hasMore: true,
   setNotes: (notes) => set({ notes: notes.slice(0, MAX_CACHED_NOTES) }),
-  setLoading: (loading) => set({ loading }),
+  setInitialLoading: (initialLoading) => set({ initialLoading }),
+  setLoadingMore: (loadingMore) => set({ loadingMore }),
   addNote: (note) => set((state) => ({
     notes: [note, ...state.notes].slice(0, MAX_CACHED_NOTES),
   })),
@@ -40,7 +44,6 @@ export const useAppStore = create<AppState>((set) => ({
   setHasMore: (hasMore) => set({ hasMore }),
   appendNotes: (notes) => set((state) => ({
     notes: [...state.notes, ...notes].slice(0, MAX_CACHED_NOTES),
-    cursor: notes.length > 0 ? notes[notes.length - 1].createdAt : state.cursor,
   })),
 }))
 

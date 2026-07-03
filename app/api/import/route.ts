@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
         tags: (n.tags as string[]) || [],
         dueDate: (n.dueDate as string) || (n.due_date as string) || null,
         done: (n.done as boolean) || false,
+        pinned: (n.pinned as boolean) || false,
         createdAt: (n.createdAt as string) || (n.created_at as string) || new Date().toISOString(),
         updatedAt: (n.updatedAt as string) || (n.updated_at as string) || new Date().toISOString(),
       }

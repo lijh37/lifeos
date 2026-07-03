@@ -15,6 +15,7 @@ function makeNote(id: string, overrides: Partial<Note> = {}): Note {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     ...overrides,
+    pinned: overrides.pinned ?? false,
   }
 }
 
@@ -22,7 +23,8 @@ describe('useAppStore', () => {
   beforeEach(() => {
     useAppStore.setState({
       notes: [],
-      loading: false,
+      initialLoading: false,
+      loadingMore: false,
       cursor: null,
       hasMore: true,
     })
@@ -31,7 +33,8 @@ describe('useAppStore', () => {
   it('should start with empty state', () => {
     const state = useAppStore.getState()
     expect(state.notes).toEqual([])
-    expect(state.loading).toBe(false)
+    expect(state.initialLoading).toBe(false)
+    expect(state.loadingMore).toBe(false)
     expect(state.cursor).toBeNull()
     expect(state.hasMore).toBe(true)
   })
@@ -85,16 +88,15 @@ describe('useAppStore', () => {
     expect(useAppStore.getState().hasMore).toBe(false)
   })
 
-  it('should append notes and update cursor', () => {
-    const note1 = makeNote('1', { createdAt: '2024-01-01T00:00:00.000Z' })
-    const note2 = makeNote('2', { createdAt: '2024-01-02T00:00:00.000Z' })
+  it('should append notes', () => {
+    const note1 = makeNote('1')
+    const note2 = makeNote('2')
     useAppStore.getState().setNotes([note1])
     useAppStore.getState().appendNotes([note2])
     const state = useAppStore.getState()
     expect(state.notes).toHaveLength(2)
     expect(state.notes[0].id).toBe('1')
     expect(state.notes[1].id).toBe('2')
-    expect(state.cursor).toBe('2024-01-02T00:00:00.000Z')
   })
 
   it('should handle append with empty array', () => {

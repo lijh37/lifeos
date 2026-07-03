@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { initDB, getClient } from '@/lib/db'
+import { initDB, getClient, getAllTags } from '@/lib/db'
 
 function db() { return getClient() }
 
@@ -7,11 +7,10 @@ export async function GET() {
   await initDB()
   const c = db()
 
-  const [noteCounts, budgetData, habitRate, tagRows, recent, habitTrend, habitTotal] = await Promise.all([
+  const [noteCounts, budgetData, habitRate, recent, habitTrend, habitTotal] = await Promise.all([
     c.execute(`SELECT type, COUNT(*) as count FROM notes GROUP BY type`),
     c.execute(`SELECT * FROM budgets ORDER BY month DESC LIMIT 1`),
     c.execute(`SELECT COUNT(*) as done FROM habit_completions WHERE completed=1 AND date >= date('now', '-7 days')`),
-    c.execute(`SELECT tags FROM notes`),
     c.execute(`
       SELECT id, 'note' as source, type, COALESCE(title, content) as title, created_at FROM notes
       UNION ALL
@@ -29,17 +28,8 @@ export async function GET() {
     if (t === 'note') note = n
   }
 
-  const topTags: Record<string, number> = {}
-  for (const r of tagRows.rows) {
-    const tags = JSON.parse(r.tags as string) as string[]
-    for (const tag of tags) {
-      if (tag) topTags[tag] = (topTags[tag] || 0) + 1
-    }
-  }
-  const sortedTags = Object.entries(topTags)
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5)
+  const allTags = await getAllTags()
+  const sortedTags = allTags.slice(0, 5)
 
   const currentBudget = budgetData.rows[0] ? {
     month: budgetData.rows[0].month as string,

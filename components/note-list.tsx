@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback, memo } from 'react'
+import { useEffect, useState, useRef, useCallback, useLayoutEffect, memo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { format } from 'date-fns'
@@ -17,7 +17,8 @@ import {
   Plus,
   Square,
   Tags,
-  GripVertical,
+  Pin,
+  PinOff,
   Loader2,
   ChevronDown,
 } from 'lucide-react'
@@ -29,17 +30,28 @@ import type { Note } from '@/lib/types'
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
 
+const SCROLL_POSITION_KEY = 'note_list_scroll'
+
 export function NoteList() {
   const router = useRouter()
-  const { notes, setNotes, loading, setLoading, removeNote, updateNote, cursor, hasMore, setCursor, setHasMore, appendNotes } = useAppStore()
+  const { notes, setNotes, initialLoading, loadingMore, setInitialLoading, setLoadingMore, removeNote, updateNote, cursor, hasMore, setCursor, setHasMore, appendNotes } = useAppStore()
+  const [mounted, setMounted] = useState(false)
+  // Wait for ScrollArea to mount so VirtualNoteList gets a valid scrollRef
+  useLayoutEffect(() => { setMounted(true) }, [])
+
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Note[] | null>(null)
+  const [searchLoading, setSearchLoading] = useState(false)
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const searchController = useRef<AbortController | undefined>(undefined)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [dragId, setDragId] = useState<string | null>(null)
-  const [dragOverId, setDragOverId] = useState<string | null>(null)
 
-  async function fetchNotes(loadMore = false) {
-    setLoading(true)
+  const fetchNotes = useCallback(async (loadMore = false) => {
+    if (loadMore) {
+      setLoadingMore(true)
+    } else {
+      setInitialLoading(true)
+    }
     try {
       const params = new URLSearchParams()
       params.set('limit', '20')
@@ -53,28 +65,47 @@ export function NoteList() {
         appendNotes(data.notes)
       } else {
         setNotes(data.notes)
-        setCursor(data.nextCursor || null)
       }
+      setCursor(data.nextCursor || null)
       setHasMore(!!data.nextCursor)
     } catch (e) {
       console.error('Failed to fetch notes:', e)
     } finally {
-      setLoading(false)
+      if (loadMore) {
+        setLoadingMore(false)
+      } else {
+        setInitialLoading(false)
+      }
     }
-  }
+  }, [cursor, setInitialLoading, setLoadingMore, setNotes, appendNotes, setCursor, setHasMore])
 
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // onScroll-based infinite scroll (more predictable than IntersectionObserver,
+  // which fires immediately on observe() — causing cascade loading)
   const handleScroll = useCallback(() => {
-    if (!scrollRef.current || loading || !hasMore) return
+    if (!scrollRef.current || loadingMore || initialLoading || !hasMore) return
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
-    if (scrollHeight - scrollTop - clientHeight < 200) {
+    // Only auto-load when user has actually scrolled (scrollTop > 0) and near bottom
+    if (scrollTop > 0 && scrollHeight - scrollTop - clientHeight < 400) {
       fetchNotes(true)
     }
-  }, [loading, hasMore, cursor])
+  }, [loadingMore, initialLoading, hasMore, fetchNotes])
 
   useEffect(() => {
-    fetchNotes()
+    // If we have cached notes from a previous session, show them immediately
+    // instead of re-fetching — preserves pagination and enables scroll restoration.
+    if (notes.length === 0) {
+      fetchNotes()
+    }
+    return () => {
+      // Save scroll position before unmounting (navigating to edit page etc.)
+      if (scrollRef.current) {
+        try {
+          sessionStorage.setItem(SCROLL_POSITION_KEY, String(scrollRef.current.scrollTop))
+        } catch { /* quota exceeded, ignore */ }
+      }
+    }
   }, [])
 
   const handleDelete = useCallback(async (id: string) => {
@@ -100,18 +131,63 @@ export function NoteList() {
     }
   }, [router])
 
-  const handleSearch = useCallback(async (q: string) => {
+  const handleSearchInput = useCallback((q: string) => {
     setSearchQuery(q)
+    clearTimeout(searchTimer.current)
+
     if (!q.trim()) {
       setSearchResults(null)
+      setSearchLoading(false)
       return
     }
-      const res = await fetch(`/api/notes?q=${encodeURIComponent(q)}&summary=true`)
-    const data = await res.json()
-    setSearchResults(data.notes)
+
+    setSearchLoading(true)
+    searchTimer.current = setTimeout(async () => {
+      // Cancel previous in-flight request to avoid race condition
+      searchController.current?.abort()
+      const controller = new AbortController()
+      searchController.current = controller
+
+      try {
+        const res = await fetch(`/api/notes?q=${encodeURIComponent(q)}&summary=true`, {
+          signal: controller.signal,
+        })
+        if (!controller.signal.aborted) {
+          const data = await res.json()
+          setSearchResults(data && Array.isArray(data.notes) ? data.notes : [])
+        }
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return
+        console.error('Search failed:', e)
+        if (!controller.signal.aborted) {
+          setSearchResults([])
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setSearchLoading(false)
+        }
+      }
+    }, 300)
   }, [])
 
   const displayNotes = searchResults ?? notes
+
+  // Restore scroll position after data is ready (from cache or fresh fetch)
+  const scrollRestored = useRef(false)
+  useEffect(() => {
+    if (!initialLoading && !loadingMore && displayNotes.length > 0 && !scrollRestored.current) {
+      const savedScroll = sessionStorage.getItem(SCROLL_POSITION_KEY)
+      if (savedScroll !== null) {
+        requestAnimationFrame(() => {
+          if (scrollRef.current) {
+            scrollRef.current.scrollTop = parseInt(savedScroll, 10)
+          }
+        })
+        sessionStorage.removeItem(SCROLL_POSITION_KEY)
+      }
+      scrollRestored.current = true
+    }
+  }, [initialLoading, loadingMore, displayNotes.length])
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds(prev => {
@@ -134,6 +210,7 @@ export function NoteList() {
 
   const handleBatchDelete = useCallback(async () => {
     if (selectedIds.size === 0) return
+    if (!confirm(`确定删除选中的 ${selectedIds.size} 条笔记？`)) return
     const ids = Array.from(selectedIds)
     try {
       await fetch('/api/notes/batch', {
@@ -170,58 +247,37 @@ export function NoteList() {
     }
   }, [notes, updateNote, clearSelection, selectedIds])
 
-  const handleDragStart = useCallback((id: string) => {
-    setDragId(id)
-  }, [])
-
-  const handleDragOver = useCallback((e: React.DragEvent, id: string) => {
-    e.preventDefault()
-    setDragOverId(id)
-  }, [])
-
-  const handleDrop = useCallback(async (e: React.DragEvent, targetId: string) => {
-    e.preventDefault()
-    if (!dragId || dragId === targetId) {
-      setDragId(null)
-      setDragOverId(null)
-      return
-    }
-
-    const currentNotes = searchResults ?? notes
-    const fromIdx = currentNotes.findIndex(n => n.id === dragId)
-    const toIdx = currentNotes.findIndex(n => n.id === targetId)
-    if (fromIdx === -1 || toIdx === -1) {
-      setDragId(null)
-      setDragOverId(null)
-      return
-    }
-
-    const reordered = [...currentNotes]
-    const [moved] = reordered.splice(fromIdx, 1)
-    reordered.splice(toIdx, 0, moved)
-    setNotes(reordered)
-
-    // Persist new order (only in full-list mode, not search results)
-    if (!searchResults) {
-      try {
-        await fetch('/api/notes/reorder', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ids: reordered.map(n => n.id) }),
+  const handleTogglePin = useCallback(async (note: Note) => {
+    const newPinned = !note.pinned
+    // Build updated array with the new pinned value, then sort by pinned DESC, created_at DESC
+    const sorted = notes
+      .map(n => n.id === note.id ? { ...n, pinned: newPinned } : n)
+      .sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      })
+    setNotes(sorted)
+    // Don't reset cursor/hasMore — that would trigger the IntersectionObserver
+    // to re-fetch page 1 via loadMore, creating duplicate entries.
+    try {
+      await fetch(`/api/notes/${note.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pinned: newPinned }),
+      })
+    } catch (e) {
+      console.error('Failed to toggle pin:', e)
+      const rolledBack = notes
+        .map(n => n.id === note.id ? { ...n, pinned: !newPinned } : n)
+        .sort((a, b) => {
+          if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         })
-      } catch (e) {
-        console.error('Failed to persist order:', e)
-      }
+      setNotes(rolledBack)
     }
+  }, [notes, setNotes])
 
-    setDragId(null)
-    setDragOverId(null)
-  }, [dragId, searchResults, notes, setNotes])
 
-  const handleDragEnd = useCallback(() => {
-    setDragId(null)
-    setDragOverId(null)
-  }, [])
 
   const isSelectedAll = displayNotes.length > 0 && selectedIds.size === displayNotes.length
   const showBatchBar = selectedIds.size > 0
@@ -230,12 +286,17 @@ export function NoteList() {
     <div className="flex h-full flex-col">
       <div className="border-b px-4 py-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          {searchLoading && searchQuery.trim() ? (
+            <Loader2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground animate-spin" />
+          ) : (
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          )}
           <Input
             placeholder="搜索笔记…"
             value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={(e) => handleSearchInput(e.target.value)}
             className="pl-9 text-base sm:text-sm"
+            aria-label="搜索笔记"
           />
         </div>
         <div className="mt-2 flex items-center justify-end">
@@ -250,11 +311,17 @@ export function NoteList() {
       </div>
 
       <ScrollArea ref={scrollRef} className="flex-1 p-4" onScroll={handleScroll}>
-        {loading ? (
+        {initialLoading && notes.length === 0 ? (
           <SkeletonNoteList count={5} />
         ) : displayNotes.length === 0 ? (
           <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
-            {searchQuery ? '没有找到匹配的记录' : '还没有任何记录，点击上方 + 新建笔记'}
+            {searchLoading ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />搜索中…</>
+            ) : searchQuery ? (
+              '没有找到匹配的记录'
+            ) : (
+              '还没有任何记录，点击上方 + 新建笔记'
+            )}
           </div>
         ) : (
           <>
@@ -267,19 +334,15 @@ export function NoteList() {
                 {selectedIds.size > 0 ? `已选 ${selectedIds.size} 项` : `${displayNotes.length} 项`}
               </span>
             </div>
-            {displayNotes.length > 200 ? (
+            {displayNotes.length > 50 && mounted ? (
               <VirtualNoteList
                 notes={displayNotes}
                 onEdit={(note) => router.push(`/notes/${note.id}`)}
                 onDelete={handleDelete}
+                onTogglePin={handleTogglePin}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
-                dragId={dragId}
-                dragOverId={dragOverId}
-                onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onDragEnd={handleDragEnd}
+                scrollRef={scrollRef}
               />
             ) : (
               <div className="space-y-2 animate-stagger">
@@ -288,14 +351,9 @@ export function NoteList() {
                   note={note}
                   onEdit={(note) => router.push(`/notes/${note.id}`)}
                   onDelete={handleDelete}
+                  onTogglePin={handleTogglePin}
                   selectedIds={selectedIds}
                   onToggleSelect={toggleSelect}
-                  dragId={dragId}
-                  dragOverId={dragOverId}
-                  onDragStart={handleDragStart}
-                  onDragOver={handleDragOver}
-                  onDrop={handleDrop}
-                  onDragEnd={handleDragEnd}
                 />)}
               </div>
             )}
@@ -305,15 +363,15 @@ export function NoteList() {
                   variant="outline"
                   size="sm"
                   onClick={() => fetchNotes(true)}
-                  disabled={loading}
+                  disabled={loadingMore}
                   className="gap-1"
                 >
-                  {loading ? (
+                  {loadingMore ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <ChevronDown className="h-4 w-4" />
                   )}
-                  {loading ? '加载中…' : '加载更多'}
+                  {loadingMore ? '加载中…' : '加载更多'}
                 </Button>
               </div>
             )}
@@ -334,42 +392,45 @@ export function NoteList() {
   )
 }
 
+// ─── Date formatting helper ──────────────────────────────────────────────────
+
+function formatNoteDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—'
+  const date = new Date(dateStr)
+  if (isNaN(date.getTime())) return '—'
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  if (diffMins < 1) return '刚刚'
+  if (diffMins < 60) return `${diffMins}分钟前`
+  const diffHours = Math.floor(diffMins / 60)
+  if (diffHours < 24) return `${diffHours}小时前`
+  if (diffHours < 48) return '昨天'
+  if (diffHours < 168) return `${Math.floor(diffHours / 24)}天前`
+  return format(date, 'yyyy/MM/dd HH:mm', { locale: zhCN })
+}
+
 // ─── NoteCard ────────────────────────────────────────────────────────────────
 
 const NoteCard = memo(function NoteCard({
-  note, onEdit, onDelete, selectedIds, onToggleSelect,
-  dragId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd,
+  note, onEdit, onDelete, onTogglePin, selectedIds, onToggleSelect,
 }: {
   note: Note
   onEdit: (note: Note) => void
   onDelete: (id: string) => void
+  onTogglePin: (note: Note) => void
   selectedIds?: Set<string>
   onToggleSelect?: (id: string) => void
-  dragId?: string | null
-  dragOverId?: string | null
-  onDragStart?: (id: string) => void
-  onDragOver?: (e: React.DragEvent, id: string) => void
-  onDrop?: (e: React.DragEvent, id: string) => void
-  onDragEnd?: () => void
 }) {
   const isSelected = selectedIds?.has(note.id) ?? false
-  const isDragging = dragId === note.id
-  const isDragOver = dragOverId === note.id
 
   return (
     <Card
       className={cn(
         'card-hover',
         note.done && 'opacity-50',
-        isDragging && 'opacity-30',
-        isDragOver && 'ring-2 ring-primary',
         isSelected && 'ring-2 ring-primary/50',
       )}
-      draggable
-      onDragStart={() => onDragStart?.(note.id)}
-      onDragOver={(e) => onDragOver?.(e, note.id)}
-      onDrop={(e) => onDrop?.(e, note.id)}
-      onDragEnd={onDragEnd}
     >
       <CardHeader className="p-3 pb-0">
         <div className="flex items-start justify-between">
@@ -386,7 +447,17 @@ const NoteCard = memo(function NoteCard({
                 )}
               </button>
             )}
-            <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors" />
+            <button
+              onClick={() => onTogglePin(note)}
+              className="shrink-0 text-muted-foreground/30 hover:text-foreground transition-colors"
+              title={note.pinned ? '取消置顶' : '置顶'}
+            >
+              {note.pinned ? (
+                <Pin className="h-4 w-4 fill-foreground text-foreground" />
+              ) : (
+                <PinOff className="h-4 w-4" />
+              )}
+            </button>
             <CardTitle className="text-sm font-medium" onClick={() => onEdit(note)}>
               {note.title || stripMarkdown(note.content, 60) || '无标题'}
             </CardTitle>
@@ -430,11 +501,11 @@ const NoteCard = memo(function NoteCard({
             </div>
           )}
           <span>
-            {format(new Date(note.createdAt), 'MM/dd HH:mm', { locale: zhCN })}
+            {formatNoteDate(note.createdAt)}
           </span>
           {note.dueDate && (
             <span className="text-amber-600">
-              截止: {format(new Date(note.dueDate), 'MM/dd HH:mm', { locale: zhCN })}
+              截止: {formatNoteDate(note.dueDate)}
             </span>
           )}
         </div>
@@ -448,64 +519,52 @@ NoteCard.displayName = 'NoteCard'
 // ─── VirtualNoteList ─────────────────────────────────────────────────────────
 
 const VirtualNoteList = memo(function VirtualNoteList({
-  notes, onEdit, onDelete,
-  selectedIds, onToggleSelect, dragId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd,
+  notes, onEdit, onDelete, onTogglePin,
+  selectedIds, onToggleSelect,
+  scrollRef,
 }: {
   notes: Note[]
   onEdit: (note: Note) => void
   onDelete: (id: string) => void
+  onTogglePin: (note: Note) => void
   selectedIds?: Set<string>
   onToggleSelect?: (id: string) => void
-  dragId?: string | null
-  dragOverId?: string | null
-  onDragStart?: (id: string) => void
-  onDragOver?: (e: React.DragEvent, id: string) => void
-  onDrop?: (e: React.DragEvent, id: string) => void
-  onDragEnd?: () => void
+  scrollRef: { current: HTMLDivElement | null }
 }) {
-  const parentRef = useRef<HTMLDivElement>(null)
-
   const virtualizer = useVirtualizer({
     count: notes.length,
-    getScrollElement: () => parentRef.current,
+    getScrollElement: () => scrollRef.current,
     estimateSize: () => 160,
     overscan: 10,
   })
 
   return (
-    <div ref={parentRef} className="h-full overflow-auto">
-      <div
-        className="relative w-full"
-        style={{ height: `${virtualizer.getTotalSize()}px` }}
-      >
-        {virtualizer.getVirtualItems().map((virtualItem) => {
-          const note = notes[virtualItem.index]
-          return (
-            <div
-              key={note.id}
-              className="absolute left-0 right-0 px-0.5"
-              style={{
-                height: `${virtualItem.size}px`,
-                transform: `translateY(${virtualItem.start}px)`,
-              }}
-            >
-              <NoteCard
-                note={note}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                selectedIds={selectedIds}
-                onToggleSelect={onToggleSelect}
-                dragId={dragId}
-                dragOverId={dragOverId}
-                onDragStart={onDragStart}
-                onDragOver={onDragOver}
-                onDrop={onDrop}
-                onDragEnd={onDragEnd}
-              />
-            </div>
-          )
-        })}
-      </div>
+    <div
+      className="relative w-full"
+      style={{ height: `${virtualizer.getTotalSize()}px` }}
+    >
+      {virtualizer.getVirtualItems().map((virtualItem) => {
+        const note = notes[virtualItem.index]
+        return (
+          <div
+            key={note.id}
+            className="absolute left-0 right-0 px-0.5"
+            style={{
+              height: `${virtualItem.size}px`,
+              transform: `translateY(${virtualItem.start}px)`,
+            }}
+          >
+            <NoteCard
+              note={note}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onTogglePin={onTogglePin}
+              selectedIds={selectedIds}
+              onToggleSelect={onToggleSelect}
+            />
+          </div>
+        )
+      })}
     </div>
   )
 })

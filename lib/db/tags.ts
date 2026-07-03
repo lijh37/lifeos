@@ -27,7 +27,7 @@ export async function syncNoteTags(noteId: string, tags: string[]): Promise<void
         args: [noteId, tagId],
       })
     }
-  } catch (e) { console.warn('[tags] 规范化标签表不可用，跳过同步:', e) }
+  } catch (e) { console.warn(`[tags] 同步标签失败(noteId=${noteId}, tags=${JSON.stringify(tags)}):`, e) }
 }
 
 /**
@@ -94,9 +94,10 @@ export async function renameTag(oldName: string, newName: string): Promise<void>
     const idx = tags.indexOf(oldName)
     if (idx !== -1) {
       tags[idx] = newName
+      const deduped = [...new Set(tags)]
       await db.execute({
         sql: 'UPDATE notes SET tags = ? WHERE id = ?',
-        args: [JSON.stringify(tags), row.id],
+        args: [JSON.stringify(deduped), row.id],
       })
     }
   }
