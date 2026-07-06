@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Notebook, Plus, MoreHorizontal } from 'lucide-react'
+import { Notebook, Plus, MoreHorizontal, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
 import { NAV_ITEMS, PRIMARY_MOBILE_NAV, MORE_MOBILE_NAV } from '@/lib/navigation'
+import { useUIStore } from '@/store'
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -57,6 +58,7 @@ export function Sidebar() {
 
 export function MobileNav() {
   const pathname = usePathname()
+  const setCommandMenuOpen = useUIStore(s => s.setCommandMenuOpen)
   const [moreOpen, setMoreOpen] = useState(false)
 
   return (
@@ -78,6 +80,13 @@ export function MobileNav() {
             </Link>
           )
         })}
+        <button
+          onClick={() => setCommandMenuOpen(true)}
+          className="flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[11px] min-h-[56px] text-muted-foreground"
+        >
+          <Search className="h-5 w-5" />
+          <span>搜索</span>
+        </button>
         <button
           onClick={() => setMoreOpen(true)}
           className="flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[10px] min-h-[56px] text-muted-foreground"

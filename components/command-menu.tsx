@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '@/components/theme-provider'
+import { useUIStore } from '@/store'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -51,7 +52,8 @@ interface Section {
 export default function CommandMenu() {
   const router = useRouter()
   const { theme, setTheme } = useTheme()
-  const [open, setOpen] = useState(false)
+  const open = useUIStore(s => s.commandMenuOpen)
+  const setCommandMenuOpen = useUIStore(s => s.setCommandMenuOpen)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<{ notes: Note[]; habits: Habit[] }>({
     notes: [],
@@ -78,15 +80,15 @@ export default function CommandMenu() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         e.stopPropagation()
-        setOpen(prev => !prev)
+        setCommandMenuOpen(!open)
       }
       if (e.key === 'Escape') {
-        setOpen(false)
+        setCommandMenuOpen(false)
       }
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [])
+  }, [open, setCommandMenuOpen])
 
   // ── Reset state whenever palette opens ──
   useEffect(() => {
@@ -157,7 +159,7 @@ export default function CommandMenu() {
             badgeType: note.type,
             onSelect: () => {
               router.push('/notes')
-              setOpen(false)
+              setCommandMenuOpen(false)
             },
           })
         }
@@ -176,7 +178,7 @@ export default function CommandMenu() {
             badgeType: 'habit',
             onSelect: () => {
               router.push('/habits')
-              setOpen(false)
+              setCommandMenuOpen(false)
             },
           })
         }
@@ -198,7 +200,7 @@ export default function CommandMenu() {
         icon: nav.icon,
         onSelect: () => {
           router.push(nav.href)
-          setOpen(false)
+          setCommandMenuOpen(false)
         },
       })
     }
@@ -224,7 +226,7 @@ export default function CommandMenu() {
           } else {
             setTheme(NEXT_THEME[theme])
           }
-          setOpen(false)
+          setCommandMenuOpen(false)
         },
       })
     }
@@ -276,7 +278,7 @@ export default function CommandMenu() {
           break
         case 'Escape':
           e.preventDefault()
-          setOpen(false)
+          setCommandMenuOpen(false)
           break
       }
     },
@@ -294,7 +296,7 @@ export default function CommandMenu() {
       {/* ── Overlay — desktop only ── */}
       <div
         className="fixed inset-0 z-[100] bg-black/50 animate-fade-in max-sm:hidden"
-        onClick={() => setOpen(false)}
+        onClick={() => setCommandMenuOpen(false)}
         aria-hidden="true"
       />
 
@@ -412,7 +414,7 @@ export default function CommandMenu() {
         <div className="flex shrink-0 items-center justify-between border-t px-4 py-2.5 text-[11px] text-muted-foreground/60 max-sm:pb-[max(0.625rem,env(safe-area-inset-bottom,0.625rem))] sm:hidden">
           <span>↑↓ 导航 &nbsp;·&nbsp; ↵ 选择</span>
           <button
-            onClick={() => setOpen(false)}
+            onClick={() => setCommandMenuOpen(false)}
             className="hover:text-foreground transition-colors"
           >
             关闭

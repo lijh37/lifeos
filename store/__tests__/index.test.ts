@@ -111,20 +111,23 @@ describe('useAppStore', () => {
 describe('useUIStore', () => {
   beforeEach(() => {
     useUIStore.setState({
-      globalSearchQuery: '',
+      commandMenuOpen: false,
       isMobileMenuOpen: false,
     })
   })
 
   it('should have default values', () => {
     const state = useUIStore.getState()
-    expect(state.globalSearchQuery).toBe('')
+    expect(state.commandMenuOpen).toBe(false)
     expect(state.isMobileMenuOpen).toBe(false)
   })
 
-  it('should set search query', () => {
-    useUIStore.getState().setGlobalSearchQuery('test')
-    expect(useUIStore.getState().globalSearchQuery).toBe('test')
+  it('should toggle command menu', () => {
+    useUIStore.getState().setCommandMenuOpen(true)
+    expect(useUIStore.getState().commandMenuOpen).toBe(true)
+
+    useUIStore.getState().setCommandMenuOpen(false)
+    expect(useUIStore.getState().commandMenuOpen).toBe(false)
   })
 
   it('should set mobile menu open', () => {
