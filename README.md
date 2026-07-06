@@ -71,7 +71,6 @@ bash scripts/tunnel.sh
 - [x] 拖拽排序 — 笔记卡片拖拽重排
 - [x] 预算管理 — 月度预算规划（固定/浮动支出），实际录入对比，超支/结余分析
 - [x] 习惯养成 — 每日打卡，连续天数 streak，7 天趋势图
-- [x] 全局搜索 — 跨笔记/习惯全文搜索，防抖 300ms
 - [x] 聊天持久化 — 对话多会话管理，自动保存，刷新恢复
 
 **数据分析与导出**
@@ -107,7 +106,6 @@ opencode-demo/
 │   ├── notes/             # 笔记列表页
 │   ├── expenses/          # 月度预算页
 │   ├── habits/            # 习惯页面
-│   ├── search/            # 全局搜索
 │   ├── tags/              # 标签管理
 │   ├── stats/             # 统计看板
 │   ├── settings/          # 设置
@@ -117,7 +115,6 @@ opencode-demo/
 │   ├── chat.tsx           # AI 对话组件
 │   ├── note-list.tsx      # 笔记列表（批量操作+拖拽排序+搜索）
 │   ├── markdown-editor.tsx # Markdown 编辑器（分栏编辑+工具栏+自动保存）
-│   ├── command-menu.tsx   # ⌘K 命令面板
 │   ├── sidebar.tsx        # 导航组件（PC 侧栏 + 手机底部栏）
 │   ├── skeleton-card.tsx  # 骨架屏（3 种变体）
 │   ├── error-boundary.tsx # Error Boundary

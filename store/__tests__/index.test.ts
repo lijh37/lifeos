@@ -111,23 +111,13 @@ describe('useAppStore', () => {
 describe('useUIStore', () => {
   beforeEach(() => {
     useUIStore.setState({
-      commandMenuOpen: false,
       isMobileMenuOpen: false,
     })
   })
 
   it('should have default values', () => {
     const state = useUIStore.getState()
-    expect(state.commandMenuOpen).toBe(false)
     expect(state.isMobileMenuOpen).toBe(false)
-  })
-
-  it('should toggle command menu', () => {
-    useUIStore.getState().setCommandMenuOpen(true)
-    expect(useUIStore.getState().commandMenuOpen).toBe(true)
-
-    useUIStore.getState().setCommandMenuOpen(false)
-    expect(useUIStore.getState().commandMenuOpen).toBe(false)
   })
 
   it('should set mobile menu open', () => {

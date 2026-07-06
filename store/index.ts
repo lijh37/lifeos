@@ -50,17 +50,12 @@ export const useAppStore = create<AppState>((set) => ({
 // ─── UI store (shared cross-page state) ────────────────────────────────────
 
 interface UIState {
-  /** ⌘K command palette visibility */
-  commandMenuOpen: boolean
-  setCommandMenuOpen: (open: boolean) => void
   /** Mobile sidebar / sheet visibility */
   isMobileMenuOpen: boolean
   setMobileMenuOpen: (open: boolean) => void
 }
 
 export const useUIStore = create<UIState>((set) => ({
-  commandMenuOpen: false,
-  setCommandMenuOpen: (commandMenuOpen) => set({ commandMenuOpen }),
   isMobileMenuOpen: false,
   setMobileMenuOpen: (isMobileMenuOpen) => set({ isMobileMenuOpen }),
 }))

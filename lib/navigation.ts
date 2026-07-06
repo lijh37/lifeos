@@ -6,7 +6,6 @@ import {
   Tags,
   BarChart3,
   Settings,
-  Sun,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -17,16 +16,7 @@ export interface NavItem {
   icon: LucideIcon
 }
 
-/** 快捷操作类型定义 */
-export interface QuickAction {
-  id: string
-  label: string
-  icon: LucideIcon
-  kind: 'navigate' | 'theme'
-  href?: string
-}
-
-/** 完整导航列表（桌面侧栏 + ⌘K 命令面板共用） */
+/** 完整导航列表（桌面侧栏 + 手机底部栏共用） */
 export const NAV_ITEMS: NavItem[] = [
   { href: '/', label: 'AI 查询', icon: Bot },
   { href: '/notes', label: '笔记', icon: Notebook },
@@ -42,10 +32,3 @@ export const PRIMARY_MOBILE_NAV: NavItem[] = NAV_ITEMS.slice(0, 5)
 
 /** 手机底部栏「更多」面板（剩余项） */
 export const MORE_MOBILE_NAV: NavItem[] = NAV_ITEMS.slice(5)
-
-/** ⌘K 命令面板快捷操作 */
-export const QUICK_ACTIONS: QuickAction[] = [
-  { id: 'new-note', label: '新建笔记', icon: Notebook, kind: 'navigate', href: '/' },
-  { id: 'new-habit', label: '新建习惯', icon: Trophy, kind: 'navigate', href: '/habits' },
-  { id: 'toggle-theme', label: '切换主题', icon: Sun, kind: 'theme' },
-]

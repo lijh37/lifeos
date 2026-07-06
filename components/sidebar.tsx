@@ -2,14 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Notebook, Plus, MoreHorizontal, Search } from 'lucide-react'
+import { Notebook, MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
 import { NAV_ITEMS, PRIMARY_MOBILE_NAV, MORE_MOBILE_NAV } from '@/lib/navigation'
-import { useUIStore } from '@/store'
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -39,15 +38,7 @@ export function Sidebar() {
       </nav>
 
       <div className="mt-auto space-y-2">
-        <div className="border-t pt-2">
-          <Link href="/notes">
-            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground">
-              <Plus className="h-4 w-4" />
-              新建笔记
-            </Button>
-          </Link>
-        </div>
-        <div className="flex items-center justify-between px-2 py-1">
+        <div className="flex items-center justify-between border-t px-2 pt-2">
           <span className="text-xs text-muted-foreground">主题</span>
           <ThemeToggle />
         </div>
@@ -58,7 +49,6 @@ export function Sidebar() {
 
 export function MobileNav() {
   const pathname = usePathname()
-  const setCommandMenuOpen = useUIStore(s => s.setCommandMenuOpen)
   const [moreOpen, setMoreOpen] = useState(false)
 
   return (
@@ -80,13 +70,6 @@ export function MobileNav() {
             </Link>
           )
         })}
-        <button
-          onClick={() => setCommandMenuOpen(true)}
-          className="flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[11px] min-h-[56px] text-muted-foreground"
-        >
-          <Search className="h-5 w-5" />
-          <span>搜索</span>
-        </button>
         <button
           onClick={() => setMoreOpen(true)}
           className="flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[10px] min-h-[56px] text-muted-foreground"

@@ -6,7 +6,6 @@ import { Sidebar, MobileNav } from "@/components/sidebar"
 import { PwaHandler } from "@/components/pwa-handler"
 import { PageAnimation } from "@/components/page-animation"
 import { AutoBackup } from "@/components/auto-backup"
-import CommandMenu from "@/components/command-menu"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -50,7 +49,6 @@ export default function RootLayout({
       <body className="h-full overflow-x-hidden">
         <ThemeProvider>
           <PwaHandler />
-          <CommandMenu />
           <div className="flex h-full">
             <Sidebar />
             <PageAnimation>
