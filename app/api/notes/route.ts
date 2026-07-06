@@ -12,9 +12,13 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '200'), 1), 500)
   const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0)
   const summary = searchParams.get('summary') === 'true'
+  const tag = searchParams.get('tag')
 
   if (q) {
-    const notes = await searchNotes(q)
+    let notes = await searchNotes(q)
+    if (tag) {
+      notes = notes.filter(n => n.tags.includes(tag))
+    }
     return NextResponse.json({ notes: summary ? notes.map(stripContent) : notes })
   }
 
@@ -27,7 +31,7 @@ export async function GET(req: NextRequest) {
 
   const cursor = searchParams.get('cursor')
 
-  const result = await getNotesCursor(noteType, limit, cursor || undefined)
+  const result = await getNotesCursor(noteType, limit, cursor || undefined, tag || undefined)
   const notes = summary ? result.notes.map(stripContent) : result.notes
   const nextCursor = result.nextCursor
 

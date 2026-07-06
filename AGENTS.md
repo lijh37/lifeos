@@ -52,7 +52,7 @@ components/             # React 组件
   ├── chat-input.tsx    # 输入框（auto-resize + Enter/Shift+Enter）
   ├── conversation-sidebar.tsx # 对话历史侧栏
   ├── message-list.tsx  # 消息气泡列表（UserMessage + AssistantMessage 已 memo）
-  ├── note-list.tsx     # 笔记列表（批量操作 + 搜索 + 置顶 + 无限滚动，NoteCard 已 memo）
+  ├── note-list.tsx     # 笔记列表（批量操作 + 搜索 + 置顶 + 按标签筛选 + 无限滚动，NoteCard 已 memo）
   ├── markdown-editor.tsx # Markdown 编辑器（分栏编辑 + 工具栏 + 自动保存）
   ├── sidebar.tsx       # 导航（PC 侧栏 + 手机底部栏，7 项，使用 lib/navigation + ⌘K 触控）
   ├── command-menu.tsx  # ⌘K 命令面板（使用 lib/navigation 共享配置）

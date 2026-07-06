@@ -45,6 +45,10 @@ export function NoteList() {
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const searchController = useRef<AbortController | undefined>(undefined)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [activeTag, setActiveTag] = useState<string | null>(null)
+  const [availableTags, setAvailableTags] = useState<{ name: string; count: number }[]>([])
+  const activeTagRef = useRef<string | null>(null)
+  activeTagRef.current = activeTag
 
   const fetchNotes = useCallback(async (loadMore = false) => {
     if (loadMore) {
@@ -56,6 +60,7 @@ export function NoteList() {
       const params = new URLSearchParams()
       params.set('limit', '20')
       params.set('summary', 'true')
+      if (activeTag) params.set('tag', activeTag)
       if (loadMore && cursor) {
         params.set('cursor', cursor)
       }
@@ -77,7 +82,7 @@ export function NoteList() {
         setInitialLoading(false)
       }
     }
-  }, [cursor, setInitialLoading, setLoadingMore, setNotes, appendNotes, setCursor, setHasMore])
+  }, [activeTag, cursor, setInitialLoading, setLoadingMore, setNotes, appendNotes, setCursor, setHasMore])
 
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -95,6 +100,7 @@ export function NoteList() {
   useEffect(() => {
     // If we have cached notes from a previous session, show them immediately
     // instead of re-fetching — preserves pagination and enables scroll restoration.
+    // Also triggered when tag filter changes (see handleTagSelect which clears notes).
     if (notes.length === 0) {
       fetchNotes()
     }
@@ -106,7 +112,7 @@ export function NoteList() {
         } catch { /* quota exceeded, ignore */ }
       }
     }
-  }, [])
+  }, [activeTag])
 
   const handleDelete = useCallback(async (id: string) => {
     try {
@@ -149,7 +155,11 @@ export function NoteList() {
       searchController.current = controller
 
       try {
-        const res = await fetch(`/api/notes?q=${encodeURIComponent(q)}&summary=true`, {
+        const searchParams = new URLSearchParams()
+        searchParams.set('q', q)
+        searchParams.set('summary', 'true')
+        if (activeTag) searchParams.set('tag', activeTag)
+        const res = await fetch(`/api/notes?${searchParams}`, {
           signal: controller.signal,
         })
         if (!controller.signal.aborted) {
@@ -168,7 +178,20 @@ export function NoteList() {
         }
       }
     }, 300)
-  }, [])
+  }, [activeTag])
+
+  const handleTagSelect = useCallback((tag: string | null) => {
+    if (tag === activeTag) return
+    // Cancel pending search when switching tag
+    clearTimeout(searchTimer.current)
+    searchController.current?.abort()
+    setActiveTag(tag)
+    setSearchQuery('')
+    setSearchResults(null)
+    setNotes([])
+    setCursor(null)
+    setHasMore(true)
+  }, [activeTag, setNotes, setCursor, setHasMore])
 
   const displayNotes = searchResults ?? notes
 
@@ -188,6 +211,14 @@ export function NoteList() {
       scrollRestored.current = true
     }
   }, [initialLoading, loadingMore, displayNotes.length])
+
+  // Fetch available tags for the filter bar
+  useEffect(() => {
+    fetch('/api/tags')
+      .then(res => res.json())
+      .then(data => setAvailableTags(data.tags || []))
+      .catch(() => {})
+  }, [])
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds(prev => {
@@ -310,6 +341,30 @@ export function NoteList() {
         </div>
       </div>
 
+      {/* Tag filter bar */}
+      {availableTags.length > 0 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto border-b px-4 py-2 scrollbar-hide">
+          <Badge
+            variant={!activeTag ? 'default' : 'outline'}
+            className="cursor-pointer shrink-0 text-xs"
+            onClick={() => handleTagSelect(null)}
+          >
+            全部
+          </Badge>
+          {availableTags.map(t => (
+            <Badge
+              key={t.name}
+              variant={activeTag === t.name ? 'default' : 'secondary'}
+              className="cursor-pointer shrink-0 text-xs gap-1"
+              onClick={() => handleTagSelect(t.name)}
+            >
+              {t.name}
+              <span className="text-[10px] opacity-70">({t.count})</span>
+            </Badge>
+          ))}
+        </div>
+      )}
+
       <ScrollArea ref={scrollRef} className="flex-1 p-4" onScroll={handleScroll}>
         {initialLoading && notes.length === 0 ? (
           <SkeletonNoteList count={5} />
@@ -319,6 +374,8 @@ export function NoteList() {
               <><Loader2 className="mr-2 h-4 w-4 animate-spin" />搜索中…</>
             ) : searchQuery ? (
               '没有找到匹配的记录'
+            ) : activeTag ? (
+              <>没有标记「<span className="font-medium">{activeTag}</span>」的笔记</>
             ) : (
               '还没有任何记录，点击上方 + 新建笔记'
             )}
@@ -342,6 +399,7 @@ export function NoteList() {
                 onTogglePin={handleTogglePin}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
+                onSelectTag={handleTagSelect}
                 scrollRef={scrollRef}
               />
             ) : (
@@ -354,6 +412,7 @@ export function NoteList() {
                   onTogglePin={handleTogglePin}
                   selectedIds={selectedIds}
                   onToggleSelect={toggleSelect}
+                  onSelectTag={handleTagSelect}
                 />)}
               </div>
             )}
@@ -413,7 +472,7 @@ function formatNoteDate(dateStr: string | null | undefined): string {
 // ─── NoteCard ────────────────────────────────────────────────────────────────
 
 const NoteCard = memo(function NoteCard({
-  note, onEdit, onDelete, onTogglePin, selectedIds, onToggleSelect,
+  note, onEdit, onDelete, onTogglePin, selectedIds, onToggleSelect, onSelectTag,
 }: {
   note: Note
   onEdit: (note: Note) => void
@@ -421,6 +480,7 @@ const NoteCard = memo(function NoteCard({
   onTogglePin: (note: Note) => void
   selectedIds?: Set<string>
   onToggleSelect?: (id: string) => void
+  onSelectTag?: (tag: string) => void
 }) {
   const isSelected = selectedIds?.has(note.id) ?? false
 
@@ -459,7 +519,7 @@ const NoteCard = memo(function NoteCard({
               )}
             </button>
             <CardTitle className="text-sm font-medium" onClick={() => onEdit(note)}>
-              {note.title || stripMarkdown(note.content, 60) || '无标题'}
+              {note.title || '无标题'}
             </CardTitle>
           </div>
           <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
@@ -494,7 +554,12 @@ const NoteCard = memo(function NoteCard({
           {note.tags.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {note.tags.map((tag: string) => (
-                <Badge key={tag} variant="secondary" className="text-[10px]">
+                <Badge
+                  key={tag}
+                  variant="secondary"
+                  className="cursor-pointer text-[10px] hover:bg-primary/20 transition-colors"
+                  onClick={(e) => { e.stopPropagation(); onSelectTag?.(tag) }}
+                >
                   {tag}
                 </Badge>
               ))}
@@ -520,7 +585,7 @@ NoteCard.displayName = 'NoteCard'
 
 const VirtualNoteList = memo(function VirtualNoteList({
   notes, onEdit, onDelete, onTogglePin,
-  selectedIds, onToggleSelect,
+  selectedIds, onToggleSelect, onSelectTag,
   scrollRef,
 }: {
   notes: Note[]
@@ -529,6 +594,7 @@ const VirtualNoteList = memo(function VirtualNoteList({
   onTogglePin: (note: Note) => void
   selectedIds?: Set<string>
   onToggleSelect?: (id: string) => void
+  onSelectTag?: (tag: string) => void
   scrollRef: { current: HTMLDivElement | null }
 }) {
   const virtualizer = useVirtualizer({
@@ -561,6 +627,7 @@ const VirtualNoteList = memo(function VirtualNoteList({
               onTogglePin={onTogglePin}
               selectedIds={selectedIds}
               onToggleSelect={onToggleSelect}
+              onSelectTag={onSelectTag}
             />
           </div>
         )

@@ -109,15 +109,25 @@ export async function getNotes(type?: NoteType, limit = 200, offset = 0): Promis
  * @param cursor - 上一页最后一条的 created_at 时间戳
  * @returns 包含笔记数组和下一页游标的对象
  */
-export async function getNotesCursor(type?: NoteType, limit = 50, cursor?: string): Promise<{ notes: Note[]; nextCursor: string | null }> {
+export async function getNotesCursor(type?: NoteType, limit = 50, cursor?: string, tag?: string): Promise<{ notes: Note[]; nextCursor: string | null }> {
   const db = getClient()
-  let sql = 'SELECT * FROM notes'
+
+  // Use table-qualified columns so we can add JOINs for tag filtering
+  let sql = 'SELECT notes.* FROM notes'
   const args: InValue[] = []
+
+  if (tag) {
+    sql += ' INNER JOIN note_tags ON notes.id = note_tags.note_id INNER JOIN tags ON note_tags.tag_id = tags.id'
+  }
 
   const conditions: string[] = []
   if (type) {
-    conditions.push('type = ?')
+    conditions.push('notes.type = ?')
     args.push(type)
+  }
+  if (tag) {
+    conditions.push('tags.name = ?')
+    args.push(tag.trim())
   }
   if (cursor) {
     // cursor is JSON: {"p": pinned, "c": createdAt} or legacy plain createdAt
@@ -131,7 +141,7 @@ export async function getNotesCursor(type?: NoteType, limit = 50, cursor?: strin
       // Legacy cursor format (plain createdAt string)
       createdAt = cursor
     }
-    conditions.push('(pinned < ? OR (pinned = ? AND created_at < ?))')
+    conditions.push('(notes.pinned < ? OR (notes.pinned = ? AND notes.created_at < ?))')
     args.push(pinned, pinned, createdAt)
   }
 
@@ -139,7 +149,7 @@ export async function getNotesCursor(type?: NoteType, limit = 50, cursor?: strin
     sql += ' WHERE ' + conditions.join(' AND ')
   }
 
-  sql += ' ORDER BY pinned DESC, created_at DESC LIMIT ?'
+  sql += ' ORDER BY notes.pinned DESC, notes.created_at DESC LIMIT ?'
   // Fetch one extra to determine if there's a next page
   args.push(limit + 1)
 

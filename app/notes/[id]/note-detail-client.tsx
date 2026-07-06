@@ -6,6 +6,7 @@ import { ArrowLeft, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { MarkdownEditor } from '@/components/markdown-editor'
 import type { Note } from '@/lib/types'
+import { useAppStore } from '@/store'
 
 export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
   const router = useRouter()
@@ -24,10 +25,13 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
     setTitle(newTitle)
     clearTimeout(titleTimer.current)
     titleTimer.current = setTimeout(() => {
+      const trimmed = newTitle.trim()
       fetch(`/api/notes/${note.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newTitle.trim() || null }),
+        body: JSON.stringify({ title: trimmed || null }),
+      }).then(() => {
+        useAppStore.getState().updateNote(note.id, { title: trimmed || '' })
       })
     }, 500)
   }
@@ -38,6 +42,7 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content }),
     })
+    useAppStore.getState().updateNote(note.id, { content })
   }
 
   async function handleAddTag(tag: string) {
@@ -45,6 +50,7 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
     const newTags = [...note.tags, tag]
     setNote(prev => ({ ...prev, tags: newTags }))
     setTagInput('')
+    useAppStore.getState().updateNote(note.id, { tags: newTags })
     try {
       await fetch(`/api/notes/${note.id}`, {
         method: 'PATCH',
@@ -57,6 +63,7 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
   async function handleRemoveTag(tag: string) {
     const newTags = note.tags.filter(t => t !== tag)
     setNote(prev => ({ ...prev, tags: newTags }))
+    useAppStore.getState().updateNote(note.id, { tags: newTags })
     try {
       await fetch(`/api/notes/${note.id}`, {
         method: 'PATCH',
@@ -69,6 +76,7 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
   async function handleDelete() {
     if (!confirm('确定删除这条笔记？')) return
     await fetch(`/api/notes/${note.id}`, { method: 'DELETE' })
+    useAppStore.getState().removeNote(note.id)
     router.replace('/notes')
   }
 

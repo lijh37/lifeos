@@ -39,6 +39,11 @@ describe('NoteList', () => {
       loadingMore: false,
     })
     mockFetch.mockReset()
+    // Default: return empty results for notes + tags to prevent crashes
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ notes: [], tags: [] }),
+    })
   })
 
   it('should render loading skeleton initially when initialLoading is true', () => {
