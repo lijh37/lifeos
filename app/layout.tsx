@@ -6,6 +6,7 @@ import { Sidebar, MobileNav } from "@/components/sidebar"
 import { PwaHandler } from "@/components/pwa-handler"
 import { PageAnimation } from "@/components/page-animation"
 import { AutoBackup } from "@/components/auto-backup"
+import { Toaster } from "sonner"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -48,6 +49,13 @@ export default function RootLayout({
       </head>
       <body className="h-full overflow-x-hidden">
         <ThemeProvider>
+          <Toaster
+            position="top-center"
+            toastOptions={{
+              className: "text-sm",
+              duration: 3000,
+            }}
+          />
           <PwaHandler />
           <div className="flex h-full">
             <Sidebar />

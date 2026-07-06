@@ -29,6 +29,7 @@ import { stripMarkdown } from '@/lib/markdown'
 import type { Note } from '@/lib/types'
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 const SCROLL_POSITION_KEY = 'note_list_scroll'
 
@@ -118,8 +119,10 @@ export function NoteList() {
     try {
       await fetch(`/api/notes/${id}`, { method: 'DELETE' })
       removeNote(id)
+      toast.success('笔记已删除')
     } catch (e) {
       console.error('Failed to delete note:', e)
+      toast.error('删除失败，请重试')
     }
   }, [removeNote])
 
@@ -134,6 +137,7 @@ export function NoteList() {
       router.push(`/notes/${data.note.id}`)
     } catch (e) {
       console.error('Failed to create note:', e)
+      toast.error('创建笔记失败，请重试')
     }
   }, [router])
 
@@ -251,8 +255,10 @@ export function NoteList() {
       })
       ids.forEach(id => removeNote(id))
       clearSelection()
+      toast.success(`已删除 ${ids.length} 条笔记`)
     } catch (e) {
       console.error('Batch delete failed:', e)
+      toast.error('批量删除失败，请重试')
     }
   }, [selectedIds, removeNote, clearSelection])
 
@@ -273,8 +279,10 @@ export function NoteList() {
         }
       })
       clearSelection()
+      toast.success(`已添加标签「${tag}」`)
     } catch (e) {
       console.error('Batch tag failed:', e)
+      toast.error('批量打标签失败，请重试')
     }
   }, [notes, updateNote, clearSelection, selectedIds])
 
@@ -296,8 +304,10 @@ export function NoteList() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pinned: newPinned }),
       })
+      toast.success(newPinned ? '已置顶' : '已取消置顶')
     } catch (e) {
       console.error('Failed to toggle pin:', e)
+      toast.error('操作失败，请重试')
       const rolledBack = notes
         .map(n => n.id === note.id ? { ...n, pinned: !newPinned } : n)
         .sort((a, b) => {
@@ -490,9 +500,9 @@ const NoteCard = memo(function NoteCard({
         isSelected && 'ring-2 ring-primary/50',
       )}
     >
-      <CardHeader className="p-3 pb-0">
+      <CardHeader className="p-4 pb-1">
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-2 min-w-0" onClick={(e) => e.stopPropagation()}>
             {onToggleSelect && (
               <button
                 onClick={() => onToggleSelect(note.id)}
@@ -516,11 +526,11 @@ const NoteCard = memo(function NoteCard({
                 <PinOff className="h-4 w-4" />
               )}
             </button>
-            <CardTitle className="text-sm font-medium" onClick={() => onEdit(note)}>
+            <CardTitle className="truncate text-sm font-medium" onClick={() => onEdit(note)}>
               {note.title || '无标题'}
             </CardTitle>
           </div>
-          <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+          <div className="flex shrink-0 gap-1" onClick={(e) => e.stopPropagation()}>
             <Button
               variant="ghost"
               size="icon"
@@ -540,7 +550,7 @@ const NoteCard = memo(function NoteCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-3 pt-2" onClick={() => onEdit(note)}>
+      <CardContent className="px-4 pb-4 pt-1" onClick={() => onEdit(note)}>
         {note.content ? (
           <p className="line-clamp-3 text-sm text-muted-foreground">
             {stripMarkdown(note.content, 200)}
@@ -650,7 +660,7 @@ function BatchActionsBar({
   onClearSelection: () => void
 }) {
   return (
-    <div className="sticky bottom-0 border-t bg-background p-3">
+    <div className="sticky bottom-0 border-t bg-background p-3 max-md:bottom-[calc(56px+env(safe-area-inset-bottom))]">
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm text-muted-foreground">已选 {selectedIds.size} 项</span>
         <div className="flex gap-2">

@@ -2,9 +2,20 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Trash2 } from 'lucide-react'
+import { ArrowLeft, Trash2, Loader2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { MarkdownEditor } from '@/components/markdown-editor'
+import {
+  AlertDialogRoot,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog'
+import { toast } from 'sonner'
 import type { Note } from '@/lib/types'
 import { useAppStore } from '@/store'
 
@@ -13,6 +24,9 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
   const [note, setNote] = useState<Note>(initialNote)
   const [title, setTitle] = useState(initialNote.title || '')
   const [tagInput, setTagInput] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const titleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // Sync state when navigating between notes
@@ -21,8 +35,18 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
     setTitle(initialNote.title || '')
   }, [initialNote.id, initialNote.title])
 
+  function handleGoBack() {
+    // Fallback to /notes when there's no history
+    if (window.history.length > 1) {
+      router.back()
+    } else {
+      router.replace('/notes')
+    }
+  }
+
   function handleTitleChange(newTitle: string) {
     setTitle(newTitle)
+    setSaving(true)
     clearTimeout(titleTimer.current)
     titleTimer.current = setTimeout(() => {
       const trimmed = newTitle.trim()
@@ -32,17 +56,25 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
         body: JSON.stringify({ title: trimmed || null }),
       }).then(() => {
         useAppStore.getState().updateNote(note.id, { title: trimmed || '' })
+        setSaving(false)
+      }).catch(() => {
+        setSaving(false)
+        toast.error('保存标题失败')
       })
     }, 500)
   }
 
   async function handleSaveContent(content: string) {
-    await fetch(`/api/notes/${note.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
-    })
-    useAppStore.getState().updateNote(note.id, { content })
+    try {
+      await fetch(`/api/notes/${note.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      })
+      useAppStore.getState().updateNote(note.id, { content })
+    } catch {
+      toast.error('保存内容失败')
+    }
   }
 
   async function handleAddTag(tag: string) {
@@ -57,7 +89,12 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tags: newTags }),
       })
-    } catch { /* optimistic update, ignore */ }
+    } catch {
+      toast.error('添加标签失败')
+      // Rollback optimistic update
+      setNote(prev => ({ ...prev, tags: note.tags }))
+      useAppStore.getState().updateNote(note.id, { tags: note.tags })
+    }
   }
 
   async function handleRemoveTag(tag: string) {
@@ -70,14 +107,24 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tags: newTags }),
       })
-    } catch { /* optimistic update, ignore */ }
+    } catch {
+      toast.error('移除标签失败')
+      setNote(prev => ({ ...prev, tags: note.tags }))
+      useAppStore.getState().updateNote(note.id, { tags: note.tags })
+    }
   }
 
   async function handleDelete() {
-    if (!confirm('确定删除这条笔记？')) return
-    await fetch(`/api/notes/${note.id}`, { method: 'DELETE' })
-    useAppStore.getState().removeNote(note.id)
-    router.replace('/notes')
+    setDeleting(true)
+    try {
+      await fetch(`/api/notes/${note.id}`, { method: 'DELETE' })
+      useAppStore.getState().removeNote(note.id)
+      toast.success('笔记已删除')
+      router.replace('/notes')
+    } catch {
+      toast.error('删除失败，请重试')
+      setDeleting(false)
+    }
   }
 
   return (
@@ -85,7 +132,7 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
       {/* Header */}
       <header className="flex items-center gap-3 border-b px-4 py-3 shrink-0">
         <button
-          onClick={() => router.back()}
+          onClick={handleGoBack}
           className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
           title="返回"
         >
@@ -98,13 +145,45 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
           placeholder="笔记标题"
           className="flex-1 bg-transparent text-lg font-semibold focus:outline-none focus:text-foreground placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring/20 focus:rounded-sm"
         />
-        <button
-          onClick={handleDelete}
-          className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-          title="删除"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {saving && (
+            <span className="flex items-center gap-1 text-[11px] text-muted-foreground/60">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              保存中
+            </span>
+          )}
+          <AlertDialogRoot open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+            <button
+              onClick={() => setDeleteConfirmOpen(true)}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+              title="删除"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>确定删除这条笔记？</AlertDialogTitle>
+                <AlertDialogDescription>
+                  删除后无法恢复，请谨慎操作。
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>取消</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {deleting ? (
+                    <><Loader2 className="mr-1 h-3 w-3 animate-spin" />删除中</>
+                  ) : (
+                    '删除'
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialogRoot>
+        </div>
       </header>
 
       {/* Editor area - fills remaining space */}
