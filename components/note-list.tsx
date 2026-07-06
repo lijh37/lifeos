@@ -341,29 +341,27 @@ export function NoteList() {
         </div>
       </div>
 
-      {/* Tag filter bar */}
-      {availableTags.length > 0 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto border-b px-4 py-2 scrollbar-hide">
+      {/* Tag filter bar — always visible, chips appear as tags load */}
+      <div className="flex items-center gap-1.5 overflow-x-auto border-b px-4 py-2 scrollbar-hide">
+        <Badge
+          variant={!activeTag ? 'default' : 'outline'}
+          className="cursor-pointer shrink-0 text-xs"
+          onClick={() => handleTagSelect(null)}
+        >
+          全部
+        </Badge>
+        {availableTags.map(t => (
           <Badge
-            variant={!activeTag ? 'default' : 'outline'}
-            className="cursor-pointer shrink-0 text-xs"
-            onClick={() => handleTagSelect(null)}
+            key={t.name}
+            variant={activeTag === t.name ? 'default' : 'secondary'}
+            className="cursor-pointer shrink-0 text-xs gap-1"
+            onClick={() => handleTagSelect(t.name)}
           >
-            全部
+            {t.name}
+            <span className="text-[10px] opacity-70">({t.count})</span>
           </Badge>
-          {availableTags.map(t => (
-            <Badge
-              key={t.name}
-              variant={activeTag === t.name ? 'default' : 'secondary'}
-              className="cursor-pointer shrink-0 text-xs gap-1"
-              onClick={() => handleTagSelect(t.name)}
-            >
-              {t.name}
-              <span className="text-[10px] opacity-70">({t.count})</span>
-            </Badge>
-          ))}
-        </div>
-      )}
+        ))}
+      </div>
 
       <ScrollArea ref={scrollRef} className="flex-1 p-4" onScroll={handleScroll}>
         {initialLoading && notes.length === 0 ? (
