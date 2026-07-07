@@ -86,17 +86,31 @@ export function NoteList() {
   }, [activeTag, cursor, setInitialLoading, setLoadingMore, setNotes, appendNotes, setCursor, setHasMore])
 
   const scrollRef = useRef<HTMLDivElement>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
 
-  // onScroll-based infinite scroll (more predictable than IntersectionObserver,
-  // which fires immediately on observe() — causing cascade loading)
-  const handleScroll = useCallback(() => {
-    if (!scrollRef.current || loadingMore || initialLoading || !hasMore) return
-    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
-    // Only auto-load when user has actually scrolled (scrollTop > 0) and near bottom
-    if (scrollTop > 0 && scrollHeight - scrollTop - clientHeight < 400) {
-      fetchNotes(true)
-    }
-  }, [loadingMore, initialLoading, hasMore, fetchNotes])
+  // IntersectionObserver-based infinite scroll (more reliable than onScroll with
+  // Base UI's custom scrollbar, which may not fire native scroll events predictably)
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    const viewport = scrollRef.current
+    if (!sentinel || !viewport || loadingMore || !hasMore) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasMore && !loadingMore && !initialLoading) {
+          fetchNotes(true)
+        }
+      },
+      {
+        root: viewport,
+        rootMargin: '0px 0px 400px 0px',
+        threshold: 0,
+      },
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, loadingMore, initialLoading, fetchNotes])
 
   useEffect(() => {
     // If we have cached notes from a previous session, show them immediately
@@ -105,15 +119,18 @@ export function NoteList() {
     if (notes.length === 0) {
       fetchNotes()
     }
+  }, [activeTag])
+
+  // Save scroll position before navigating away
+  useEffect(() => {
     return () => {
-      // Save scroll position before unmounting (navigating to edit page etc.)
       if (scrollRef.current) {
         try {
           sessionStorage.setItem(SCROLL_POSITION_KEY, String(scrollRef.current.scrollTop))
         } catch { /* quota exceeded, ignore */ }
       }
     }
-  }, [activeTag])
+  }, [])
 
   const handleDelete = useCallback(async (id: string) => {
     try {
@@ -373,7 +390,7 @@ export function NoteList() {
         ))}
       </div>
 
-      <ScrollArea ref={scrollRef} className="flex-1 p-4" onScroll={handleScroll}>
+      <ScrollArea ref={scrollRef} className="flex-1 p-4">
         {initialLoading && notes.length === 0 ? (
           <SkeletonNoteList count={5} />
         ) : displayNotes.length === 0 ? (
@@ -442,6 +459,8 @@ export function NoteList() {
                 </Button>
               </div>
             )}
+            {/* Sentinel for IntersectionObserver — always rendered so observer never loses target */}
+            <div ref={sentinelRef} className="h-px" />
           </>
         )}
       </ScrollArea>
