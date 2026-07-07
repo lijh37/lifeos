@@ -87,18 +87,27 @@ export function NoteList() {
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
+  // Track sentinel visibility across Effect re-runs to prevent cascade loading.
+  // Only triggers on transition: NOT visible → visible (skips initial-observe and
+  // post-load events when sentinel stays in view after content grows).
+  const wasSentinelVisible = useRef(false)
 
   // IntersectionObserver-based infinite scroll (more reliable than onScroll with
   // Base UI's custom scrollbar, which may not fire native scroll events predictably)
   useEffect(() => {
     const sentinel = sentinelRef.current
     const viewport = scrollRef.current
-    if (!sentinel || !viewport || loadingMore || !hasMore) return
+    if (!sentinel || !viewport || loadingMore || !hasMore || initialLoading) return
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && hasMore && !loadingMore && !initialLoading) {
-          fetchNotes(true)
+        if (entry.isIntersecting) {
+          if (!wasSentinelVisible.current && hasMore && !loadingMore && !initialLoading) {
+            wasSentinelVisible.current = true
+            fetchNotes(true)
+          }
+        } else {
+          wasSentinelVisible.current = false
         }
       },
       {
