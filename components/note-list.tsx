@@ -87,13 +87,10 @@ export function NoteList() {
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
-  // Track sentinel visibility across Effect re-runs to prevent cascade loading.
-  // Only triggers on transition: NOT visible → visible (skips initial-observe and
-  // post-load events when sentinel stays in view after content grows).
-  const wasSentinelVisible = useRef(false)
 
-  // IntersectionObserver-based infinite scroll (more reliable than onScroll with
-  // Base UI's custom scrollbar, which may not fire native scroll events predictably)
+  // Auto-load more when sentinel enters the 400px trigger zone below viewport.
+  // The effect lifecycle naturally prevents cascade: loadingMore disconnects the
+  // observer, and after content grows the sentinel is pushed below the trigger zone.
   useEffect(() => {
     const sentinel = sentinelRef.current
     const viewport = scrollRef.current
@@ -101,13 +98,8 @@ export function NoteList() {
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          if (!wasSentinelVisible.current && hasMore && !loadingMore && !initialLoading) {
-            wasSentinelVisible.current = true
-            fetchNotes(true)
-          }
-        } else {
-          wasSentinelVisible.current = false
+        if (entry.isIntersecting && hasMore && !loadingMore && !initialLoading) {
+          fetchNotes(true)
         }
       },
       {
@@ -399,7 +391,7 @@ export function NoteList() {
         ))}
       </div>
 
-      <ScrollArea ref={scrollRef} className="flex-1 p-4">
+      <ScrollArea ref={scrollRef} className="flex-1 p-4 pb-20">
         {initialLoading && notes.length === 0 ? (
           <SkeletonNoteList count={5} />
         ) : displayNotes.length === 0 ? (
