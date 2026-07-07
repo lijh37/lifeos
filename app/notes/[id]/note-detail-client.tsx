@@ -35,6 +35,15 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
     setTitle(initialNote.title || '')
   }, [initialNote.id, initialNote.title])
 
+  // Ensure note is in the list cache so back navigation shows it without a refresh
+  useEffect(() => {
+    const store = useAppStore.getState()
+    const exists = store.notes.some(n => n.id === initialNote.id)
+    if (!exists) {
+      store.addNote(initialNote)
+    }
+  }, [initialNote.id])
+
   function handleGoBack() {
     // Fallback to /notes when there's no history
     if (window.history.length > 1) {
