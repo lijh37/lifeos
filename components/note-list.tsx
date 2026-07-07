@@ -151,6 +151,8 @@ export function NoteList() {
         body: JSON.stringify({ type: 'note', title: '', content: '', tags: [] }),
       })
       const data = await res.json()
+      // Add to local cache immediately so the list shows it on back navigation
+      useAppStore.getState().addNote(data.note)
       router.push(`/notes/${data.note.id}`)
     } catch (e) {
       console.error('Failed to create note:', e)
