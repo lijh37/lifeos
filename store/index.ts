@@ -24,7 +24,7 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set) => ({
   notes: [],
-  initialLoading: false,
+  initialLoading: true,
   loadingMore: false,
   cursor: null,
   hasMore: true,

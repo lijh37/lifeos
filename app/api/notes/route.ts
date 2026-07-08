@@ -30,8 +30,8 @@ export async function GET(req: NextRequest) {
 
   const cursor = searchParams.get('cursor')
 
-  const result = await getNotesCursor(noteType, limit, cursor || undefined, tag || undefined)
-  const notes = summary ? result.notes.map(stripContent) : result.notes
+  const result = await getNotesCursor(noteType, limit, cursor || undefined, tag || undefined, summary)
+  const notes = result.notes
   const nextCursor = result.nextCursor
 
   return NextResponse.json({ notes, nextCursor })

@@ -7,7 +7,7 @@ import { deleteAttachmentsByNoteId } from './attachments'
 function rowToNote(row: Record<string, unknown>): Note {
   return {
     id: row.id as string,
-    content: row.content as string,
+    content: (row.content as string) || '',
     title: row.title as string | null,
     type: row.type as NoteType,
     tags: JSON.parse(row.tags as string) as string[],
@@ -109,11 +109,15 @@ export async function getNotes(type?: NoteType, limit = 200, offset = 0): Promis
  * @param cursor - 上一页最后一条的 created_at 时间戳
  * @returns 包含笔记数组和下一页游标的对象
  */
-export async function getNotesCursor(type?: NoteType, limit = 50, cursor?: string, tag?: string): Promise<{ notes: Note[]; nextCursor: string | null }> {
+export async function getNotesCursor(type?: NoteType, limit = 50, cursor?: string, tag?: string, summary = false): Promise<{ notes: Note[]; nextCursor: string | null }> {
   const db = getClient()
 
   // Use table-qualified columns so we can add JOINs for tag filtering
-  let sql = 'SELECT notes.* FROM notes'
+  // Summary mode only fetches first 80 chars of content (for list preview)
+  const selectColumns = summary
+    ? "notes.id, notes.title, notes.type, notes.tags, notes.pinned, notes.done, notes.created_at, notes.updated_at, notes.due_date, substr(notes.content, 1, 80) AS content"
+    : 'notes.*'
+  let sql = `SELECT ${selectColumns} FROM notes`
   const args: InValue[] = []
 
   if (tag) {

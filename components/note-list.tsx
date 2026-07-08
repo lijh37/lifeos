@@ -388,7 +388,7 @@ export function NoteList() {
                 scrollRef={scrollRef}
               />
             ) : (
-              <div className="space-y-1.5 animate-stagger">
+              <div className="space-y-1.5">
                 {displayNotes.map((note) => <NoteCard
                   key={note.id}
                   note={note}
