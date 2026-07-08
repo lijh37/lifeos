@@ -451,9 +451,11 @@ const NoteCard = memo(function NoteCard({
   onSelectTag?: (tag: string) => void
 }) {
   const isSelected = selectedIds?.has(note.id) ?? false
+  const router = useRouter()
 
   return (
     <Card
+      onPointerEnter={() => router.prefetch(`/notes/${note.id}`)}
       size="sm"
       className={cn(
         'card-hover',
