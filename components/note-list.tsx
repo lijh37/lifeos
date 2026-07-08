@@ -87,30 +87,35 @@ export function NoteList() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
 
-  // Track sentinel visibility transitions to prevent cascade: only trigger
-  // when sentinel goes from NOT visible → visible (skips initial observation
-  // and re-entry after content grows).
+  // Use refs for values the observer reads — avoids observer recreation on
+  // every fetch cycle, which was causing cascade loads (sentinel in view →
+  // fetch → loading flags toggle → effect re-runs → observer reconnects →
+  // sentinelTriggered resets → sentinel still visible → triggers again).
+  const loadingMoreRef = useRef(loadingMore)
+  loadingMoreRef.current = loadingMore
+  const initialLoadingRef = useRef(initialLoading)
+  initialLoadingRef.current = initialLoading
+  const hasMoreRef = useRef(hasMore)
+  hasMoreRef.current = hasMore
+  const fetchNotesRef = useRef(fetchNotes)
+  fetchNotesRef.current = fetchNotes
   const sentinelTriggered = useRef(false)
 
   useEffect(() => {
     const sentinel = sentinelRef.current
     const viewport = scrollRef.current
-    if (!sentinel || !viewport || loadingMore || !hasMore || initialLoading) return
-
-    // Reset transition tracker for the new observer cycle — this is the key fix
-    // that prevents wasSentinelVisible getting stuck at true across load cycles.
-    sentinelTriggered.current = false
+    if (!sentinel || !viewport) return
 
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          if (!sentinelTriggered.current && hasMore && !loadingMore && !initialLoading) {
+          if (!sentinelTriggered.current && hasMoreRef.current && !loadingMoreRef.current && !initialLoadingRef.current) {
             sentinelTriggered.current = true
-            fetchNotes(true)
+            fetchNotesRef.current(true)
           }
         } else {
           // Sentinel went out of view (user scrolled up or content grew).
-          // Reset counter so the next scroll-in triggers a load.
+          // Reset so the next scroll-in triggers a load.
           sentinelTriggered.current = false
         }
       },
@@ -123,7 +128,7 @@ export function NoteList() {
 
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [hasMore, loadingMore, initialLoading, fetchNotes])
+  }, [])
 
   useEffect(() => {
     // If we have cached notes from a previous session, show them immediately
