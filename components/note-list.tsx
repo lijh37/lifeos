@@ -101,10 +101,15 @@ export function NoteList() {
   fetchNotesRef.current = fetchNotes
   const sentinelTriggered = useRef(false)
 
+  // Re-create observer when sentinel element appears/disappears (notes transitions
+  // from empty to populated, or tag switches). Reactive flags use refs inside the
+  // callback so the observer stays stable across fetch cycles — no cascade.
+  const observerKey = notes.length > 0
   useEffect(() => {
     const sentinel = sentinelRef.current
     const viewport = scrollRef.current
     if (!sentinel || !viewport) return
+    if (typeof IntersectionObserver === 'undefined') return
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -128,7 +133,7 @@ export function NoteList() {
 
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [])
+  }, [observerKey])
 
   useEffect(() => {
     // If we have cached notes from a previous session, show them immediately
