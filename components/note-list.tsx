@@ -495,7 +495,7 @@ const NoteCard = memo(function NoteCard({
       </CardHeader>
       <CardContent className="px-3 pb-3 pt-0.5" onClick={() => onEdit(note)}>
         {note.content ? (
-          <p className="line-clamp-2 text-sm text-muted-foreground">
+          <p className="line-clamp-1 text-sm text-muted-foreground">
             {stripMarkdown(note.content, 200)}
           </p>
         ) : (
@@ -551,7 +551,7 @@ const VirtualNoteList = memo(function VirtualNoteList({
   const virtualizer = useVirtualizer({
     count: notes.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 130,
+    estimateSize: () => 110,
     overscan: 10,
   })
 
