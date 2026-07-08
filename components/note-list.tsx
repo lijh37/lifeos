@@ -381,7 +381,7 @@ export function NoteList() {
                 scrollRef={scrollRef}
               />
             ) : (
-              <div className="space-y-2 animate-stagger">
+              <div className="space-y-1.5 animate-stagger">
                 {displayNotes.map((note) => <NoteCard
                   key={note.id}
                   note={note}
@@ -447,13 +447,14 @@ const NoteCard = memo(function NoteCard({
 
   return (
     <Card
+      size="sm"
       className={cn(
         'card-hover',
         note.done && 'opacity-50',
         isSelected && 'ring-2 ring-primary/50',
       )}
     >
-      <CardHeader className="p-4 pb-1">
+      <CardHeader className="p-3 pb-0.5">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2 min-w-0" onClick={(e) => e.stopPropagation()}>
             {onToggleSelect && (
@@ -503,15 +504,15 @@ const NoteCard = memo(function NoteCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="px-4 pb-4 pt-1" onClick={() => onEdit(note)}>
+      <CardContent className="px-3 pb-3 pt-0.5" onClick={() => onEdit(note)}>
         {note.content ? (
-          <p className="line-clamp-3 text-sm text-muted-foreground">
+          <p className="line-clamp-2 text-sm text-muted-foreground">
             {stripMarkdown(note.content, 200)}
           </p>
         ) : (
           <p className="text-sm text-muted-foreground italic">空白笔记</p>
         )}
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
           {note.tags.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {note.tags.map((tag: string) => (
@@ -561,7 +562,7 @@ const VirtualNoteList = memo(function VirtualNoteList({
   const virtualizer = useVirtualizer({
     count: notes.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 160,
+    estimateSize: () => 130,
     overscan: 10,
   })
 
