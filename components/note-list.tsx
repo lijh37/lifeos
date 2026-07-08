@@ -98,17 +98,6 @@ export function NoteList() {
     }
   }, [loadingMore, hasMore, initialLoading, fetchNotes, searchQuery])
 
-  // Auto-fill: after a load completes, if content still doesn't fill the viewport,
-  // keep loading more. This handles the case where there are too few/short notes.
-  // The cascade stops naturally when the viewport is filled or hasMore is false.
-  useEffect(() => {
-    if (loadingMore || !hasMore || initialLoading || searchQuery) return
-    const el = scrollRef.current
-    if (el && el.scrollHeight - el.clientHeight < 400) {
-      fetchNotes(true)
-    }
-  }, [loadingMore, hasMore, initialLoading, searchQuery, fetchNotes])
-
   useEffect(() => {
     // If we have cached notes from a previous session, show them immediately
     // instead of re-fetching — preserves pagination and enables scroll restoration.
