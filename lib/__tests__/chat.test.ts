@@ -1,4 +1,5 @@
-// IMPORTANT: Set env BEFORE importing db
+// IMPORTANT: Clear Turso env + set :memory: BEFORE importing db
+delete process.env.TURSO_DATABASE_URL
 process.env.DATABASE_URL = ':memory:'
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'

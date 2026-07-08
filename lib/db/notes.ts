@@ -134,17 +134,9 @@ export async function getNotesCursor(type?: NoteType, limit = 50, cursor?: strin
     args.push(tag.trim())
   }
   if (cursor) {
-    // cursor is JSON: {"p": pinned, "c": createdAt} or legacy plain createdAt
-    let pinned = 0
-    let createdAt = ''
-    try {
-      const parsed = JSON.parse(cursor)
-      pinned = parsed.p ?? 0
-      createdAt = parsed.c ?? ''
-    } catch {
-      // Legacy cursor format (plain createdAt string)
-      createdAt = cursor
-    }
+    const parsed = JSON.parse(cursor)
+    const pinned = parsed.p ?? 0
+    const createdAt = parsed.c ?? ''
     conditions.push('(notes.pinned < ? OR (notes.pinned = ? AND notes.created_at < ?))')
     args.push(pinned, pinned, createdAt)
   }
@@ -173,7 +165,7 @@ export async function getNotesCursor(type?: NoteType, limit = 50, cursor?: strin
 }
 
 /**
- * 按截止日期范围查询笔记，可按类型过滤，支持分页。
+ * 按创建日期范围查询笔记，可按类型过滤，支持分页。
  * @param startDate - 起始日期（ISO 字符串）
  * @param endDate - 结束日期（ISO 字符串）
  * @param type - 可选，笔记类型筛选
@@ -183,33 +175,16 @@ export async function getNotesCursor(type?: NoteType, limit = 50, cursor?: strin
  */
 export async function getNotesByDateRange(startDate: string, endDate: string, type?: NoteType, limit = 200, offset = 0): Promise<Note[]> {
   const db = getClient()
-  let sql = 'SELECT * FROM notes WHERE due_date >= ? AND due_date <= ?'
+  let sql = 'SELECT * FROM notes WHERE created_at >= ? AND created_at <= ?'
   const args: InValue[] = [startDate, endDate]
   if (type) {
     sql += ' AND type = ?'
     args.push(type)
   }
-  sql += ' ORDER BY due_date ASC, created_at DESC LIMIT ? OFFSET ?'
+  sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
   args.push(limit, offset)
   const result = await db.execute({ sql, args })
   return result.rows.map(rowToNote)
-}
-
-/**
- * 统计笔记数量，可按类型过滤。
- * @param type - 可选，笔记类型筛选
- * @returns 笔记总数
- */
-export async function getNotesCountByType(type?: NoteType): Promise<number> {
-  const db = getClient()
-  let sql = 'SELECT COUNT(*) as count FROM notes'
-  const args: InValue[] = []
-  if (type) {
-    sql += ' WHERE type = ?'
-    args.push(type)
-  }
-  const result = await db.execute({ sql, args })
-  return result.rows[0]?.count as number || 0
 }
 
 /**

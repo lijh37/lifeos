@@ -2,55 +2,48 @@ import { createClient } from '@libsql/client'
 
 let client: ReturnType<typeof createClient> | null = null
 let dbInitialized = false
-let initPromise: Promise<void> | null = null
 export let fts5Available: boolean | undefined
 
 /**
- * 获取数据库客户端实例（单例），优先使用 Turso 远程数据库，否则回退到本地 SQLite 文件。
- * 首次调用时自动触发一次 DB 初始化（建表、索引等），后续跳过。
- * 调用方无需再手动执行 initDB()。
+ * 获取数据库客户端实例（单例）：
+ * - 生产/开发：TURSO_DATABASE_URL → Turso 远程数据库
+ * - 测试：DATABASE_URL=:memory: → 内存 SQLite
+ * 首次调用时自动触发一次 DB 初始化，后续跳过。
+ * 未配置环境变量时抛出明确错误。
  */
 export function getClient() {
-  if (client) {
-    if (!initPromise && !dbInitialized) {
-      initPromise = initDB()
-    }
-    return client
-  }
+  if (client) return client
+
   const tursoUrl = process.env.TURSO_DATABASE_URL
-  const url = tursoUrl || process.env.DATABASE_URL || 'file:./data/life.db'
+  const fallbackUrl = process.env.DATABASE_URL
+  const url = tursoUrl || fallbackUrl
+  if (!url) {
+    throw new Error(
+      'Database not configured. Set TURSO_DATABASE_URL (Turso remote) or DATABASE_URL (local/CI).'
+    )
+  }
   const authToken = process.env.TURSO_AUTH_TOKEN
   client = tursoUrl
     ? createClient({ url: tursoUrl, authToken })
     : createClient({ url })
-  // 每个冷实例仅一次：后台初始化（Turso 跳过 DDL，本地 SQLite 建表）
-  initPromise = initDB()
+  initDB()
   return client
 }
 
 /**
- * 等待 DB 初始化完成。极少需要显式调用 —— getClient() 已自动触发初始化。
- * 测试和极少数需要确保初始化完毕的场景使用。
- */
-export async function ensureDB(): Promise<void> {
-  if (dbInitialized) return
-  if (initPromise) await initPromise
-  else initPromise = initDB()
-  await initPromise
-}
-
-/**
- * 初始化数据库：创建所有必要的表和索引，包括 notes、chat_messages、conversations、budgets、
- * attachments、habits、habit_completions，以及 FTS5 全文索引和规范化标签表。
- * 首次调用后自动跳过重复初始化。
+ * 初始化数据库（仅首次调用生效）：
+ * - Turso 模式：表结构已在云端存在，标记 FTS5 可用后跳过 DDL
+ * - 本地 / :memory: 模式：自动建表、索引、FTS5、标签表
  */
 export async function initDB() {
   if (dbInitialized) return
-  // Turso: 云端数据库表已存在，跳过 DDL 和迁移，避免冷启动时 ~20 次网络往返
+  dbInitialized = true
+
   if (process.env.TURSO_DATABASE_URL) {
-    dbInitialized = true
+    fts5Available = true
     return
   }
+
   const db = getClient()
   await db.execute(`
     CREATE TABLE IF NOT EXISTS notes (
@@ -61,6 +54,7 @@ export async function initDB() {
       tags TEXT DEFAULT '[]',
       due_date TEXT,
       done INTEGER DEFAULT 0,
+      pinned INTEGER DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )
@@ -82,15 +76,6 @@ export async function initDB() {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )
-  `)
-  await db.execute(`
-    CREATE INDEX IF NOT EXISTS idx_notes_type ON notes(type)
-  `)
-  await db.execute(`
-    CREATE INDEX IF NOT EXISTS idx_notes_created ON notes(created_at)
-  `)
-  await db.execute(`
-    CREATE INDEX IF NOT EXISTS idx_notes_due_date ON notes(due_date)
   `)
   await db.execute(`
     CREATE TABLE IF NOT EXISTS budgets (
@@ -120,9 +105,6 @@ export async function initDB() {
     )
   `)
   await db.execute(`
-    CREATE INDEX IF NOT EXISTS idx_attachments_note ON attachments(note_id)
-  `)
-  await db.execute(`
     CREATE TABLE IF NOT EXISTS habits (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -141,35 +123,33 @@ export async function initDB() {
     )
   `)
   await db.execute(`
-    CREATE INDEX IF NOT EXISTS idx_habit_completions_habit ON habit_completions(habit_id)
+    CREATE TABLE IF NOT EXISTS tags (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL
+    )
   `)
   await db.execute(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_habit_completions_unique ON habit_completions(habit_id, date)
+    CREATE TABLE IF NOT EXISTS note_tags (
+      note_id TEXT NOT NULL,
+      tag_id TEXT NOT NULL,
+      PRIMARY KEY (note_id, tag_id)
+    )
   `)
-  await db.execute(`
-    CREATE INDEX IF NOT EXISTS idx_notes_search ON notes(content, title)
-  `)
-  try {
-    await db.execute(`CREATE INDEX IF NOT EXISTS idx_notes_type_due ON notes(type, due_date)`)
-  } catch { /* index may already exist */ }
-  try {
-    await db.execute(`CREATE INDEX IF NOT EXISTS idx_notes_done ON notes(type, done)`)
-  } catch { /* index may already exist */ }
-  try {
-    await db.execute(`CREATE INDEX IF NOT EXISTS idx_chat_messages_conv ON chat_messages(conversation_id, created_at)`)
-  } catch { /* index may already exist */ }
 
-  try {
-    await db.execute(`ALTER TABLE chat_messages ADD COLUMN conversation_id TEXT`)
-  } catch { /* column may already exist */ }
-  try {
-    await db.execute(`ALTER TABLE notes ADD COLUMN pinned INTEGER DEFAULT 0`)
-  } catch { /* column may already exist */ }
-
-  // Composite index supporting cursor pagination (pinned DESC, created_at DESC)
-  try {
-    await db.execute(`CREATE INDEX IF NOT EXISTS idx_notes_pinned_created ON notes(pinned, created_at)`)
-  } catch { /* index may already exist */ }
+  // Indexes
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_notes_type ON notes(type)`)
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_notes_created ON notes(created_at)`)
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_notes_due_date ON notes(due_date)`)
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_notes_search ON notes(content, title)`)
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_notes_pinned_created ON notes(pinned, created_at)`)
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_notes_type_due ON notes(type, due_date)`)
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_notes_done ON notes(type, done)`)
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_attachments_note ON attachments(note_id)`)
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_habit_completions_habit ON habit_completions(habit_id)`)
+  await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_habit_completions_unique ON habit_completions(habit_id, date)`)
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_chat_messages_conv ON chat_messages(conversation_id, created_at)`)
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_note_tags_tag ON note_tags(tag_id)`)
 
   // FTS5 full-text search (graceful fallback if not available)
   try {
@@ -200,40 +180,4 @@ export async function initDB() {
     `)
     fts5Available = true
   } catch { console.warn('[fts5] 全文索引不可用，回退到 LIKE 搜索'); fts5Available = false }
-
-  // Normalized tags tables
-  try {
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS tags (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL UNIQUE,
-        created_at TEXT NOT NULL
-      )
-    `)
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS note_tags (
-        note_id TEXT NOT NULL,
-        tag_id TEXT NOT NULL,
-        PRIMARY KEY (note_id, tag_id)
-      )
-    `)
-    await db.execute(`
-      CREATE INDEX IF NOT EXISTS idx_note_tags_tag ON note_tags(tag_id)
-    `)
-  } catch { /* tables may already exist */ }
-
-  // Migrate existing JSON tags to normalized tables
-  try {
-    const migrationCheck = await db.execute('SELECT COUNT(*) as count FROM tags')
-    if ((migrationCheck.rows[0]?.count as number) === 0) {
-      const { syncNoteTags } = await import('./tags')
-      const existingNotes = await db.execute('SELECT id, tags FROM notes')
-      for (const row of existingNotes.rows) {
-        const noteTags = JSON.parse(row.tags as string) as string[]
-        await syncNoteTags(row.id as string, noteTags)
-      }
-    }
-  } catch { /* migration not needed */ }
-
-  dbInitialized = true
 }

@@ -193,7 +193,7 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">数据库</span>
-                  <span>SQLite / Turso</span>
+                  <span>Turso（云端）</span>
                 </div>
               </div>
             </CardContent>

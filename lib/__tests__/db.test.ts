@@ -1,8 +1,9 @@
-// IMPORTANT: Set env BEFORE importing db
+// IMPORTANT: Clear Turso env + set :memory: BEFORE importing db
+delete process.env.TURSO_DATABASE_URL
 process.env.DATABASE_URL = ':memory:'
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
-import { initDB, createNote, getNotes, getNote, updateNote, deleteNote, getNotesCountByType } from '@/lib/db'
+import { initDB, createNote, getNotes, getNote, updateNote, deleteNote } from '@/lib/db'
 import type { Note } from '@/lib/types'
 
 function makeNote(overrides: Partial<Note> = {}): Note {
@@ -80,13 +81,6 @@ describe('Database - Notes', () => {
     const notes = await getNotes('note')
     expect(notes.length).toBeGreaterThanOrEqual(2)
     expect(notes[0].type).toBe('note')
-  })
-
-  it('should return counts by type', async () => {
-    await createNote(makeNote({ type: 'note' }))
-
-    const count = await getNotesCountByType('note')
-    expect(count).toBeGreaterThanOrEqual(1)
   })
 
   it('should handle tags as JSON array', async () => {

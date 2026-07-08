@@ -8,7 +8,7 @@
 - **语言**: TypeScript
 - **UI**: Tailwind CSS + shadcn/ui
 - **AI**: DeepSeek API (OpenAI 兼容接口)
-- **数据库**: SQLite (本地) / Turso (云端同步)
+- **数据库**: Turso (云端，基于 libSQL)
 - **状态管理**: Zustand
 - **日期处理**: date-fns v4
 - **图标**: lucide-react
@@ -68,7 +68,7 @@ bash scripts/tunnel.sh
 - [x] AI 对话查询 — 自然语言提问，AI 搜索笔记/习惯/预算数据并回复
 - [x] 笔记管理 — 按标签筛选、关键词搜索、标记完成、删除
 - [x] 批量操作 — 多选笔记 → 批量删除/改标签
-- [x] 拖拽排序 — 笔记卡片拖拽重排
+- [x] 笔记置顶 — 重要笔记置顶优先展示
 - [x] 预算管理 — 月度预算规划（固定/浮动支出），实际录入对比，超支/结余分析
 - [x] 习惯养成 — 每日打卡，连续天数 streak，7 天趋势图
 - [x] 聊天持久化 — 对话多会话管理，自动保存，刷新恢复
@@ -90,7 +90,7 @@ bash scripts/tunnel.sh
 - [x] 密码保护 — proxy.ts 中间件 + /login 页面
 - [x] API 鉴权 — Cookie / Bearer Token 双模式
 - [x] 速率限制 — /api/chat 20 req/min/IP
-- [x] XSS 防护 — DOMPurify 显式白名单配置
+- [x] XSS 防护 — rehype-sanitize Markdown 净化
 
 ### 规划中
 
@@ -113,14 +113,14 @@ opencode-demo/
 ├── components/
 │   ├── ui/                # shadcn 组件
 │   ├── chat.tsx           # AI 对话组件
-│   ├── note-list.tsx      # 笔记列表（批量操作+拖拽排序+搜索）
+│   ├── note-list.tsx      # 笔记列表（批量操作+置顶+搜索+无限滚动）
 │   ├── markdown-editor.tsx # Markdown 编辑器（分栏编辑+工具栏+自动保存）
 │   ├── sidebar.tsx        # 导航组件（PC 侧栏 + 手机底部栏）
 │   ├── skeleton-card.tsx  # 骨架屏（3 种变体）
 │   ├── error-boundary.tsx # Error Boundary
 │   └── ...                # 其他组件
 ├── lib/
-│   ├── db.ts              # 数据库操作
+│   ├── db/                # 数据库模块（模块化，通过 index.ts 重导出）
 │   ├── types.ts           # TypeScript 类型
 │   ├── prompts.ts         # AI 系统提示词
 │   ├── rate-limiter.ts    # 限流器
@@ -129,7 +129,7 @@ opencode-demo/
 ├── scripts/               # 工具脚本
 ├── e2e/                   # Playwright E2E 测试
 ├── proxy.ts               # Next.js 16 中间件（密码保护）
-├── data/                  # 本地 SQLite 数据目录（gitignored）
+├── data/                  # 本地数据目录（gitignored，当前使用 Turso 远程库）
 └── vercel.json            # 部署配置
 ```
 
@@ -169,7 +169,7 @@ git push origin main
 | `TURSO_AUTH_TOKEN` | Turso 认证 Token |
 | `APP_PASSWORD` | 登录密码（默认 `demo`） |
 
-本地开发使用 SQLite（`data/life.db`），设置 `TURSO_DATABASE_URL` 时自动切换到 Turso 云数据库。
+项目使用 Turso 远程数据库，通过 `TURSO_DATABASE_URL` 和 `TURSO_AUTH_TOKEN` 环境变量连接。不再使用本地 SQLite。
 
 ## WSL2 提示
 
