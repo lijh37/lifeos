@@ -86,32 +86,28 @@ export function NoteList() {
   }, [activeTag, cursor, setInitialLoading, setLoadingMore, setNotes, appendNotes, setCursor, setHasMore])
 
   const scrollRef = useRef<HTMLDivElement>(null)
-  const sentinelRef = useRef<HTMLDivElement>(null)
 
-  // Auto-load more when sentinel enters the 400px trigger zone below viewport.
-  // The effect lifecycle naturally prevents cascade: loadingMore disconnects the
-  // observer, and after content grows the sentinel is pushed below the trigger zone.
+  // Scroll-based infinite scroll: auto-load when within 400px of bottom.
+  // Reliable with Base UI ScrollArea since onScroll fires natively on the Viewport.
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el || loadingMore || !hasMore || initialLoading || searchQuery) return
+    const { scrollHeight, scrollTop, clientHeight } = el
+    if (scrollHeight - scrollTop - clientHeight < 400) {
+      fetchNotes(true)
+    }
+  }, [loadingMore, hasMore, initialLoading, fetchNotes, searchQuery])
+
+  // Auto-fill: after a load completes, if content still doesn't fill the viewport,
+  // keep loading more. This handles the case where there are too few/short notes.
+  // The cascade stops naturally when the viewport is filled or hasMore is false.
   useEffect(() => {
-    const sentinel = sentinelRef.current
-    const viewport = scrollRef.current
-    if (!sentinel || !viewport || loadingMore || !hasMore || initialLoading) return
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && hasMore && !loadingMore && !initialLoading) {
-          fetchNotes(true)
-        }
-      },
-      {
-        root: viewport,
-        rootMargin: '0px 0px 400px 0px',
-        threshold: 0,
-      },
-    )
-
-    observer.observe(sentinel)
-    return () => observer.disconnect()
-  }, [hasMore, loadingMore, initialLoading, fetchNotes])
+    if (loadingMore || !hasMore || initialLoading || searchQuery) return
+    const el = scrollRef.current
+    if (el && el.scrollHeight - el.clientHeight < 400) {
+      fetchNotes(true)
+    }
+  }, [loadingMore, hasMore, initialLoading, searchQuery, fetchNotes])
 
   useEffect(() => {
     // If we have cached notes from a previous session, show them immediately
@@ -391,7 +387,7 @@ export function NoteList() {
         ))}
       </div>
 
-      <ScrollArea ref={scrollRef} className="flex-1 p-4 pb-20">
+      <ScrollArea ref={scrollRef} onScroll={handleScroll} className="flex-1 p-4 pb-20">
         {initialLoading && notes.length === 0 ? (
           <SkeletonNoteList count={5} />
         ) : displayNotes.length === 0 ? (
@@ -460,8 +456,8 @@ export function NoteList() {
                 </Button>
               </div>
             )}
-            {/* Sentinel for IntersectionObserver — always rendered so observer never loses target */}
-            <div ref={sentinelRef} className="h-px" />
+            {/* Bottom spacer for mobile nav clearance */}
+            <div className="h-20" />
           </>
         )}
       </ScrollArea>
