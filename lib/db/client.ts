@@ -23,7 +23,7 @@ export function getClient() {
   client = tursoUrl
     ? createClient({ url: tursoUrl, authToken })
     : createClient({ url })
-  // 每个冷实例仅一次：后台初始化（Turso 表已存在，本地 SQLite 也很快）
+  // 每个冷实例仅一次：后台初始化（Turso 跳过 DDL，本地 SQLite 建表）
   initPromise = initDB()
   return client
 }
@@ -46,6 +46,11 @@ export async function ensureDB(): Promise<void> {
  */
 export async function initDB() {
   if (dbInitialized) return
+  // Turso: 云端数据库表已存在，跳过 DDL 和迁移，避免冷启动时 ~20 次网络往返
+  if (process.env.TURSO_DATABASE_URL) {
+    dbInitialized = true
+    return
+  }
   const db = getClient()
   await db.execute(`
     CREATE TABLE IF NOT EXISTS notes (
