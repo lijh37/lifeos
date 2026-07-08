@@ -85,12 +85,8 @@ export function NoteList() {
   }, [activeTag, cursor, setInitialLoading, setLoadingMore, setNotes, appendNotes, setCursor, setHasMore])
 
   const scrollRef = useRef<HTMLDivElement>(null)
-  const sentinelRef = useRef<HTMLDivElement>(null)
 
-  // Use refs for values the observer reads — avoids observer recreation on
-  // every fetch cycle, which was causing cascade loads (sentinel in view →
-  // fetch → loading flags toggle → effect re-runs → observer reconnects →
-  // sentinelTriggered resets → sentinel still visible → triggers again).
+  // Refs for values the scroll handler reads — avoids re-creating the listener.
   const loadingMoreRef = useRef(loadingMore)
   loadingMoreRef.current = loadingMore
   const initialLoadingRef = useRef(initialLoading)
@@ -99,41 +95,31 @@ export function NoteList() {
   hasMoreRef.current = hasMore
   const fetchNotesRef = useRef(fetchNotes)
   fetchNotesRef.current = fetchNotes
-  const sentinelTriggered = useRef(false)
+  const scrollTriggered = useRef(false)
 
-  // Re-create observer when sentinel element appears/disappears (notes transitions
-  // from empty to populated, or tag switches). Reactive flags use refs inside the
-  // callback so the observer stays stable across fetch cycles — no cascade.
-  const observerKey = notes.length > 0
+  // Scroll-based infinite load: listen on the native-scrolling Viewport.
+  // Triggers when the user scrolls within 600px of the bottom.
+  // Does NOT fire on mount — only on actual user scroll.
   useEffect(() => {
-    const sentinel = sentinelRef.current
     const viewport = scrollRef.current
-    if (!sentinel || !viewport) return
-    if (typeof IntersectionObserver === 'undefined') return
+    if (!viewport) return
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          if (!sentinelTriggered.current && hasMoreRef.current && !loadingMoreRef.current && !initialLoadingRef.current) {
-            sentinelTriggered.current = true
-            fetchNotesRef.current(true)
-          }
-        } else {
-          // Sentinel went out of view (user scrolled up or content grew).
-          // Reset so the next scroll-in triggers a load.
-          sentinelTriggered.current = false
+    const onScroll = () => {
+      if (loadingMoreRef.current || !hasMoreRef.current || initialLoadingRef.current) return
+      const { scrollTop, scrollHeight, clientHeight } = viewport
+      if (scrollHeight - scrollTop - clientHeight < 600) {
+        if (!scrollTriggered.current) {
+          scrollTriggered.current = true
+          fetchNotesRef.current(true)
         }
-      },
-      {
-        root: viewport,
-        rootMargin: '0px 0px 400px 0px',
-        threshold: 0,
-      },
-    )
+      } else {
+        scrollTriggered.current = false
+      }
+    }
 
-    observer.observe(sentinel)
-    return () => observer.disconnect()
-  }, [observerKey])
+    viewport.addEventListener('scroll', onScroll, { passive: true })
+    return () => viewport.removeEventListener('scroll', onScroll)
+  }, [])
 
   useEffect(() => {
     // If we have cached notes from a previous session, show them immediately
@@ -468,8 +454,7 @@ export function NoteList() {
                 />)}
               </div>
             )}
-            {/* Sentinel for IntersectionObserver — always rendered so observer never loses target */}
-            <div ref={sentinelRef} className="h-px" />
+
           </>
         )}
       </ScrollArea>
