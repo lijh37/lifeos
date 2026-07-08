@@ -34,7 +34,7 @@ const SCROLL_POSITION_KEY = 'note_list_scroll'
 
 export function NoteList() {
   const router = useRouter()
-  const { notes, setNotes, initialLoading, loadingMore, setInitialLoading, setLoadingMore, removeNote, updateNote, cursor, hasMore, setCursor, setHasMore, appendNotes } = useAppStore()
+  const { notes, setNotes, initialLoading, setInitialLoading, removeNote, updateNote } = useAppStore()
   const [mounted, setMounted] = useState(false)
   // Wait for ScrollArea to mount so VirtualNoteList gets a valid scrollRef
   useLayoutEffect(() => { setMounted(true) }, [])
@@ -50,70 +50,24 @@ export function NoteList() {
   const activeTagRef = useRef<string | null>(null)
   activeTagRef.current = activeTag
 
-  const fetchNotes = useCallback(async (loadMore = false) => {
-    if (loadMore) {
-      setLoadingMore(true)
-    } else {
-      setInitialLoading(true)
-    }
+  const fetchNotes = useCallback(async () => {
+    setInitialLoading(true)
     try {
       const params = new URLSearchParams()
-      params.set('limit', '20')
+      params.set('limit', '500')
       params.set('summary', 'true')
       if (activeTag) params.set('tag', activeTag)
-      if (loadMore && cursor) {
-        params.set('cursor', cursor)
-      }
       const res = await fetch(`/api/notes?${params}`)
       const data = await res.json()
-      if (loadMore) {
-        appendNotes(data.notes)
-      } else {
-        setNotes(data.notes)
-      }
-      setCursor(data.nextCursor || null)
-      setHasMore(!!data.nextCursor)
+      setNotes(data.notes)
     } catch (e) {
       console.error('Failed to fetch notes:', e)
     } finally {
-      if (loadMore) {
-        setLoadingMore(false)
-      } else {
-        setInitialLoading(false)
-      }
+      setInitialLoading(false)
     }
-  }, [activeTag, cursor, setInitialLoading, setLoadingMore, setNotes, appendNotes, setCursor, setHasMore])
+  }, [activeTag, setInitialLoading, setNotes])
 
   const scrollRef = useRef<HTMLDivElement>(null)
-  // Synchronous guard — no need to wait for re-render.
-  const scrollLoadingRef = useRef(false)
-  const hasMoreRef = useRef(hasMore)
-  hasMoreRef.current = hasMore
-  const fetchNotesRef = useRef(fetchNotes)
-  fetchNotesRef.current = fetchNotes
-
-  // Scroll-based infinite load: listen on the native-scrolling Viewport.
-  // Triggers when the user scrolls within 600px of the bottom.
-  // Guard uses a plain ref (sync, no re-render delay) to prevent cascade.
-  useEffect(() => {
-    const viewport = scrollRef.current
-    if (!viewport) return
-
-    const onScroll = () => {
-      if (scrollLoadingRef.current || !hasMoreRef.current) return
-      const { scrollTop, scrollHeight, clientHeight } = viewport
-      if (scrollHeight - scrollTop - clientHeight < 600) {
-        scrollLoadingRef.current = true
-        // Reset guard when fetch completes (success or fail).
-        fetchNotesRef.current(true).finally(() => {
-          scrollLoadingRef.current = false
-        })
-      }
-    }
-
-    viewport.addEventListener('scroll', onScroll, { passive: true })
-    return () => viewport.removeEventListener('scroll', onScroll)
-  }, [])
 
   useEffect(() => {
     // If we have cached notes from a previous session, show them immediately
@@ -213,16 +167,14 @@ export function NoteList() {
     setSearchQuery('')
     setSearchResults(null)
     setNotes([])
-    setCursor(null)
-    setHasMore(true)
-  }, [activeTag, setNotes, setCursor, setHasMore])
+  }, [activeTag, setNotes])
 
   const displayNotes = searchResults ?? notes
 
   // Restore scroll position after data is ready (from cache or fresh fetch)
   const scrollRestored = useRef(false)
   useEffect(() => {
-    if (!initialLoading && !loadingMore && displayNotes.length > 0 && !scrollRestored.current) {
+    if (!initialLoading && displayNotes.length > 0 && !scrollRestored.current) {
       const savedScroll = sessionStorage.getItem(SCROLL_POSITION_KEY)
       if (savedScroll !== null) {
         requestAnimationFrame(() => {
@@ -234,7 +186,7 @@ export function NoteList() {
       }
       scrollRestored.current = true
     }
-  }, [initialLoading, loadingMore, displayNotes.length])
+  }, [initialLoading, displayNotes.length])
 
   // Fetch available tags for the filter bar
   useEffect(() => {
@@ -322,12 +274,6 @@ export function NoteList() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pinned: newPinned }),
       })
-      // Reset pagination cursor — the sorted list changed the pinned order,
-      // so the old cursor no longer reflects correct server-side sort position.
-      // Next scroll-triggered loadMore will fetch from the beginning, and dedup
-      // in appendNotes prevents any duplicates.
-      setCursor(null)
-      setHasMore(true)
       toast.success(newPinned ? '已置顶' : '已取消置顶')
     } catch (e) {
       console.error('Failed to toggle pin:', e)
