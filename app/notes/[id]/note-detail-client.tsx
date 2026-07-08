@@ -23,6 +23,7 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
   const router = useRouter()
   const [note, setNote] = useState<Note>(initialNote)
   const [title, setTitle] = useState(initialNote.title || '')
+  const [contentLoading, setContentLoading] = useState(!initialNote.content)
   const [tagInput, setTagInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
@@ -33,7 +34,26 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
   useEffect(() => {
     setNote(initialNote)
     setTitle(initialNote.title || '')
+    if (!initialNote.content) {
+      setContentLoading(true)
+    }
   }, [initialNote.id, initialNote.title])
+
+  // Fetch full note content (RSC only sends metadata — content is lazy-loaded)
+  useEffect(() => {
+    if (!initialNote.content) {
+      setContentLoading(true)
+      fetch(`/api/notes/${initialNote.id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.note) {
+            setNote(prev => ({ ...prev, content: data.note.content }))
+          }
+          setContentLoading(false)
+        })
+        .catch(() => setContentLoading(false))
+    }
+  }, [initialNote.id])
 
   // Ensure note is in the list cache so back navigation shows it without a refresh
   useEffect(() => {
@@ -196,13 +216,21 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
       </header>
 
       {/* Editor area - fills remaining space */}
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 relative">
         <MarkdownEditor
           key={note.id}
           content={note.content}
           onSave={handleSaveContent}
           placeholder="开始写笔记..."
         />
+        {contentLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/60 z-10">
+            <span className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              加载内容…
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Tags bar */}

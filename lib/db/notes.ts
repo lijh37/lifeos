@@ -225,6 +225,22 @@ export async function getNote(id: string): Promise<Note | null> {
 }
 
 /**
+ * 根据 ID 获取笔记元数据（不含 content 字段），用于列表预览等轻量场景。
+ * 避免大正文笔记在 RSC 中传输整个 content。
+ * @param id - 笔记 ID
+ * @returns 笔记对象（content 为空字符串），未找到时返回 null
+ */
+export async function getNoteMeta(id: string): Promise<Note | null> {
+  const db = getClient()
+  const result = await db.execute({
+    sql: `SELECT id, title, type, tags, done, pinned, created_at, updated_at, due_date FROM notes WHERE id = ?`,
+    args: [id],
+  })
+  if (result.rows.length === 0) return null
+  return rowToNote(result.rows[0])
+}
+
+/**
  * 按关键词搜索笔记，优先使用 FTS5 全文索引，失败时回退到 LIKE 模糊匹配。
  * 支持标题和内容搜索，返回最多 50 条结果。
  * @param query - 搜索关键词
