@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Bold,
   Heading2,
@@ -12,12 +12,8 @@ import {
   Edit3,
   Columns2,
 } from 'lucide-react'
+import { MarkdownRenderer } from '@/lib/markdown'
 import { cn } from '@/lib/utils'
-
-/** Lazy-loaded Markdown preview to avoid blocking initial render with react-markdown parsing */
-const MarkdownPreview = lazy(() =>
-  import('@/lib/markdown').then((m) => ({ default: m.MarkdownRenderer }))
-)
 
 interface MarkdownEditorProps {
   content: string
@@ -221,15 +217,13 @@ export function MarkdownEditor({ content: initialContent, onSave, placeholder = 
             'flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 min-w-0',
             viewMode === 'edit' && 'hidden',
           )}>
-            <Suspense fallback={<div className="flex items-center justify-center h-full"><p className="text-sm text-muted-foreground/50">预览加载中…</p></div>}>
               {content ? (
-                <MarkdownPreview content={content} />
+                <MarkdownRenderer content={content} />
               ) : (
                 <div className="flex items-center justify-center h-full">
                   <p className="text-sm text-muted-foreground/50">预览区域</p>
                 </div>
               )}
-            </Suspense>
           </div>
         </div>
       </div>
@@ -279,13 +273,11 @@ export function MarkdownEditor({ content: initialContent, onSave, placeholder = 
       <div className="flex min-h-0 flex-1">
           {showingPreview ? (
           <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 min-w-0">
-            <Suspense fallback={<p className="text-sm text-muted-foreground/50">预览加载中…</p>}>
               {content ? (
-                <MarkdownPreview content={content} />
+                <MarkdownRenderer content={content} />
               ) : (
                 <p className="text-sm text-muted-foreground">预览</p>
               )}
-            </Suspense>
           </div>
         ) : (
           <textarea
