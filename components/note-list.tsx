@@ -86,47 +86,60 @@ export function NoteList() {
   }, [activeTag, cursor, setInitialLoading, setLoadingMore, setNotes, appendNotes, setCursor, setHasMore])
 
   const scrollRef = useRef<HTMLDivElement>(null)
-  // Refs keep the scroll listener stable across load cycles while reading the
-  // latest state, avoiding disconnect/reconnect cascade.
-  const loadingMoreRef = useRef(false)
-  const hasMoreRef = useRef(false)
-  loadingMoreRef.current = loadingMore
-  hasMoreRef.current = hasMore
+  const sentinelRef = useRef<HTMLDivElement>(null)
 
-  // Native DOM scroll + wheel listeners on the Viewport, because Base UI's
-  // React onScroll prop may not fire reliably with its custom scrollbar.
-  // Uses refs for loadingMore/hasMore to avoid stale closures.
+  // Track sentinel visibility transitions to prevent cascade: only trigger
+  // when sentinel goes from NOT visible → visible (skips initial observation
+  // and re-entry after content grows).
+  const sentinelTriggered = useRef(false)
+  // Limit auto-fill to 2 pages so content doesn't cascade all at once.
+  const autoFillCount = useRef(0)
+
   useEffect(() => {
-    const el = scrollRef.current
-    if (!el || !hasMore || initialLoading || searchQuery) return
+    const sentinel = sentinelRef.current
+    const viewport = scrollRef.current
+    if (!sentinel || !viewport || loadingMore || !hasMore || initialLoading) return
 
-    const checkAndLoad = () => {
-      if (loadingMoreRef.current || !hasMoreRef.current || initialLoading || searchQuery) return
-      const { scrollHeight, scrollTop, clientHeight } = el
-      if (scrollHeight - scrollTop - clientHeight < 400) {
-        fetchNotes(true)
-      }
-    }
+    // Reset transition tracker for the new observer cycle — this is the key fix
+    // that prevents wasSentinelVisible getting stuck at true across load cycles.
+    sentinelTriggered.current = false
 
-    el.addEventListener('scroll', checkAndLoad, { passive: true })
-    el.addEventListener('wheel', checkAndLoad, { passive: true })
-    return () => {
-      el.removeEventListener('scroll', checkAndLoad)
-      el.removeEventListener('wheel', checkAndLoad)
-    }
-    // loadingMore intentionally omitted — ref is used instead to keep the
-    // listener stable across load cycles (no disconnect/reconnect cascade).
-  }, [hasMore, initialLoading, fetchNotes, searchQuery])
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          if (!sentinelTriggered.current && hasMore && !loadingMore && !initialLoading) {
+            sentinelTriggered.current = true
+            autoFillCount.current++
+            fetchNotes(true)
+          }
+        } else {
+          // Sentinel went out of view (user scrolled up or content grew).
+          // Reset both counters so the next scroll-in triggers a load.
+          sentinelTriggered.current = false
+          autoFillCount.current = 0
+        }
+      },
+      {
+        root: viewport,
+        rootMargin: '0px 0px 400px 0px',
+        threshold: 0,
+      },
+    )
 
-  // One-shot auto-fill: after initial load, if content doesn't fill the viewport,
-  // load one more page automatically. Prevents an empty-looking page while
-  // avoiding cascading (runs exactly once per note-list mount).
-  const didFillCheck = useRef(false)
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, loadingMore, initialLoading, fetchNotes])
+
+  // Auto-fill: after initial load, if content doesn't fill the viewport,
+  // load up to 2 pages automatically. Stops when the viewport is filled,
+  // hasMore is false, or the page limit is reached.
   useEffect(() => {
-    if (initialLoading || loadingMore || !hasMore || searchQuery || didFillCheck.current) return
-    const el = scrollRef.current
-    if (el && el.scrollHeight - el.clientHeight < 400) {
-      didFillCheck.current = true
+    if (initialLoading || loadingMore || !hasMore || searchQuery) return
+    const sentinel = sentinelRef.current
+    const viewport = scrollRef.current
+    if (!sentinel || !viewport) return
+    if (viewport.scrollHeight - viewport.clientHeight < 400 && autoFillCount.current < 2) {
+      autoFillCount.current++
       fetchNotes(true)
     }
   }, [initialLoading, loadingMore, hasMore, searchQuery, fetchNotes])
@@ -478,8 +491,8 @@ export function NoteList() {
                 </Button>
               </div>
             )}
-            {/* Bottom spacer for mobile nav clearance */}
-            <div className="h-20" />
+            {/* Sentinel for IntersectionObserver — always rendered so observer never loses target */}
+            <div ref={sentinelRef} className="h-px" />
           </>
         )}
       </ScrollArea>
