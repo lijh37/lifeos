@@ -20,7 +20,6 @@ import {
   Pin,
   PinOff,
   Loader2,
-  ChevronDown,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { ExportButton } from '@/components/export-button'
@@ -92,8 +91,6 @@ export function NoteList() {
   // when sentinel goes from NOT visible → visible (skips initial observation
   // and re-entry after content grows).
   const sentinelTriggered = useRef(false)
-  // Limit auto-fill to 2 pages so content doesn't cascade all at once.
-  const autoFillCount = useRef(0)
 
   useEffect(() => {
     const sentinel = sentinelRef.current
@@ -109,14 +106,12 @@ export function NoteList() {
         if (entry.isIntersecting) {
           if (!sentinelTriggered.current && hasMore && !loadingMore && !initialLoading) {
             sentinelTriggered.current = true
-            autoFillCount.current++
             fetchNotes(true)
           }
         } else {
           // Sentinel went out of view (user scrolled up or content grew).
-          // Reset both counters so the next scroll-in triggers a load.
+          // Reset counter so the next scroll-in triggers a load.
           sentinelTriggered.current = false
-          autoFillCount.current = 0
         }
       },
       {
@@ -129,20 +124,6 @@ export function NoteList() {
     observer.observe(sentinel)
     return () => observer.disconnect()
   }, [hasMore, loadingMore, initialLoading, fetchNotes])
-
-  // Auto-fill: after initial load, if content doesn't fill the viewport,
-  // load up to 2 pages automatically. Stops when the viewport is filled,
-  // hasMore is false, or the page limit is reached.
-  useEffect(() => {
-    if (initialLoading || loadingMore || !hasMore || searchQuery) return
-    const sentinel = sentinelRef.current
-    const viewport = scrollRef.current
-    if (!sentinel || !viewport) return
-    if (viewport.scrollHeight - viewport.clientHeight < 400 && autoFillCount.current < 2) {
-      autoFillCount.current++
-      fetchNotes(true)
-    }
-  }, [initialLoading, loadingMore, hasMore, searchQuery, fetchNotes])
 
   useEffect(() => {
     // If we have cached notes from a previous session, show them immediately
@@ -345,14 +326,18 @@ export function NoteList() {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       })
     setNotes(sorted)
-    // Don't reset cursor/hasMore — that would trigger the IntersectionObserver
-    // to re-fetch page 1 via loadMore, creating duplicate entries.
     try {
       await fetch(`/api/notes/${note.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pinned: newPinned }),
       })
+      // Reset pagination cursor — the sorted list changed the pinned order,
+      // so the old cursor no longer reflects correct server-side sort position.
+      // Next scroll-triggered loadMore will fetch from the beginning, and dedup
+      // in appendNotes prevents any duplicates.
+      setCursor(null)
+      setHasMore(true)
       toast.success(newPinned ? '已置顶' : '已取消置顶')
     } catch (e) {
       console.error('Failed to toggle pin:', e)
@@ -471,24 +456,6 @@ export function NoteList() {
                   onToggleSelect={toggleSelect}
                   onSelectTag={handleTagSelect}
                 />)}
-              </div>
-            )}
-            {hasMore && !searchQuery && (
-              <div className="flex justify-center py-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fetchNotes(true)}
-                  disabled={loadingMore}
-                  className="gap-1"
-                >
-                  {loadingMore ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
-                  {loadingMore ? '加载中…' : '加载更多'}
-                </Button>
               </div>
             )}
             {/* Sentinel for IntersectionObserver — always rendered so observer never loses target */}

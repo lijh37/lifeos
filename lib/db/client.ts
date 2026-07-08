@@ -140,6 +140,11 @@ export async function initDB() {
     await db.execute(`ALTER TABLE notes ADD COLUMN pinned INTEGER DEFAULT 0`)
   } catch { /* column may already exist */ }
 
+  // Composite index supporting cursor pagination (pinned DESC, created_at DESC)
+  try {
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_notes_pinned_created ON notes(pinned, created_at)`)
+  } catch { /* index may already exist */ }
+
   // FTS5 full-text search (graceful fallback if not available)
   try {
     await db.execute(`

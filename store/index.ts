@@ -42,9 +42,11 @@ export const useAppStore = create<AppState>((set) => ({
   })),
   setCursor: (cursor) => set({ cursor }),
   setHasMore: (hasMore) => set({ hasMore }),
-  appendNotes: (notes) => set((state) => ({
-    notes: [...state.notes, ...notes].slice(0, MAX_CACHED_NOTES),
-  })),
+  appendNotes: (notes) => set((state) => {
+    const existingIds = new Set(state.notes.map(n => n.id))
+    const newNotes = notes.filter(n => !existingIds.has(n.id))
+    return { notes: [...state.notes, ...newNotes].slice(0, MAX_CACHED_NOTES) }
+  }),
 }))
 
 // ─── UI store (shared cross-page state) ────────────────────────────────────
