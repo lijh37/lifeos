@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createNote, getNotesCursor, deleteNote, searchNotes, getNotesByDateRange, initDB } from '@/lib/db'
+import { createNote, getNotesCursor, deleteNote, searchNotes, getNotesByDateRange } from '@/lib/db'
 import type { Note } from '@/lib/types'
 
 export async function GET(req: NextRequest) {
-  await initDB()
   const { searchParams } = new URL(req.url)
   const type = searchParams.get('type')
   const q = searchParams.get('q')
@@ -44,7 +43,6 @@ function stripContent(note: Note): Note {
 }
 
 export async function POST(req: NextRequest) {
-  await initDB()
   const body = await req.json()
   const now = new Date().toISOString()
   const note: Note = {
@@ -64,7 +62,6 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  await initDB()
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })

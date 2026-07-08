@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
-import { initDB, getClient, getAllTags } from '@/lib/db'
+import { getClient, getAllTags } from '@/lib/db'
 
 function db() { return getClient() }
 
 export async function GET() {
-  await initDB()
   const c = db()
 
   const [noteCounts, budgetData, habitRate, recent, habitTrend, habitTotal] = await Promise.all([

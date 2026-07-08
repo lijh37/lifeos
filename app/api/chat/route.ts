@@ -2,7 +2,6 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { convertToModelMessages, streamText, type UIMessage } from 'ai'
 import { SYSTEM_PROMPT } from '@/lib/prompts'
 import { tools } from '@/lib/ai-tools'
-import { initDB } from '@/lib/db'
 import { chatRateLimiter } from '@/lib/rate-limiter'
 
 export const runtime = 'nodejs'
@@ -26,7 +25,6 @@ export async function POST(req: Request) {
       )
     }
 
-    await initDB()
     const body = await req.json()
     const { messages }: { messages: UIMessage[] } = body
 

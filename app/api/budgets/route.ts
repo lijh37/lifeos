@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getBudget, getBudgets, upsertBudget, initDB } from '@/lib/db'
+import { getBudget, getBudgets, upsertBudget } from '@/lib/db'
 
 export async function GET(req: NextRequest) {
-  await initDB()
   const { searchParams } = new URL(req.url)
   const month = searchParams.get('month')
   if (month) {
@@ -14,7 +13,6 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  await initDB()
   const body = await req.json()
   const { month, fixedBudget, variableBudget, fixedActual, variableActual, notes, isCompleted, savingsCompleted } = body
   if (!month) {

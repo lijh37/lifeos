@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { initDB, deleteNote, getNote, updateNote } from '@/lib/db'
+import { deleteNote, getNote, updateNote } from '@/lib/db'
 
 export async function POST(req: NextRequest) {
-  await initDB()
   const body = await req.json()
   const { action, ids, tag } = body as { action: 'delete' | 'tag'; ids: string[]; tag?: string }
 

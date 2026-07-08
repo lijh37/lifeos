@@ -2,20 +2,41 @@ import { createClient } from '@libsql/client'
 
 let client: ReturnType<typeof createClient> | null = null
 let dbInitialized = false
+let initPromise: Promise<void> | null = null
 export let fts5Available: boolean | undefined
 
 /**
  * 获取数据库客户端实例（单例），优先使用 Turso 远程数据库，否则回退到本地 SQLite 文件。
+ * 首次调用时自动触发一次 DB 初始化（建表、索引等），后续跳过。
+ * 调用方无需再手动执行 initDB()。
  */
 export function getClient() {
-  if (client) return client
+  if (client) {
+    if (!initPromise && !dbInitialized) {
+      initPromise = initDB()
+    }
+    return client
+  }
   const tursoUrl = process.env.TURSO_DATABASE_URL
   const url = tursoUrl || process.env.DATABASE_URL || 'file:./data/life.db'
   const authToken = process.env.TURSO_AUTH_TOKEN
   client = tursoUrl
     ? createClient({ url: tursoUrl, authToken })
     : createClient({ url })
+  // 每个冷实例仅一次：后台初始化（Turso 表已存在，本地 SQLite 也很快）
+  initPromise = initDB()
   return client
+}
+
+/**
+ * 等待 DB 初始化完成。极少需要显式调用 —— getClient() 已自动触发初始化。
+ * 测试和极少数需要确保初始化完毕的场景使用。
+ */
+export async function ensureDB(): Promise<void> {
+  if (dbInitialized) return
+  if (initPromise) await initPromise
+  else initPromise = initDB()
+  await initPromise
 }
 
 /**

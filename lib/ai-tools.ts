@@ -1,6 +1,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { searchNotes, searchHabits, getNotesByDateRange, getHabits, getStreaks, getBudget, initDB } from './db'
+import { searchNotes, searchHabits, getNotesByDateRange, getHabits, getStreaks, getBudget } from './db'
 
 // --- Query tools ---
 
@@ -10,7 +10,6 @@ export const searchNotesByKeyword = tool({
     query: z.string().min(1).describe('搜索关键词，如 "会议"、"跑步"、"项目"'),
   }),
   execute: async ({ query }) => {
-    await initDB()
     const results = await searchNotes(query)
     if (results.length === 0) {
       return { count: 0, results: [], summary: `未找到与 "${query}" 相关的记录。` }
@@ -36,7 +35,6 @@ export const searchHabitsByKeyword = tool({
     query: z.string().min(1).describe('搜索关键词，如 "跑步"、"读书"'),
   }),
   execute: async ({ query }) => {
-    await initDB()
     const results = await searchHabits(query)
     if (results.length === 0) {
       return { count: 0, results: [], summary: `未找到与 "${query}" 相关的习惯。` }
@@ -62,7 +60,6 @@ export const getNotesInDateRange = tool({
     type: z.enum(['note']).optional().describe('可选，过滤记录类型'),
   }),
   execute: async ({ startDate, endDate, type }) => {
-    await initDB()
     const results = await getNotesByDateRange(startDate, endDate, type)
     if (results.length === 0) {
       return { count: 0, results: [], summary: `在 ${startDate} 到 ${endDate} 之间没有找到记录。` }
@@ -86,7 +83,6 @@ export const getHabitProgress = tool({
   description: '查询所有习惯及其连续打卡天数。返回习惯列表和当前的连续打卡记录。',
   inputSchema: z.object({}),
   execute: async () => {
-    await initDB()
     const habits = await getHabits()
     const streaks = await getStreaks()
     const results = habits.map(h => ({
@@ -112,7 +108,6 @@ export const getBudgetInfo = tool({
     month: z.string().describe('月份，格式如 "2026-06"'),
   }),
   execute: async ({ month }) => {
-    await initDB()
     const budget = await getBudget(month)
     if (!budget) {
       return { exists: false, summary: `${month} 还没有设置预算。` }

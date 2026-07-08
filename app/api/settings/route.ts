@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { initDB, getNotesCount, getBudgetsCount, getHabitsCount, clearTable } from '@/lib/db'
+import { getNotesCount, getBudgetsCount, getHabitsCount, clearTable } from '@/lib/db'
 
 export async function GET() {
-  await initDB()
   const [notes, budgets, habits] = await Promise.all([
     getNotesCount(),
     getBudgetsCount(),
@@ -17,7 +16,6 @@ export async function GET() {
 }
 
 export async function DELETE(req: NextRequest) {
-  await initDB()
   const { searchParams } = new URL(req.url)
   const type = searchParams.get('type')
 

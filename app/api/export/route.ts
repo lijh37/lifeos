@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getNotes, getBudgets, initDB } from '@/lib/db'
+import { getNotes, getBudgets } from '@/lib/db'
 import type { Note, Budget } from '@/lib/types'
 
 function toBeijingTime(iso: string): string {
@@ -118,7 +118,6 @@ function toCSV(budgets: Budget[]): string {
 }
 
 export async function GET(req: NextRequest) {
-  await initDB()
   const { searchParams } = new URL(req.url)
   const type = searchParams.get('type') || 'all'
   const format = searchParams.get('format') || 'md'

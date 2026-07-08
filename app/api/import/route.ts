@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { initDB, createNote, upsertBudget } from '@/lib/db'
+import { createNote, upsertBudget } from '@/lib/db'
 import type { Note } from '@/lib/types'
 
 export async function POST(req: NextRequest) {
-  await initDB()
   let body: { notes?: unknown[]; budgets?: unknown[] }
   try {
     body = await req.json()
