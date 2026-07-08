@@ -86,17 +86,50 @@ export function NoteList() {
   }, [activeTag, cursor, setInitialLoading, setLoadingMore, setNotes, appendNotes, setCursor, setHasMore])
 
   const scrollRef = useRef<HTMLDivElement>(null)
+  // Refs keep the scroll listener stable across load cycles while reading the
+  // latest state, avoiding disconnect/reconnect cascade.
+  const loadingMoreRef = useRef(false)
+  const hasMoreRef = useRef(false)
+  loadingMoreRef.current = loadingMore
+  hasMoreRef.current = hasMore
 
-  // Scroll-based infinite scroll: auto-load when within 400px of bottom.
-  // Reliable with Base UI ScrollArea since onScroll fires natively on the Viewport.
-  const handleScroll = useCallback(() => {
+  // Native DOM scroll + wheel listeners on the Viewport, because Base UI's
+  // React onScroll prop may not fire reliably with its custom scrollbar.
+  // Uses refs for loadingMore/hasMore to avoid stale closures.
+  useEffect(() => {
     const el = scrollRef.current
-    if (!el || loadingMore || !hasMore || initialLoading || searchQuery) return
-    const { scrollHeight, scrollTop, clientHeight } = el
-    if (scrollHeight - scrollTop - clientHeight < 400) {
+    if (!el || !hasMore || initialLoading || searchQuery) return
+
+    const checkAndLoad = () => {
+      if (loadingMoreRef.current || !hasMoreRef.current || initialLoading || searchQuery) return
+      const { scrollHeight, scrollTop, clientHeight } = el
+      if (scrollHeight - scrollTop - clientHeight < 400) {
+        fetchNotes(true)
+      }
+    }
+
+    el.addEventListener('scroll', checkAndLoad, { passive: true })
+    el.addEventListener('wheel', checkAndLoad, { passive: true })
+    return () => {
+      el.removeEventListener('scroll', checkAndLoad)
+      el.removeEventListener('wheel', checkAndLoad)
+    }
+    // loadingMore intentionally omitted — ref is used instead to keep the
+    // listener stable across load cycles (no disconnect/reconnect cascade).
+  }, [hasMore, initialLoading, fetchNotes, searchQuery])
+
+  // One-shot auto-fill: after initial load, if content doesn't fill the viewport,
+  // load one more page automatically. Prevents an empty-looking page while
+  // avoiding cascading (runs exactly once per note-list mount).
+  const didFillCheck = useRef(false)
+  useEffect(() => {
+    if (initialLoading || loadingMore || !hasMore || searchQuery || didFillCheck.current) return
+    const el = scrollRef.current
+    if (el && el.scrollHeight - el.clientHeight < 400) {
+      didFillCheck.current = true
       fetchNotes(true)
     }
-  }, [loadingMore, hasMore, initialLoading, fetchNotes, searchQuery])
+  }, [initialLoading, loadingMore, hasMore, searchQuery, fetchNotes])
 
   useEffect(() => {
     // If we have cached notes from a previous session, show them immediately
@@ -376,7 +409,7 @@ export function NoteList() {
         ))}
       </div>
 
-      <ScrollArea ref={scrollRef} onScroll={handleScroll} className="flex-1 p-4 pb-20">
+      <ScrollArea ref={scrollRef} className="flex-1 p-4 pb-20">
         {initialLoading && notes.length === 0 ? (
           <SkeletonNoteList count={5} />
         ) : displayNotes.length === 0 ? (
