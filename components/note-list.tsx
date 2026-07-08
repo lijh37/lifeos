@@ -13,7 +13,6 @@ import {
   CheckSquare,
   Trash2,
   Search,
-  Pencil,
   Plus,
   Square,
   Tags,
@@ -483,24 +482,6 @@ const NoteCard = memo(function NoteCard({
             <CardTitle className="truncate text-sm font-medium" onClick={() => onEdit(note)}>
               {note.title || '无标题'}
             </CardTitle>
-          </div>
-          <div className="flex shrink-0 gap-1" onClick={(e) => e.stopPropagation()}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => onEdit(note)}
-            >
-              <Pencil className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 text-destructive"
-              onClick={() => onDelete(note.id)}
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
           </div>
         </div>
       </CardHeader>
