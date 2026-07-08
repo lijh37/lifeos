@@ -85,35 +85,29 @@ export function NoteList() {
   }, [activeTag, cursor, setInitialLoading, setLoadingMore, setNotes, appendNotes, setCursor, setHasMore])
 
   const scrollRef = useRef<HTMLDivElement>(null)
-
-  // Refs for values the scroll handler reads — avoids re-creating the listener.
-  const loadingMoreRef = useRef(loadingMore)
-  loadingMoreRef.current = loadingMore
-  const initialLoadingRef = useRef(initialLoading)
-  initialLoadingRef.current = initialLoading
+  // Synchronous guard — no need to wait for re-render.
+  const scrollLoadingRef = useRef(false)
   const hasMoreRef = useRef(hasMore)
   hasMoreRef.current = hasMore
   const fetchNotesRef = useRef(fetchNotes)
   fetchNotesRef.current = fetchNotes
-  const scrollTriggered = useRef(false)
 
   // Scroll-based infinite load: listen on the native-scrolling Viewport.
   // Triggers when the user scrolls within 600px of the bottom.
-  // Does NOT fire on mount — only on actual user scroll.
+  // Guard uses a plain ref (sync, no re-render delay) to prevent cascade.
   useEffect(() => {
     const viewport = scrollRef.current
     if (!viewport) return
 
     const onScroll = () => {
-      if (loadingMoreRef.current || !hasMoreRef.current || initialLoadingRef.current) return
+      if (scrollLoadingRef.current || !hasMoreRef.current) return
       const { scrollTop, scrollHeight, clientHeight } = viewport
       if (scrollHeight - scrollTop - clientHeight < 600) {
-        if (!scrollTriggered.current) {
-          scrollTriggered.current = true
-          fetchNotesRef.current(true)
-        }
-      } else {
-        scrollTriggered.current = false
+        scrollLoadingRef.current = true
+        // Reset guard when fetch completes (success or fail).
+        fetchNotesRef.current(true).finally(() => {
+          scrollLoadingRef.current = false
+        })
       }
     }
 
