@@ -1,5 +1,4 @@
 import {
-  Bot,
   Notebook,
   PiggyBank,
   Trophy,
@@ -18,7 +17,6 @@ export interface NavItem {
 
 /** 完整导航列表（桌面侧栏 + 手机底部栏共用） */
 export const NAV_ITEMS: NavItem[] = [
-  { href: '/', label: 'AI 查询', icon: Bot },
   { href: '/notes', label: '笔记', icon: Notebook },
   { href: '/expenses', label: '预算', icon: PiggyBank },
   { href: '/habits', label: '习惯', icon: Trophy },
@@ -27,7 +25,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/settings', label: '设置', icon: Settings },
 ]
 
-/** 手机底部栏主导航（前 5 项，包含 AI 对话入口） */
+/** 手机底部栏主导航（前 5 项） */
 export const PRIMARY_MOBILE_NAV: NavItem[] = NAV_ITEMS.slice(0, 5)
 
 /** 手机底部栏「更多」面板（剩余项） */
