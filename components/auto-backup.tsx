@@ -4,6 +4,16 @@ import { useEffect, useState, useCallback } from 'react'
 import { Download, Upload, Clock, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  AlertDialogRoot,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog'
 
 const BACKUP_KEY = 'lifeos_auto_backup'
 const BACKUP_INTERVAL = 5 * 60 * 1000
@@ -67,6 +77,7 @@ export function BackupManager() {
   const { lastBackup, performBackup } = useAutoBackup()
   const [backingUp, setBackingUp] = useState(false)
   const [restoring, setRestoring] = useState(false)
+  const [restoreOpen, setRestoreOpen] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
 
   const handleManualBackup = async () => {
@@ -84,8 +95,6 @@ export function BackupManager() {
       setTimeout(() => setStatus(null), 2000)
       return
     }
-
-    if (!confirm('恢复备份将覆盖当前数据，确定继续？')) return
 
     setRestoring(true)
     try {
@@ -120,38 +129,60 @@ export function BackupManager() {
   }
 
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <h2 className="text-sm font-medium text-muted-foreground">自动备份</h2>
-              <p className="text-xs text-muted-foreground">
-                {lastBackup
-                  ? `上次备份: ${new Date(lastBackup).toLocaleString('zh-CN')}`
-                  : '尚未备份'}
-              </p>
+    <>
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <h2 className="text-sm font-medium text-muted-foreground">自动备份</h2>
+                <p className="text-xs text-muted-foreground">
+                  {lastBackup
+                    ? `上次备份: ${new Date(lastBackup).toLocaleString('zh-CN')}`
+                    : '尚未备份'}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleManualBackup} disabled={backingUp}>
+                {backingUp ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Download className="mr-1 h-3 w-3" />}
+                备份
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setRestoreOpen(true)} disabled={restoring}>
+                {restoring ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Upload className="mr-1 h-3 w-3" />}
+                恢复
+              </Button>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleManualBackup} disabled={backingUp}>
-              {backingUp ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Download className="mr-1 h-3 w-3" />}
-              备份
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleRestore} disabled={restoring}>
-              {restoring ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Upload className="mr-1 h-3 w-3" />}
+          {status && (
+            <div className="mt-2 flex items-center gap-1 text-xs text-green-600">
+              <CheckCircle className="h-3 w-3" />
+              {status}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialogRoot open={restoreOpen} onOpenChange={setRestoreOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>恢复备份</AlertDialogTitle>
+            <AlertDialogDescription>
+              恢复备份将覆盖当前数据，确定继续？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRestore}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               恢复
-            </Button>
-          </div>
-        </div>
-        {status && (
-          <div className="mt-2 flex items-center gap-1 text-xs text-green-600">
-            <CheckCircle className="h-3 w-3" />
-            {status}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialogRoot>
+    </>
   )
 }

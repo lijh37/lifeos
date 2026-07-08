@@ -7,6 +7,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { SkeletonCard } from '@/components/skeleton-card'
+import {
+  AlertDialogRoot,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog'
 
 export default function TagsPage() {
   const [tags, setTags] = useState<{ name: string; count: number }[]>([])
@@ -14,6 +24,7 @@ export default function TagsPage() {
   const [editing, setEditing] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
 
   const fetchTags = () => {
     fetch('/api/tags')
@@ -50,7 +61,6 @@ export default function TagsPage() {
   }
 
   const handleDelete = async (name: string) => {
-    if (!confirm(`确定删除标签「${name}」？将从所有笔记中移除。`)) return
     const res = await fetch(`/api/tags?name=${encodeURIComponent(name)}`, { method: 'DELETE' })
     if (res.ok) {
       showMsg('success', `标签「${name}」已删除`)
@@ -58,6 +68,7 @@ export default function TagsPage() {
     } else {
       showMsg('error', '删除失败')
     }
+    setDeleteTarget(null)
   }
 
   return (
@@ -129,14 +140,12 @@ export default function TagsPage() {
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7 text-destructive"
-                        onClick={() => handleDelete(tag.name)}
+                      <button
+                        onClick={() => setDeleteTarget(tag.name)}
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-destructive hover:bg-destructive/10 transition-colors"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      </button>
                     </>
                   )}
                 </CardContent>
@@ -145,6 +154,24 @@ export default function TagsPage() {
           </div>
         )}
       </ScrollArea>
+
+      <AlertDialogRoot open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确定删除标签「{deleteTarget}」？</AlertDialogTitle>
+            <AlertDialogDescription>将从所有笔记中移除该标签。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && handleDelete(deleteTarget)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialogRoot>
     </div>
   )
 }

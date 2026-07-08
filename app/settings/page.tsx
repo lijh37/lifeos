@@ -7,6 +7,16 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { BackupManager } from '@/components/auto-backup'
+import {
+  AlertDialogRoot,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog'
 
 export default function SettingsPage() {
   const [stats, setStats] = useState<{
@@ -18,6 +28,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [importing, setImporting] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [clearTarget, setClearTarget] = useState<{ type: string; label: string } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const fetchStats = () => {
@@ -35,7 +46,6 @@ export default function SettingsPage() {
   }
 
   const handleClear = async (type: string, label: string) => {
-    if (!confirm(`确定清除所有${label}？此操作不可恢复。`)) return
     const res = await fetch(`/api/settings?type=${type}`, { method: 'DELETE' })
     if (res.ok) {
       showMsg('success', `${label}已清除`)
@@ -116,7 +126,7 @@ export default function SettingsPage() {
                       <Badge variant="secondary" className="text-xs">{item.count}</Badge>
                       {item.count > 0 && (
                         <button
-                          onClick={() => handleClear(item.type, item.label)}
+                          onClick={() => setClearTarget({ type: item.type, label: item.label })}
                           className="text-xs text-destructive hover:underline"
                         >
                           清除
@@ -131,7 +141,7 @@ export default function SettingsPage() {
                         variant="destructive"
                         size="sm"
                         className="ml-auto"
-                        onClick={() => handleClear('all', '全部数据')}
+                        onClick={() => setClearTarget({ type: 'all', label: '全部数据' })}
                       >
                         <Trash2 className="mr-1 h-3 w-3" />
                         清除全部
@@ -190,6 +200,32 @@ export default function SettingsPage() {
           </Card>
         </div>
       </ScrollArea>
+
+      <AlertDialogRoot
+        open={clearTarget !== null}
+        onOpenChange={(open) => { if (!open) setClearTarget(null) }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确定清除所有{clearTarget?.label}？</AlertDialogTitle>
+            <AlertDialogDescription>此操作不可恢复，数据将被永久删除。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (clearTarget) {
+                  handleClear(clearTarget.type, clearTarget.label)
+                  setClearTarget(null)
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              清除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialogRoot>
     </div>
   )
 }
