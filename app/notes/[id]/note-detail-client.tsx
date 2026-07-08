@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Trash2, Loader2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { MarkdownEditor } from '@/components/markdown-editor'
+import { AttachmentSection } from '@/components/attachment-section'
 import {
   AlertDialogRoot,
   AlertDialogContent,
@@ -204,6 +205,9 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
           placeholder="开始写笔记..."
         />
       </div>
+
+      {/* Attachment section */}
+      <AttachmentSection noteId={note.id} />
 
       {/* Tags bar */}
       <div className="flex flex-wrap items-center gap-1.5 border-t px-4 py-2 shrink-0">
