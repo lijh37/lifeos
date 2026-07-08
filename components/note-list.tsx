@@ -454,7 +454,7 @@ const NoteCard = memo(function NoteCard({
       )}
     >
       <CardHeader className="p-3 pb-0.5">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between min-w-0">
           <div className="flex items-center gap-2 min-w-0" onClick={(e) => e.stopPropagation()}>
             {onToggleSelect && (
               <button
