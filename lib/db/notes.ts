@@ -120,7 +120,10 @@ export async function getNotesCursor(type?: NoteType, limit = 50, cursor?: strin
   let sql = `SELECT ${selectColumns} FROM notes`
   const args: InValue[] = []
 
-  if (tag) {
+  const UNTAGGED = '__untagged__'
+  if (tag === UNTAGGED) {
+    sql += ' LEFT JOIN note_tags ON notes.id = note_tags.note_id'
+  } else if (tag) {
     sql += ' INNER JOIN note_tags ON notes.id = note_tags.note_id INNER JOIN tags ON note_tags.tag_id = tags.id'
   }
 
@@ -129,7 +132,9 @@ export async function getNotesCursor(type?: NoteType, limit = 50, cursor?: strin
     conditions.push('notes.type = ?')
     args.push(type)
   }
-  if (tag) {
+  if (tag === UNTAGGED) {
+    conditions.push('note_tags.note_id IS NULL')
+  } else if (tag) {
     conditions.push('tags.name = ?')
     args.push(tag.trim())
   }

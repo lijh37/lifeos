@@ -13,9 +13,13 @@ export async function GET(req: NextRequest) {
   const summary = searchParams.get('summary') === 'true'
   const tag = searchParams.get('tag')
 
+  const UNTAGGED = '__untagged__'
+
   if (q) {
     let notes = await searchNotes(q)
-    if (tag) {
+    if (tag === UNTAGGED) {
+      notes = notes.filter(n => n.tags.length === 0)
+    } else if (tag) {
       notes = notes.filter(n => n.tags.includes(tag))
     }
     return NextResponse.json({ notes: summary ? notes.map(stripContent) : notes })

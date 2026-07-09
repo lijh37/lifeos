@@ -344,7 +344,7 @@ export function NoteList() {
             className="cursor-pointer shrink-0 text-xs gap-1"
             onClick={() => handleTagSelect(t.name)}
           >
-            {t.name}
+            {t.name === '__untagged__' ? '未分类' : t.name}
             <span className="text-[10px] opacity-70">({t.count})</span>
           </Badge>
         ))}
@@ -360,7 +360,7 @@ export function NoteList() {
             ) : searchQuery ? (
               '没有找到匹配的记录'
             ) : activeTag ? (
-              <>没有标记「<span className="font-medium">{activeTag}</span>」的笔记</>
+              <>{activeTag === '__untagged__' ? '没有未分类的笔记' : <>没有标记「<span className="font-medium">{activeTag}</span>」的笔记</>}</>
             ) : (
               '还没有任何记录，点击上方 + 新建笔记'
             )}

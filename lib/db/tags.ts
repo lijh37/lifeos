@@ -35,9 +35,12 @@ export async function syncNoteTags(noteId: string, tags: string[]): Promise<void
  * 优先从规范化标签表查询，失败时回退到 JSON 字段解析。
  * @returns 标签名和对应计数对象的数组
  */
+const UNTAGGED = '__untagged__'
+
 export async function getAllTags(): Promise<{ name: string; count: number }[]> {
   const db = getClient()
   try {
+    // Get tagged note count per tag
     const result = await db.execute(`
       SELECT t.name, COUNT(nt.note_id) as count
       FROM tags t
@@ -45,23 +48,44 @@ export async function getAllTags(): Promise<{ name: string; count: number }[]> {
       GROUP BY t.id
       ORDER BY count DESC, t.name ASC
     `)
-    return result.rows.map(r => ({
+    const tags = result.rows.map(r => ({
       name: r.name as string,
       count: r.count as number,
     }))
+
+    // Get untagged note count
+    const untaggedResult = await db.execute(`
+      SELECT COUNT(*) as count FROM notes
+      WHERE id NOT IN (SELECT DISTINCT note_id FROM note_tags)
+    `)
+    const untaggedCount = untaggedResult.rows[0]?.count as number || 0
+    if (untaggedCount > 0) {
+      tags.push({ name: UNTAGGED, count: untaggedCount })
+    }
+
+    return tags
   } catch (e) {
     console.warn('[tags] 规范化标签查询失败，回退到 JSON 解析:', e)
     const result = await db.execute('SELECT tags FROM notes')
     const tagCount: Record<string, number> = {}
+    let untaggedCount = 0
     for (const row of result.rows) {
       const tags = JSON.parse(row.tags as string) as string[]
-      for (const tag of tags) {
-        if (tag) tagCount[tag] = (tagCount[tag] || 0) + 1
+      if (tags.length === 0 || tags.every(t => !t)) {
+        untaggedCount++
+      } else {
+        for (const tag of tags) {
+          if (tag) tagCount[tag] = (tagCount[tag] || 0) + 1
+        }
       }
     }
-    return Object.entries(tagCount)
+    const entries = Object.entries(tagCount)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
+    if (untaggedCount > 0) {
+      entries.push({ name: UNTAGGED, count: untaggedCount })
+    }
+    return entries
   }
 }
 
