@@ -15,6 +15,11 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { Attachment } from '@/lib/types'
 
+// ─── Constants ──────────────────────────────────────────────────────────────
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB，与服务端一致
+const UPLOAD_TIMEOUT = 60000 // 60s 超时
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatFileSize(bytes: number): string {
@@ -79,14 +84,27 @@ export function AttachmentSection({ noteId }: AttachmentSectionProps) {
     let failed = 0
 
     for (const file of fileArray) {
+      // 客户端文件大小预检
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`${file.name}: 文件超过 ${formatFileSize(MAX_FILE_SIZE)} 限制`)
+        failed++
+        continue
+      }
+
       const formData = new FormData()
       formData.append('file', file)
 
       try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT)
+
         const res = await fetch(`/api/notes/${noteId}/attachments`, {
           method: 'POST',
           body: formData,
+          signal: controller.signal,
         })
+
+        clearTimeout(timeoutId)
 
         if (res.ok) {
           const data = await res.json()
@@ -97,8 +115,12 @@ export function AttachmentSection({ noteId }: AttachmentSectionProps) {
           toast.error(`${file.name}: ${err.error}`)
           failed++
         }
-      } catch {
-        toast.error(`${file.name}: 网络错误`)
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          toast.error(`${file.name}: 上传超时，请检查网络后重试`)
+        } else {
+          toast.error(`${file.name}: 网络错误，请检查连接`)
+        }
         failed++
       }
     }

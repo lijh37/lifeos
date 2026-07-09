@@ -10,6 +10,7 @@ const publicPaths = [
   '/sw.js',
   '/icons/',
   '/ca.pem',
+  '/uploads/',
 ]
 
 export function proxy(request: NextRequest) {

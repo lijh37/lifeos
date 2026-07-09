@@ -76,6 +76,7 @@ self.addEventListener('fetch', (event) => {
 
   // API routes: network-only, no cache
   if (url.pathname.startsWith('/api/')) {
+    event.respondWith(fetch(request))
     return
   }
 
