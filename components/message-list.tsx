@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Bot, User, Clock, RefreshCw, Copy } from 'lucide-react'
+import { MarkdownRenderer } from '@/lib/markdown'
 import { useChatContext } from './chat-context'
 
 const UserMessage = memo(function UserMessage({
@@ -30,6 +31,63 @@ const UserMessage = memo(function UserMessage({
 })
 UserMessage.displayName = 'UserMessage'
 
+const toolNameConfig: Record<
+  string,
+  { call: string; result: (result: unknown) => string }
+> = {
+  searchNotesByKeyword: {
+    call: '🔍 正在搜索笔记…',
+    result: (result) => {
+      const data = result as Record<string, unknown>
+      const count = typeof data?.count === 'number' ? data.count : 0
+      return `✅ 找到 ${count} 篇相关笔记`
+    },
+  },
+  searchHabitsByKeyword: {
+    call: '🔍 正在搜索习惯…',
+    result: (result) => {
+      const data = result as Record<string, unknown>
+      const count = typeof data?.count === 'number' ? data.count : 0
+      return `✅ 找到 ${count} 个相关习惯`
+    },
+  },
+  getNotesInDateRange: {
+    call: '🔍 正在查询笔记…',
+    result: (result) => {
+      const data = result as Record<string, unknown>
+      const count = typeof data?.count === 'number' ? data.count : 0
+      return `✅ 找到 ${count} 篇笔记`
+    },
+  },
+  getHabitProgress: {
+    call: '📊 正在查询习惯进度…',
+    result: () => '✅ 习惯进度查询完成',
+  },
+  getBudgetInfo: {
+    call: '📊 正在查询预算…',
+    result: () => '✅ 预算查询完成',
+  },
+}
+
+const ToolInvocation = memo(function ToolInvocation({
+  invocation,
+}: {
+  invocation: { toolName: string; state: string; args?: unknown; result?: unknown }
+}) {
+  const config = toolNameConfig[invocation.toolName]
+  if (!config) return null
+
+  const isCall = invocation.state === 'call'
+  const message = isCall ? config.call : config.result(invocation.result)
+
+  return (
+    <Card className="bg-muted/50 p-2.5">
+      <p className="text-xs text-muted-foreground">{message}</p>
+    </Card>
+  )
+})
+ToolInvocation.displayName = 'ToolInvocation'
+
 const AssistantMessage = memo(function AssistantMessage({
   msg,
   getMessageText,
@@ -40,23 +98,30 @@ const AssistantMessage = memo(function AssistantMessage({
   handleCopy: (text: string) => void
 }) {
   const text = getMessageText(msg)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const toolInvocations = (msg.parts?.filter((p) => p.type === 'tool-invocation') || []) as any[]
   return (
     <div className="flex justify-start">
       <div className="flex max-w-[80%] gap-3">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
           <Bot className="h-4 w-4" />
         </div>
-        <div>
-          <Card className="group relative bg-card p-3">
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">{text}</p>
-            <button
-              onClick={() => handleCopy(text)}
-              className="absolute right-2 top-2 hidden rounded p-1 text-muted-foreground hover:bg-accent group-hover:block"
-              title="复制"
-            >
-              <Copy className="h-3 w-3" />
-            </button>
-          </Card>
+        <div className="space-y-2">
+          {text && (
+            <Card className="group relative bg-card p-3">
+              <MarkdownRenderer content={text} />
+              <button
+                onClick={() => handleCopy(text)}
+                className="absolute right-2 top-2 hidden rounded p-1 text-muted-foreground hover:bg-accent group-hover:block"
+                title="复制"
+              >
+                <Copy className="h-3 w-3" />
+              </button>
+            </Card>
+          )}
+          {toolInvocations.map((part, idx) => (
+            <ToolInvocation key={idx} invocation={part.toolInvocation} />
+          ))}
         </div>
       </div>
     </div>

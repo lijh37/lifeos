@@ -22,7 +22,7 @@ export function ChatInput() {
             el.style.height = `${Math.min(el.scrollHeight, 200)}px`
           }}
           onKeyDown={handleKeyDown}
-          placeholder="输入你想记录的内容…"
+          placeholder="搜索笔记、习惯、预算，直接问我…"
           className="min-h-[44px] resize-none text-base sm:text-sm"
           rows={1}
           disabled={isLoading}

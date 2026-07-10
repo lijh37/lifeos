@@ -1,9 +1,9 @@
 import {
+  MessageSquare,
   Notebook,
   PiggyBank,
   Trophy,
   Tags,
-  BarChart3,
   Settings,
   type LucideIcon,
 } from 'lucide-react'
@@ -17,11 +17,11 @@ export interface NavItem {
 
 /** 完整导航列表（桌面侧栏 + 手机底部栏共用） */
 export const NAV_ITEMS: NavItem[] = [
+  { href: '/chat', label: '对话', icon: MessageSquare },
   { href: '/notes', label: '笔记', icon: Notebook },
   { href: '/expenses', label: '预算', icon: PiggyBank },
   { href: '/habits', label: '习惯', icon: Trophy },
   { href: '/tags', label: '标签', icon: Tags },
-  { href: '/stats', label: '统计', icon: BarChart3 },
   { href: '/settings', label: '设置', icon: Settings },
 ]
 

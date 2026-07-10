@@ -28,10 +28,9 @@ app/                  # Next.js App Router 页面和 API
   ├── api/notes/batch/ # 批量操作（删除/加标签）
   ├── api/budgets/    # 预算 CRUD
   ├── api/habits/     # 习惯 CRUD（含 streaks、趋势、统计）
-  ├── api/export/     # 导出（MD/JSON/CSV）
+  ├── api/backup/     # 备份导出/恢复 JSON
   ├── api/tags/       # 标签管理
-  ├── api/settings/   # 数据统计 + 批量清除
-  ├── api/import/     # JSON 备份导入
+  ├── api/settings/   # 备份与恢复页面
   ├── api/stats/      # 聚合统计（含习惯趋势）
   ├── api/auth/       # 密码验证
   ├── notes/          # 笔记列表页（批量选择+搜索+置顶+无限滚动）
@@ -43,7 +42,7 @@ app/                  # Next.js App Router 页面和 API
   ├── habits/         # 习惯页面
   ├── tags/           # 标签管理
   ├── stats/          # 统计看板
-  ├── settings/       # 设置页
+  ├── settings/       # 备份与恢复
   └── login/          # 登录页
 components/             # React 组件
   ├── ui/               # shadcn 基础组件
@@ -55,8 +54,6 @@ components/             # React 组件
   ├── note-list.tsx     # 笔记列表（批量操作 + 搜索 + 置顶 + 按标签筛选 + 无限滚动，NoteCard 已 memo）
   ├── markdown-editor.tsx # Markdown 编辑器（分栏编辑 + 工具栏 + 自动保存）
   ├── sidebar.tsx       # 导航（PC 侧栏 + 手机底部栏，7 项，使用 lib/navigation）
-  ├── export-button.tsx # 导出按钮（MD/JSON）
-  ├── auto-backup.tsx   # 自动备份钩子 + 管理面板
   ├── error-boundary.tsx # React Error Boundary
   ├── theme-provider.tsx # 主题上下文
   ├── theme-toggle.tsx  # 深色模式切换

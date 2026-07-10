@@ -121,7 +121,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       sentAtRef.current = Date.now()
       timeoutRef.current = setTimeout(() => {
         setTimedOut(true)
-      }, 15000)
+      }, 25000)
     } else if (status === 'streaming' || status === 'ready') {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)

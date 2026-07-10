@@ -5,7 +5,6 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Sidebar, MobileNav } from "@/components/sidebar"
 import { PwaHandler } from "@/components/pwa-handler"
 import { PageAnimation } from "@/components/page-animation"
-import { AutoBackup } from "@/components/auto-backup"
 import { Toaster } from "sonner"
 
 const geistSans = Geist({

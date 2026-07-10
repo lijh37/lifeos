@@ -21,7 +21,6 @@ import {
   Loader2,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-import { ExportButton } from '@/components/export-button'
 import { SkeletonNoteList } from '@/components/skeleton-card'
 import { stripMarkdown } from '@/lib/markdown'
 import type { Note } from '@/lib/types'
@@ -323,7 +322,6 @@ export function NoteList() {
               <Plus className="h-3.5 w-3.5" />
               新建
             </Button>
-            <ExportButton />
           </div>
         </div>
       </div>
