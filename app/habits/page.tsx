@@ -207,7 +207,7 @@ function HabitsPageInner() {
               </div>
             )}
 
-            {stats && stats.trend7d.length > 1 && (
+            {stats && (
               <div className="rounded-lg bg-card p-3">
                 <div className="mb-2 flex items-center gap-1.5">
                   <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />

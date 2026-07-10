@@ -18,10 +18,26 @@ export async function GET() {
       args: [monthStartStr],
     }),
     db.execute({
-      sql: `SELECT date, COUNT(*) as count FROM habit_completions WHERE completed=1 AND date >= date('now', '-7 days') GROUP BY date ORDER BY date ASC`,
+      sql: `SELECT date, COUNT(*) as count FROM habit_completions WHERE completed=1 AND date >= date('now', '-6 days') GROUP BY date ORDER BY date ASC`,
     }),
     db.execute(`SELECT COUNT(*) as count FROM habit_completions WHERE completed=1`),
   ])
+
+  // 生成精确7天日期范围，缺失天数补0
+  const countMap: Record<string, number> = {}
+  trend7d.rows.forEach(r => {
+    countMap[r.date as string] = r.count as number
+  })
+  const trend7dFilled: { date: string; count: number }[] = []
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date()
+    d.setDate(d.getDate() - i)
+    const dateStr = d.toISOString().slice(0, 10)
+    trend7dFilled.push({
+      date: dateStr,
+      count: countMap[dateStr] || 0,
+    })
+  }
 
   const daysInMonth = new Date(
     monthStart.getFullYear(),
@@ -42,10 +58,7 @@ export async function GET() {
       monthlyRate,
       monthCompletions,
       totalCompletions: (totalCount.rows[0]?.count as number) || 0,
-      trend7d: trend7d.rows.map(r => ({
-        date: r.date as string,
-        count: r.count as number,
-      })),
+      trend7d: trend7dFilled,
     },
   })
 }
