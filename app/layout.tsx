@@ -57,7 +57,9 @@ export default function RootLayout({
           <PwaHandler />
           <div className="flex h-full">
             <Sidebar />
-            <main className="min-w-0 flex-1 pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">{children}</main>
+            <main className="min-w-0 flex-1">
+              <div className="h-full pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">{children}</div>
+            </main>
             <MobileNav />
           </div>
         </ThemeProvider>
