@@ -3,7 +3,7 @@ delete process.env.TURSO_DATABASE_URL
 process.env.DATABASE_URL = ':memory:'
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
-import { initDB, createNote, getNotes, getNote, updateNote, deleteNote } from '@/lib/db'
+import { initDB, createNote, getNotes, getNote, updateNote, deleteNote, getClient, createHabit, getHabits, toggleCompletion, getTodayCompletions, deleteHabit, upsertBudget, getBudget, getBudgets, searchNotes, getAllTags, renameTag, deleteTag } from '@/lib/db'
 import type { Note } from '@/lib/types'
 
 function makeNote(overrides: Partial<Note> = {}): Note {
@@ -28,7 +28,8 @@ describe('Database - Notes', () => {
   })
 
   beforeEach(async () => {
-    const { getClient } = await import('@/lib/db')
+    await getClient().execute('DELETE FROM note_tags')
+    await getClient().execute('DELETE FROM tags')
     await getClient().execute('DELETE FROM notes')
   })
 
@@ -95,13 +96,11 @@ describe('Database - Habits', () => {
   })
 
   beforeEach(async () => {
-    const { getClient } = await import('@/lib/db')
     await getClient().execute('DELETE FROM habits')
     await getClient().execute('DELETE FROM habit_completions')
   })
 
   it('should create and list habits', async () => {
-    const { createHabit, getHabits } = await import('@/lib/db')
     const habit = {
       id: crypto.randomUUID(),
       name: '每天跑步',
@@ -116,7 +115,6 @@ describe('Database - Habits', () => {
   })
 
   it('should toggle completion', async () => {
-    const { createHabit, toggleCompletion, getTodayCompletions } = await import('@/lib/db')
     const habit = {
       id: crypto.randomUUID(),
       name: '阅读',
@@ -135,7 +133,6 @@ describe('Database - Habits', () => {
   })
 
   it('should toggle completion off', async () => {
-    const { createHabit, toggleCompletion, getTodayCompletions } = await import('@/lib/db')
     const habit = {
       id: crypto.randomUUID(),
       name: '冥想',
@@ -152,7 +149,6 @@ describe('Database - Habits', () => {
   })
 
   it('should delete habit and its completions', async () => {
-    const { createHabit, toggleCompletion, deleteHabit, getHabits } = await import('@/lib/db')
     const habit = {
       id: crypto.randomUUID(),
       name: '写作',
@@ -167,7 +163,6 @@ describe('Database - Habits', () => {
     expect(habits).toHaveLength(0)
 
     // Also verify completions deleted
-    const { getTodayCompletions } = await import('@/lib/db')
     const completions = await getTodayCompletions()
     expect(completions[habit.id]).toBeUndefined()
   })
@@ -179,12 +174,12 @@ describe('Database - Budgets', () => {
   })
 
   beforeEach(async () => {
-    const { getClient } = await import('@/lib/db')
+    await getClient().execute('DELETE FROM note_tags')
+    await getClient().execute('DELETE FROM tags')
     await getClient().execute('DELETE FROM notes')
   })
 
   it('should create and get a budget', async () => {
-    const { upsertBudget, getBudget } = await import('@/lib/db')
     const budget = await upsertBudget('2026-06', { fixedBudget: 10000, variableBudget: 5000 })
     expect(budget.month).toBe('2026-06')
     expect(budget.fixedBudget).toBe(10000)
@@ -196,7 +191,6 @@ describe('Database - Budgets', () => {
   })
 
   it('should update an existing budget', async () => {
-    const { upsertBudget, getBudget } = await import('@/lib/db')
     await upsertBudget('2026-06', { fixedBudget: 10000 })
     await upsertBudget('2026-06', { fixedBudget: 15000, fixedActual: 12000 })
 
@@ -206,7 +200,6 @@ describe('Database - Budgets', () => {
   })
 
   it('should list all budgets', async () => {
-    const { upsertBudget, getBudgets } = await import('@/lib/db')
     await upsertBudget('2026-06', { fixedBudget: 10000 })
     await upsertBudget('2026-07', { fixedBudget: 20000 })
 
@@ -221,12 +214,12 @@ describe('Database - Search and Tags', () => {
   })
 
   beforeEach(async () => {
-    const { getClient } = await import('@/lib/db')
+    await getClient().execute('DELETE FROM note_tags')
+    await getClient().execute('DELETE FROM tags')
     await getClient().execute('DELETE FROM notes')
   })
 
   it('should search notes by content', async () => {
-    const { createNote, searchNotes } = await import('@/lib/db')
     await createNote(makeNote({ content: 'This is about machine learning', tags: ['AI', 'tech'] }))
     await createNote(makeNote({ content: 'Shopping list: milk, bread', tags: ['life'] }))
 
@@ -236,7 +229,6 @@ describe('Database - Search and Tags', () => {
   })
 
   it('should search notes by title', async () => {
-    const { createNote, searchNotes } = await import('@/lib/db')
     await createNote(makeNote({ content: 'details', title: 'Project Plan', tags: [] }))
 
     const results = await searchNotes('Project')
@@ -244,7 +236,6 @@ describe('Database - Search and Tags', () => {
   })
 
   it('should collect all tags with counts', async () => {
-    const { createNote, getAllTags } = await import('@/lib/db')
     await createNote(makeNote({ tags: ['work', 'urgent'] }))
     await createNote(makeNote({ tags: ['work', 'personal'] }))
     await createNote(makeNote({ tags: ['personal'] }))
@@ -260,7 +251,6 @@ describe('Database - Search and Tags', () => {
   })
 
   it('should rename a tag', async () => {
-    const { createNote, renameTag, getAllTags, getNote } = await import('@/lib/db')
     const note = makeNote({ tags: ['work', 'urgent'] })
     await createNote(note)
 
@@ -279,7 +269,6 @@ describe('Database - Search and Tags', () => {
   })
 
   it('should merge tags when renaming to existing name', async () => {
-    const { createNote, renameTag, getAllTags, getNote } = await import('@/lib/db')
     const note1 = makeNote({ tags: ['work', 'urgent'] })
     const note2 = makeNote({ tags: ['important', 'urgent'] })
     await createNote(note1)
@@ -299,7 +288,6 @@ describe('Database - Search and Tags', () => {
   })
 
   it('should not create duplicates in JSON column when merging tags', async () => {
-    const { createNote, renameTag, getNote } = await import('@/lib/db')
     // Note already has both 'work' and 'job' — renaming 'work' → 'job' should not create [job, job]
     const note = makeNote({ tags: ['work', 'job', 'urgent'] })
     await createNote(note)
@@ -310,7 +298,6 @@ describe('Database - Search and Tags', () => {
   })
 
   it('should delete a tag', async () => {
-    const { createNote, deleteTag, getAllTags, getNote } = await import('@/lib/db')
     const note = makeNote({ tags: ['work', 'urgent', 'personal'] })
     await createNote(note)
 
@@ -326,7 +313,6 @@ describe('Database - Search and Tags', () => {
   })
 
   it('should delete non-existent tag without error', async () => {
-    const { deleteTag } = await import('@/lib/db')
     await expect(deleteTag('nonexistent')).resolves.toBeUndefined()
   })
 })

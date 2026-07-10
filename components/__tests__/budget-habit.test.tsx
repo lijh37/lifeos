@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { ProgressBar, BudgetCard } from '@/app/expenses/page'
+import { ProgressBar } from '@/components/progress-bar'
+import { BudgetCard } from '@/components/budget-card'
 import { HabitRow } from '@/app/habits/page'
 import type { Budget, Habit } from '@/lib/types'
 

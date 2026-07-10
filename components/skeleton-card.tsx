@@ -48,3 +48,6 @@ export function SkeletonHabits({ count = 4 }: { count?: number }) {
   )
 }
 
+export function SkeletonCard({ count = 3 }: { count?: number }) {
+  return <SkeletonNoteList count={count} />
+}

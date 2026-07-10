@@ -36,7 +36,6 @@ describe('NoteList', () => {
     useAppStore.setState({
       notes: [],
       initialLoading: false,
-      loadingMore: false,
     })
     mockFetch.mockReset()
     // Default: return empty results for notes + tags to prevent crashes

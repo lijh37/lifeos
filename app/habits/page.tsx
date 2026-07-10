@@ -103,12 +103,20 @@ function HabitsPageInner() {
     })
     const data = await res.json()
     setTodayMap((prev) => ({ ...prev, [habitId]: data.completed }))
+    fetch('/api/habits')
+      .then(r => r.json())
+      .then(d => setStats(d.stats || null))
+      .catch(() => {})
   }
 
   async function handleDelete(id: string) {
     try {
       await fetch(`/api/habits?id=${id}`, { method: 'DELETE' })
       setHabits((prev) => prev.filter((h) => h.id !== id))
+      fetch('/api/habits')
+        .then(r => r.json())
+        .then(d => setStats(d.stats || null))
+        .catch(() => {})
     } catch (e) {
       console.error('Failed to delete habit:', e)
     }
@@ -125,6 +133,10 @@ function HabitsPageInner() {
     setHabits((prev) => [data.habit, ...prev])
     setNewName('')
     setShowInput(false)
+    fetch('/api/habits')
+      .then(r => r.json())
+      .then(d => setStats(d.stats || null))
+      .catch(() => {})
   }
 
   const today = new Date().toISOString().slice(0, 10)
@@ -166,7 +178,7 @@ function HabitsPageInner() {
         ) : habits.length === 0 ? (
           <div className="flex h-48 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
             <Trophy className="h-10 w-10 text-muted-foreground/50" />
-            <p>还没有习惯，点击新建添加</p>
+            <p>还没有习惯，去 AI 对话或点新建添加</p>
           </div>
         ) : (
           <div className="space-y-4 p-4">
@@ -236,6 +248,7 @@ function HabitsPageInner() {
   )
 }
 
+// Export for testing
 export { HabitRow }
 
 export default function HabitsPage() {

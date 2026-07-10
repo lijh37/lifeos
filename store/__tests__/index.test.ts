@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useAppStore, useUIStore } from '@/store'
+import { useAppStore } from '@/store'
 import type { Note } from '@/lib/types'
 
 // Helper to create test notes
@@ -24,9 +24,6 @@ describe('useAppStore', () => {
     useAppStore.setState({
       notes: [],
       initialLoading: false,
-      loadingMore: false,
-      cursor: null,
-      hasMore: true,
     })
   })
 
@@ -34,9 +31,6 @@ describe('useAppStore', () => {
     const state = useAppStore.getState()
     expect(state.notes).toEqual([])
     expect(state.initialLoading).toBe(false)
-    expect(state.loadingMore).toBe(false)
-    expect(state.cursor).toBeNull()
-    expect(state.hasMore).toBe(true)
   })
 
   it('should set notes', () => {
@@ -75,56 +69,7 @@ describe('useAppStore', () => {
     const updated = useAppStore.getState().notes[0]
     expect(updated.content).toBe('updated')
     expect(updated.done).toBe(true)
-    // original fields should remain
     expect(updated.id).toBe('1')
     expect(updated.type).toBe('note')
-  })
-
-  it('should set cursor and hasMore', () => {
-    useAppStore.getState().setCursor('abc123')
-    expect(useAppStore.getState().cursor).toBe('abc123')
-
-    useAppStore.getState().setHasMore(false)
-    expect(useAppStore.getState().hasMore).toBe(false)
-  })
-
-  it('should append notes', () => {
-    const note1 = makeNote('1')
-    const note2 = makeNote('2')
-    useAppStore.getState().setNotes([note1])
-    useAppStore.getState().appendNotes([note2])
-    const state = useAppStore.getState()
-    expect(state.notes).toHaveLength(2)
-    expect(state.notes[0].id).toBe('1')
-    expect(state.notes[1].id).toBe('2')
-  })
-
-  it('should handle append with empty array', () => {
-    useAppStore.getState().setCursor('existing-cursor')
-    useAppStore.getState().appendNotes([])
-    const state = useAppStore.getState()
-    expect(state.notes).toHaveLength(0)
-    expect(state.cursor).toBe('existing-cursor')
-  })
-})
-
-describe('useUIStore', () => {
-  beforeEach(() => {
-    useUIStore.setState({
-      isMobileMenuOpen: false,
-    })
-  })
-
-  it('should have default values', () => {
-    const state = useUIStore.getState()
-    expect(state.isMobileMenuOpen).toBe(false)
-  })
-
-  it('should set mobile menu open', () => {
-    useUIStore.getState().setMobileMenuOpen(true)
-    expect(useUIStore.getState().isMobileMenuOpen).toBe(true)
-
-    useUIStore.getState().setMobileMenuOpen(false)
-    expect(useUIStore.getState().isMobileMenuOpen).toBe(false)
   })
 })

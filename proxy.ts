@@ -9,7 +9,6 @@ const publicPaths = [
   '/manifest.json',
   '/sw.js',
   '/icons/',
-  '/ca.pem',
   '/uploads/',
 ]
 

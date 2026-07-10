@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createNote, getNotesCursor, deleteNote, searchNotes, getNotesByDateRange } from '@/lib/db'
 import type { Note } from '@/lib/types'
+import { UNTAGGED } from '@/lib/db/tags'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -12,8 +13,6 @@ export async function GET(req: NextRequest) {
   const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0)
   const summary = searchParams.get('summary') === 'true'
   const tag = searchParams.get('tag')
-
-  const UNTAGGED = '__untagged__'
 
   if (q) {
     let notes = await searchNotes(q)
