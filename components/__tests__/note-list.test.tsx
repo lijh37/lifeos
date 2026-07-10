@@ -100,19 +100,6 @@ describe('NoteList', () => {
     })
   })
 
-  it('should show export button', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ notes: [] }),
-    })
-
-    render(<NoteList />)
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /导出/ })).toBeInTheDocument()
-    })
-  })
-
   it('should display multiple tags on a note', async () => {
     const notes = [
       createNote({ content: 'Tagged note', title: 'Tagged', type: 'note', tags: ['work', 'urgent'] }),

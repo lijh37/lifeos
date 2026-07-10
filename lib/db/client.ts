@@ -60,24 +60,6 @@ export async function initDB() {
     )
   `)
   await db.execute(`
-    CREATE TABLE IF NOT EXISTS chat_messages (
-      id TEXT PRIMARY KEY,
-      role TEXT NOT NULL,
-      content TEXT NOT NULL,
-      related_note_id TEXT,
-      conversation_id TEXT,
-      created_at TEXT NOT NULL
-    )
-  `)
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS conversations (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL DEFAULT '新对话',
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )
-  `)
-  await db.execute(`
     CREATE TABLE IF NOT EXISTS budgets (
       id TEXT PRIMARY KEY,
       month TEXT NOT NULL UNIQUE,
@@ -148,7 +130,6 @@ export async function initDB() {
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_attachments_note ON attachments(note_id)`)
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_habit_completions_habit ON habit_completions(habit_id)`)
   await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_habit_completions_unique ON habit_completions(habit_id, date)`)
-  await db.execute(`CREATE INDEX IF NOT EXISTS idx_chat_messages_conv ON chat_messages(conversation_id, created_at)`)
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_note_tags_tag ON note_tags(tag_id)`)
 
   // FTS5 full-text search (graceful fallback if not available)

@@ -1,5 +1,4 @@
 import {
-  MessageSquare,
   Notebook,
   PiggyBank,
   Trophy,
@@ -17,7 +16,6 @@ export interface NavItem {
 
 /** 完整导航列表（桌面侧栏 + 手机底部栏共用） */
 export const NAV_ITEMS: NavItem[] = [
-  { href: '/chat', label: '对话', icon: MessageSquare },
   { href: '/notes', label: '笔记', icon: Notebook },
   { href: '/expenses', label: '预算', icon: PiggyBank },
   { href: '/habits', label: '习惯', icon: Trophy },
@@ -25,8 +23,8 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/settings', label: '设置', icon: Settings },
 ]
 
-/** 手机底部栏主导航（前 5 项） */
-export const PRIMARY_MOBILE_NAV: NavItem[] = NAV_ITEMS.slice(0, 5)
+/** 手机底部栏主导航（前 4 项） */
+export const PRIMARY_MOBILE_NAV: NavItem[] = NAV_ITEMS.slice(0, 4)
 
 /** 手机底部栏「更多」面板（剩余项） */
-export const MORE_MOBILE_NAV: NavItem[] = NAV_ITEMS.slice(5)
+export const MORE_MOBILE_NAV: NavItem[] = NAV_ITEMS.slice(4)

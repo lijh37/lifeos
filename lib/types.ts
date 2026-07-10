@@ -98,34 +98,5 @@ export interface HabitCompletion {
   createdAt: string
 }
 
-/** 聊天消息数据结构 */
-export interface ChatMessage {
-  /** 唯一标识（UUID） */
-  id: string
-  /** 消息角色：用户或 AI 助手 */
-  role: 'user' | 'assistant'
-  /** 消息正文 */
-  content: string
-  /** 关联的笔记 ID（可为空） */
-  relatedNoteId: string | null
-  /** 所属对话 ID（可为空） */
-  conversationId: string | null
-  /** 创建时间（ISO 8601） */
-  createdAt: string
-}
-
-/** 对话会话数据结构 */
-export interface Conversation {
-  /** 唯一标识（UUID） */
-  id: string
-  /** 对话标题 */
-  title: string
-  /** 创建时间（ISO 8601） */
-  createdAt: string
-  /** 最后更新时间（ISO 8601） */
-  updatedAt: string
-  /** 包含的消息数量 */
-  messageCount: number
-}
 
 
