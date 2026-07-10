@@ -35,7 +35,6 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY || 'sk-test' }}
           DATABASE_URL: ':memory:'
           APP_PASSWORD: ''
 
