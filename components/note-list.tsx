@@ -19,6 +19,7 @@ import {
   Pin,
   PinOff,
   Loader2,
+  Download,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { SkeletonNoteList } from '@/components/skeleton-card'
@@ -321,6 +322,15 @@ export function NoteList() {
             <Button variant="default" size="sm" onClick={handleCreateNote} className="gap-1 text-xs">
               <Plus className="h-3.5 w-3.5" />
               新建
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open('/api/export', '_blank')}
+              className="gap-1 text-xs"
+            >
+              <Download className="h-3.5 w-3.5" />
+              导出
             </Button>
           </div>
         </div>
