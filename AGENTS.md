@@ -88,19 +88,18 @@ public/
 
 ### 数据库
 
-使用 `@libsql/client` 直接操作，7 个表（支持置顶 `pinned` 字段）：
-- `notes` — 笔记（含 FTS5 全文索引）
+使用 `@libsql/client` 直接操作，5 个表（标签存储在 `notes.tags` JSON 列中）：
+- `notes` — 笔记（含 FTS5 全文索引，标签存为 JSON 数组）
 - `budgets` — 月度预算
 - `habits` + `habit_completions` — 习惯打卡
 - `attachments` — 笔记附件
-- `tags` + `note_tags` — 规范化标签关联
 - 详情见 `lib/db/client.ts` 的 `initDB()`
 
 ### UI 动效约定
 
 - 页面过渡：`PageAnimation` 组件基于 `useSelectedLayoutSegment` 实现 key 变化触发 fadeIn
 - 列表交错：容器加 `animate-stagger`，子项自动延迟
-- 骨架屏：使用 `SkeletonCard` / `SkeletonNoteList` / `SkeletonHabits` 替代手动 Loader2
+- 骨架屏：使用 `SkeletonNoteList` / `SkeletonHabits` 替代手动 Loader2
 - 卡片悬浮：列表中的 Card 统一加 `card-hover` 类
 
 ### 状态管理

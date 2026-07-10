@@ -2,7 +2,6 @@ import { createClient } from '@libsql/client'
 
 let client: ReturnType<typeof createClient> | null = null
 let dbInitialized = false
-export let fts5Available: boolean | undefined
 
 /**
  * 获取数据库客户端实例（单例）：
@@ -40,7 +39,6 @@ export async function initDB() {
   dbInitialized = true
 
   if (process.env.TURSO_DATABASE_URL) {
-    fts5Available = true
     return
   }
 
@@ -104,21 +102,6 @@ export async function initDB() {
       created_at TEXT NOT NULL
     )
   `)
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS tags (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
-      created_at TEXT NOT NULL
-    )
-  `)
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS note_tags (
-      note_id TEXT NOT NULL,
-      tag_id TEXT NOT NULL,
-      PRIMARY KEY (note_id, tag_id)
-    )
-  `)
-
   // Indexes
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_notes_type ON notes(type)`)
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_notes_created ON notes(created_at)`)
@@ -130,35 +113,4 @@ export async function initDB() {
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_attachments_note ON attachments(note_id)`)
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_habit_completions_habit ON habit_completions(habit_id)`)
   await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_habit_completions_unique ON habit_completions(habit_id, date)`)
-  await db.execute(`CREATE INDEX IF NOT EXISTS idx_note_tags_tag ON note_tags(tag_id)`)
-
-  // FTS5 full-text search (graceful fallback if not available)
-  try {
-    await db.execute(`
-      CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
-        content, title, content=notes, content_rowid=rowid
-      )
-    `)
-    await db.execute(`
-      INSERT OR IGNORE INTO notes_fts(rowid, content, title)
-      SELECT rowid, content, title FROM notes
-    `)
-    await db.execute(`
-      CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes BEGIN
-        INSERT INTO notes_fts(rowid, content, title) VALUES (new.rowid, new.content, new.title);
-      END
-    `)
-    await db.execute(`
-      CREATE TRIGGER IF NOT EXISTS notes_ad AFTER DELETE ON notes BEGIN
-        INSERT INTO notes_fts(notes_fts, rowid, content, title) VALUES('delete', old.rowid, old.content, old.title);
-      END
-    `)
-    await db.execute(`
-      CREATE TRIGGER IF NOT EXISTS notes_au AFTER UPDATE ON notes BEGIN
-        INSERT INTO notes_fts(notes_fts, rowid, content, title) VALUES('delete', old.rowid, old.content, old.title);
-        INSERT INTO notes_fts(rowid, content, title) VALUES (new.rowid, new.content, new.title);
-      END
-    `)
-    fts5Available = true
-  } catch { console.warn('[fts5] 全文索引不可用，回退到 LIKE 搜索'); fts5Available = false }
 }

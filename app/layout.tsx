@@ -4,7 +4,6 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Sidebar, MobileNav } from "@/components/sidebar"
 import { PwaHandler } from "@/components/pwa-handler"
-import { PageAnimation } from "@/components/page-animation"
 import { Toaster } from "sonner"
 
 const geistSans = Geist({
@@ -58,9 +57,7 @@ export default function RootLayout({
           <PwaHandler />
           <div className="flex h-full">
             <Sidebar />
-            <PageAnimation>
-              <main className="pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">{children}</main>
-            </PageAnimation>
+            <main className="min-w-0 flex-1 pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">{children}</main>
             <MobileNav />
           </div>
         </ThemeProvider>

@@ -53,11 +53,9 @@ export async function POST(req: NextRequest) {
 
   const db = getClient()
 
-  // Clear existing data in FK-safe order
+  // Clear existing data
   await db.execute('DELETE FROM habit_completions')
   await db.execute('DELETE FROM habits')
-  await db.execute('DELETE FROM note_tags')
-  await db.execute('DELETE FROM tags')
   await db.execute('DELETE FROM budgets')
   await db.execute('DELETE FROM notes')
 

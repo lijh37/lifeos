@@ -29,8 +29,6 @@ describe('Database - Notes', () => {
 
   beforeEach(async () => {
     const { getClient } = await import('@/lib/db')
-    await getClient().execute('DELETE FROM note_tags')
-    await getClient().execute('DELETE FROM tags')
     await getClient().execute('DELETE FROM notes')
   })
 
@@ -182,8 +180,6 @@ describe('Database - Budgets', () => {
 
   beforeEach(async () => {
     const { getClient } = await import('@/lib/db')
-    await getClient().execute('DELETE FROM note_tags')
-    await getClient().execute('DELETE FROM tags')
     await getClient().execute('DELETE FROM notes')
   })
 
@@ -226,8 +222,6 @@ describe('Database - Search and Tags', () => {
 
   beforeEach(async () => {
     const { getClient } = await import('@/lib/db')
-    await getClient().execute('DELETE FROM note_tags')
-    await getClient().execute('DELETE FROM tags')
     await getClient().execute('DELETE FROM notes')
   })
 
