@@ -7,7 +7,6 @@ const publicPaths = [
   '/login',
   '/api/auth',
   '/manifest.json',
-  '/sw.js',
   '/icons/',
   '/uploads/',
 ]

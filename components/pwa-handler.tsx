@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { Download, Bug, RefreshCw, Loader2, Check } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { Download, Loader2, Check } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -13,10 +13,6 @@ interface BeforeInstallPromptEvent extends Event {
 export function PwaHandler() {
   const [isOffline, setIsOffline] = useState(false)
   const [showInstall, setShowInstall] = useState(false)
-  const [swStatus, setSwStatus] = useState<'pending' | 'active' | 'error'>('pending')
-  const [showDebug, setShowDebug] = useState(false)
-  const [manifestStatus, setManifestStatus] = useState<string>('checking')
-  const [pageUrl, setPageUrl] = useState('')
   const [installed, setInstalled] = useState(false)
   const [installState, setInstallState] = useState<'idle' | 'installing' | 'done' | 'error'>('idle')
 
@@ -43,22 +39,6 @@ export function PwaHandler() {
     })
   }
 
-  const checkSW = useCallback(() => {
-    if (!('serviceWorker' in navigator)) {
-      setSwStatus('error')
-      return
-    }
-    navigator.serviceWorker.register('/sw.js').then((reg) => {
-      setSwStatus(reg.active ? 'active' : 'pending')
-      reg.addEventListener('updatefound', () => {
-        setSwStatus(reg.installing ? 'pending' : 'active')
-      })
-    }).catch((err) => {
-      console.warn('SW registration failed:', err)
-      setSwStatus('error')
-    })
-  }, [])
-
   useEffect(() => {
     setIsOffline(!navigator.onLine)
     const onOnline = () => setIsOffline(false)
@@ -78,34 +58,14 @@ export function PwaHandler() {
       setInstallState('done')
     })
 
-    if (window.location.search.includes('debug=1')) setShowDebug(true)
-    checkSW()
-
     return () => {
       window.removeEventListener('online', onOnline)
       window.removeEventListener('offline', onOffline)
       window.removeEventListener('beforeinstallprompt', handler)
     }
-  }, [checkSW])
-
-  useEffect(() => {
-    setPageUrl(`${location.protocol}//${location.host}`)
-    fetch('/manifest.json').then((r) => {
-      if (r.ok) setManifestStatus(`✅ ${r.status} ${r.headers.get('content-type') || ''}`)
-      else setManifestStatus(`❌ ${r.status}`)
-    }).catch(() => setManifestStatus('❌ fetch failed'))
   }, [])
 
   const isInstallReady = installState === 'idle'
-
-  const debugInfo = [
-    `URL: ${pageUrl || '加载中...'}`,
-    `SW: ${swStatus === 'active' ? '✅ 已注册' : swStatus === 'error' ? '❌ 失败' : '⏳ 注册中'}`,
-    `beforeinstallprompt: ${deferredPromptRef.current ? '✅ 已触发' : '⏳ 等待交互后触发'}`,
-    `manifest: ${manifestStatus}`,
-    `离线: ${isOffline ? '⚠️ 是' : '✅ 否'}`,
-    `已安装: ${installed ? '✅ 是' : '否'}`,
-  ]
 
   return (
     <>
@@ -140,34 +100,6 @@ export function PwaHandler() {
           {installState === 'error' && (
             <p className="mt-2 text-xs text-destructive">安装失败，请重试</p>
           )}
-        </div>
-      )}
-
-      {showDebug && (
-        <div className="fixed right-4 top-16 z-50 w-72 rounded-lg border bg-card p-3 text-xs shadow-lg">
-          <div className="mb-1.5 flex items-center justify-between">
-            <p className="font-medium">PWA 诊断 <button onClick={() => setShowDebug(false)} className="ml-1 text-muted-foreground hover:text-foreground">✕</button></p>
-            <button
-              onClick={() => setShowDebug(false)}
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20"
-              title="关闭诊断"
-            >
-              <Bug className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          {debugInfo.map((line, i) => (
-            <p key={i} className="font-mono leading-5">{line}</p>
-          ))}
-          <div className="mt-2 flex gap-2">
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={checkSW}>
-              <RefreshCw className="mr-1 h-3 w-3" />
-              刷新
-            </Button>
-            <p className="text-muted-foreground">
-              {swStatus !== 'active' ? 'SW 未注册成功' : ''}
-              {!deferredPromptRef.current && swStatus === 'active' ? '在页面上点几下即可触发安装' : ''}
-            </p>
-          </div>
         </div>
       )}
     </>
