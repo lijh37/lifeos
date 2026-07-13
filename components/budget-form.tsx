@@ -61,7 +61,7 @@ function BudgetForm({ budget, onSave }: { budget: Budget | null; onSave: (data: 
                 type="number"
                 value={variableBudgetInput}
                 onChange={(e) => setVariableBudgetInput(e.target.value)}
-                placeholder="例: 1600"
+                placeholder="例: 1700"
                 className="pr-8"
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">¥</span>

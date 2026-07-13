@@ -4,7 +4,7 @@ import { zhCN } from 'date-fns/locale'
 import { CheckCircle2 } from 'lucide-react'
 import type { Budget } from '@/lib/types'
 
-const BudgetCard = memo(function BudgetCard({ budget, currentMonth, onEdit, onDelete }: { budget: Budget; currentMonth: string; onEdit?: (b: Budget) => void; onDelete?: (id: string) => void }) {
+const BudgetCard = memo(function BudgetCard({ budget, currentMonth }: { budget: Budget; currentMonth: string }) {
   const tb = budget.fixedBudget + budget.variableBudget
   const ta = (budget.fixedActual ?? 0) + (budget.variableActual ?? 0)
   const over = budget.fixedActual !== null && budget.variableActual !== null && ta > tb

@@ -25,10 +25,7 @@ app/                  # Next.js App Router 页面和 API
   ├── api/habits/     # 习惯 CRUD（含 streaks、趋势、统计）
   ├── api/backup/     # 备份导出/恢复 JSON
   ├── api/tags/       # 标签管理
-  ├── api/search/     # 全文搜索
   ├── api/export/     # 导出（Markdown / JSON）
-  ├── api/import/     # 导入
-  ├── api/settings/   # 设置
   ├── api/auth/       # 密码验证
   ├── notes/          # 笔记列表页（批量选择+搜索+置顶+无限滚动）
   │   └── [id]/       # 笔记详情页（编辑器 + 标题/标签/删除）
@@ -50,7 +47,7 @@ components/             # React 组件
   ├── theme-toggle.tsx  # 深色模式切换
   ├── pwa-handler.tsx   # PWA 安装管理 + 诊断面板（无 as any）
   ├── page-animation.tsx # 页面过渡动效（fadeIn key 驱动）
-  └── skeleton-card.tsx # 骨架屏（NoteList/Habits 两种变体）
+  └── skeleton-card.tsx # 骨架屏（SkeletonNoteList / SkeletonHabits）
 lib/                    # 核心逻辑
   ├── db/               # 数据库模块（模块化，通过 index.ts 重导出）
   │   ├── client.ts     # getClient() + initDB()（含所有 DDL）
@@ -62,11 +59,10 @@ lib/                    # 核心逻辑
   │   └── index.ts      # 重导出（import from '@/lib/db' 不变）
   ├── types.ts          # TypeScript 类型（Note/Habit/Budget）
   ├── markdown.tsx      # MarkdownRenderer（react-markdown + Tailwind 样式）
-  ├── constants.ts      # 共享常量（类型颜色/分类标签映射）
   ├── navigation.ts     # 共享导航配置（NAV_ITEMS / PRIMARY_MOBILE_NAV）
   └── utils.ts          # cn() + genId() 等工具函数
 store/                  # Zustand 全局状态
-  ├── index.ts          # useAppStore（笔记分页缓存）+ useUIStore（UI 状态）
+  ├── index.ts          # useAppStore（笔记列表缓存，MAX_CACHED_NOTES=500）
   └── __tests__/        # 状态管理测试（10 测试）
 scripts/
   └── tunnel.sh         # HTTPS 隧道启动（cloudflared/ngrok/localtunnel）
@@ -98,13 +94,13 @@ public/
 
 - 页面过渡：`PageAnimation` 组件基于 `useSelectedLayoutSegment` 实现 key 变化触发 fadeIn
 - 列表交错：容器加 `animate-stagger`，子项自动延迟
-- 骨架屏：使用 `SkeletonCard` / `SkeletonNoteList` / `SkeletonHabits` 替代手动 Loader2
+- 骨架屏：使用 `SkeletonNoteList` / `SkeletonHabits` 替代手动 Loader2
 - 卡片悬浮：列表中的 Card 统一加 `card-hover` 类
 
 ### 状态管理
 
 - `useAppStore`（`store/index.ts`）：笔记列表缓存（cursor 分页，MAX_CACHED_NOTES=500），用于 note-list 组件
-- `useUIStore`（`store/index.ts`）：跨页面共享 UI 状态（isMobileMenuOpen）
+
 
 ### 性能优化约定
 
@@ -145,6 +141,6 @@ public/
 ## 测试
 
 ```bash
-npm test        # vitest 单元测试（5 文件，52 测试）
+npm test        # vitest 单元测试（5 文件，47 测试）
 npm run test:e2e # Playwright E2E（TODO）
 ```

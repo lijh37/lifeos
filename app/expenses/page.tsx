@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { SkeletonCard } from '@/components/skeleton-card'
+import { SkeletonNoteList } from '@/components/skeleton-card'
 import { ChevronLeft, ChevronRight, PiggyBank, CheckCircle2, AlertCircle, Sparkles, Loader2 } from 'lucide-react'
 import type { Budget } from '@/lib/types'
 import { ProgressBar } from '@/components/progress-bar'
@@ -131,7 +131,7 @@ export default function BudgetPage() {
       <ScrollArea className="flex-1">
         {loading ? (
           <div className="p-4">
-            <SkeletonCard count={4} />
+            <SkeletonNoteList count={4} />
           </div>
         ) : (
           <div className="space-y-3 p-4">

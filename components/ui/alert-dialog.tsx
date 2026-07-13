@@ -10,14 +10,6 @@ function AlertDialogRoot({ ...props }: AlertDialog.Root.Props) {
   return <AlertDialog.Root data-slot="alert-dialog" {...props} />
 }
 
-function AlertDialogTrigger({ ...props }: AlertDialog.Trigger.Props) {
-  return <AlertDialog.Trigger data-slot="alert-dialog-trigger" {...props} />
-}
-
-function AlertDialogPortal({ ...props }: AlertDialog.Portal.Props) {
-  return <AlertDialog.Portal data-slot="alert-dialog-portal" {...props} />
-}
-
 function AlertDialogOverlay({ className, ...props }: AlertDialog.Backdrop.Props) {
   return (
     <AlertDialog.Backdrop
@@ -103,12 +95,11 @@ function AlertDialogCancel({ ...props }: AlertDialog.Close.Props) {
 
 export {
   AlertDialogRoot,
-  AlertDialogTrigger,
   AlertDialogContent,
   AlertDialogHeader,
   AlertDialogFooter,
   AlertDialogTitle,
   AlertDialogDescription,
   AlertDialogAction,
-  AlertDialogCancel,
+  AlertDialogCancel
 }

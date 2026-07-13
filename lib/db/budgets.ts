@@ -99,12 +99,4 @@ export async function upsertBudget(month: string, data: Partial<Budget>): Promis
   return budget
 }
 
-/**
- * 获取预算记录总数。
- * @returns 预算数量
- */
-export async function getBudgetsCount(): Promise<number> {
-  const db = getClient()
-  const result = await db.execute('SELECT COUNT(*) as count FROM budgets')
-  return result.rows[0]?.count as number || 0
-}
+

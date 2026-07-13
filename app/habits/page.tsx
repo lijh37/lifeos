@@ -178,7 +178,7 @@ function HabitsPageInner() {
         ) : habits.length === 0 ? (
           <div className="flex h-48 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
             <Trophy className="h-10 w-10 text-muted-foreground/50" />
-            <p>还没有习惯，去 AI 对话或点新建添加</p>
+            <p>还没有习惯，点上方「新建」按钮添加</p>
           </div>
         ) : (
           <div className="space-y-4 p-4">
@@ -213,12 +213,12 @@ function HabitsPageInner() {
                   <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="text-xs text-muted-foreground">近7天趋势</span>
                 </div>
-                <div className="flex items-end gap-1.5" style={{ height: 48 }}>
+                <div className="flex gap-1.5" style={{ height: 48 }}>
                   {stats.trend7d.map((d) => {
                     const maxCount = Math.max(...stats.trend7d.map(x => x.count), 1)
                     const height = (d.count / maxCount) * 100
                     return (
-                      <div key={d.date} className="flex flex-1 flex-col items-center gap-0.5">
+                      <div key={d.date} className="flex flex-1 flex-col items-center justify-end gap-0.5">
                         <div
                           className="w-full rounded-t bg-orange-400"
                           style={{ height: `${Math.max(height, 8)}%` }}

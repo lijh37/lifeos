@@ -1,6 +1,3 @@
-/** 笔记类型（当前仅支持 'note'） */
-export type NoteType = 'note'
-
 /** 笔记附件数据结构 */
 export interface Attachment {
   /** 唯一标识（UUID） */
@@ -28,7 +25,7 @@ export interface Note {
   /** 笔记标题（可为空） */
   title: string | null
   /** 笔记类型 */
-  type: NoteType
+  type: 'note'
   /** 标签列表 */
   tags: string[]
   /** 截止日期（ISO 8601，可为空） */
@@ -80,20 +77,6 @@ export interface Habit {
   description: string
   /** 打卡频率：daily（每日）或 weekly（每周） */
   frequency: 'daily' | 'weekly'
-  /** 创建时间（ISO 8601） */
-  createdAt: string
-}
-
-/** 习惯打卡记录 */
-export interface HabitCompletion {
-  /** 唯一标识（UUID） */
-  id: string
-  /** 关联习惯 ID */
-  habitId: string
-  /** 打卡日期（YYYY-MM-DD 格式） */
-  date: string
-  /** 是否已完成打卡 */
-  completed: boolean
   /** 创建时间（ISO 8601） */
   createdAt: string
 }

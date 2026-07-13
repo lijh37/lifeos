@@ -1,5 +1,5 @@
 import type { InValue } from '@libsql/client'
-import type { Note, NoteType } from '../types'
+import type { Note } from '../types'
 import { getClient, fts5Available } from './client'
 import { syncNoteTags } from './tags'
 import { deleteAttachmentsByNoteId } from './attachments'
@@ -9,7 +9,7 @@ function rowToNote(row: Record<string, unknown>): Note {
     id: row.id as string,
     content: (row.content as string) || '',
     title: row.title as string | null,
-    type: row.type as NoteType,
+    type: 'note',
     tags: JSON.parse(row.tags as string) as string[],
     dueDate: row.due_date as string | null,
     done: (row.done as number) === 1,
@@ -88,7 +88,7 @@ export async function deleteNote(id: string): Promise<void> {
  * @param offset - 分页偏移量（默认 0）
  * @returns 笔记对象数组
  */
-export async function getNotes(type?: NoteType, limit = 200, offset = 0): Promise<Note[]> {
+export async function getNotes(type?: 'note', limit = 200, offset = 0): Promise<Note[]> {
   const db = getClient()
   let sql = 'SELECT * FROM notes'
   const args: InValue[] = []
@@ -109,7 +109,7 @@ export async function getNotes(type?: NoteType, limit = 200, offset = 0): Promis
  * @param cursor - 上一页最后一条的 created_at 时间戳
  * @returns 包含笔记数组和下一页游标的对象
  */
-export async function getNotesCursor(type?: NoteType, limit = 50, cursor?: string, tag?: string, summary = false): Promise<{ notes: Note[]; nextCursor: string | null }> {
+export async function getNotesCursor(type?: 'note', limit = 50, cursor?: string, tag?: string, summary = false): Promise<{ notes: Note[]; nextCursor: string | null }> {
   const db = getClient()
 
   // Use table-qualified columns so we can add JOINs for tag filtering
@@ -178,7 +178,7 @@ export async function getNotesCursor(type?: NoteType, limit = 50, cursor?: strin
  * @param offset - 分页偏移量（默认 0）
  * @returns 匹配日期范围的笔记数组
  */
-export async function getNotesByDateRange(startDate: string, endDate: string, type?: NoteType, limit = 200, offset = 0): Promise<Note[]> {
+export async function getNotesByDateRange(startDate: string, endDate: string, type?: 'note', limit = 200, offset = 0): Promise<Note[]> {
   const db = getClient()
   let sql = 'SELECT * FROM notes WHERE created_at >= ? AND created_at <= ?'
   const args: InValue[] = [startDate, endDate]
@@ -200,22 +200,6 @@ export async function getNotesByDateRange(startDate: string, endDate: string, ty
 export async function getNote(id: string): Promise<Note | null> {
   const db = getClient()
   const result = await db.execute({ sql: 'SELECT * FROM notes WHERE id = ?', args: [id] })
-  if (result.rows.length === 0) return null
-  return rowToNote(result.rows[0])
-}
-
-/**
- * 根据 ID 获取笔记元数据（不含 content 字段），用于列表预览等轻量场景。
- * 避免大正文笔记在 RSC 中传输整个 content。
- * @param id - 笔记 ID
- * @returns 笔记对象（content 为空字符串），未找到时返回 null
- */
-export async function getNoteMeta(id: string): Promise<Note | null> {
-  const db = getClient()
-  const result = await db.execute({
-    sql: `SELECT id, title, type, tags, done, pinned, created_at, updated_at, due_date FROM notes WHERE id = ?`,
-    args: [id],
-  })
   if (result.rows.length === 0) return null
   return rowToNote(result.rows[0])
 }
@@ -254,14 +238,4 @@ export async function searchNotes(query: string): Promise<Note[]> {
   return result.rows.map(rowToNote)
 }
 
-/**
- * 获取类型为 note 的笔记总数。
- * @returns 包含 note 计数的对象
- */
-export async function getNotesCount(): Promise<{ note: number }> {
-  const db = getClient()
-  const result = await db.execute(
-    `SELECT COUNT(*) as count FROM notes WHERE type = 'note'`
-  )
-  return { note: result.rows[0]?.count as number || 0 }
-}
+

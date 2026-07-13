@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { SkeletonCard } from '@/components/skeleton-card'
+import { SkeletonNoteList } from '@/components/skeleton-card'
 import {
   AlertDialogRoot,
   AlertDialogContent,
@@ -93,11 +93,11 @@ export default function TagsPage() {
       <ScrollArea className="flex-1">
         {loading ? (
           <div className="p-4">
-            <SkeletonCard count={5} />
+            <SkeletonNoteList count={5} />
           </div>
         ) : tags.length === 0 ? (
           <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
-            还没有标签，去 AI 对话页面创建笔记吧
+            还没有标签，创建笔记即可添加标签
           </div>
         ) : (
           <div className="space-y-1 p-4 animate-stagger">

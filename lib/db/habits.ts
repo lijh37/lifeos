@@ -128,27 +128,4 @@ export async function getTodayCompletions(): Promise<Record<string, boolean>> {
   return map
 }
 
-/**
- * 按关键词搜索习惯（名称或描述），返回最多 50 条结果。
- * @param query - 搜索关键词
- * @returns 匹配的习惯数组
- */
-export async function searchHabits(query: string): Promise<Habit[]> {
-  const term = `%${query}%`
-  const db = getClient()
-  const result = await db.execute({
-    sql: `SELECT * FROM habits WHERE name LIKE ? OR description LIKE ? ORDER BY created_at DESC LIMIT 50`,
-    args: [term, term],
-  })
-  return result.rows.map(rowToHabit)
-}
 
-/**
- * 获取习惯记录总数。
- * @returns 习惯数量
- */
-export async function getHabitsCount(): Promise<number> {
-  const db = getClient()
-  const result = await db.execute('SELECT COUNT(*) as count FROM habits')
-  return result.rows[0]?.count as number || 0
-}
