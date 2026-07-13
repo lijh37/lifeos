@@ -72,4 +72,42 @@ describe('useAppStore', () => {
     expect(updated.id).toBe('1')
     expect(updated.type).toBe('note')
   })
+
+  it('should update non-existent note without error', () => {
+    useAppStore.getState().setNotes([makeNote('1')])
+    expect(() => {
+      useAppStore.getState().updateNote('999', { content: 'ghost' })
+    }).not.toThrow()
+    expect(useAppStore.getState().notes).toHaveLength(1)
+  })
+
+  it('should remove non-existent note without error', () => {
+    useAppStore.getState().setNotes([makeNote('1')])
+    expect(() => {
+      useAppStore.getState().removeNote('999')
+    }).not.toThrow()
+    expect(useAppStore.getState().notes).toHaveLength(1)
+  })
+
+  it('should handle remove from empty list without error', () => {
+    expect(() => {
+      useAppStore.getState().removeNote('1')
+    }).not.toThrow()
+  })
+
+  it('should set initial loading state', () => {
+    expect(useAppStore.getState().initialLoading).toBe(false)
+    useAppStore.getState().setInitialLoading(true)
+    expect(useAppStore.getState().initialLoading).toBe(true)
+    useAppStore.getState().setInitialLoading(false)
+    expect(useAppStore.getState().initialLoading).toBe(false)
+  })
+
+  it('should cap notes at MAX_CACHED_NOTES on addNote', () => {
+    const manyNotes = Array.from({ length: 500 }, (_, i) => makeNote(String(i)))
+    useAppStore.getState().setNotes(manyNotes)
+    useAppStore.getState().addNote(makeNote('overflow'))
+    expect(useAppStore.getState().notes).toHaveLength(500)
+    expect(useAppStore.getState().notes[0].id).toBe('overflow')
+  })
 })

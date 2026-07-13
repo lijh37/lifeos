@@ -25,7 +25,7 @@ async function fetchTagsForNotes(noteIds: string[]): Promise<Map<string, string[
   const db = getClient()
   const placeholders = noteIds.map(() => '?').join(',')
   const result = await db.execute({
-    sql: `SELECT nt.note_id, t.name FROM note_tags nt JOIN tags t ON nt.tag_id = t.id WHERE nt.note_id IN (${placeholders})`,
+    sql: `SELECT nt.note_id, t.name FROM note_tags nt JOIN tags t ON nt.tag_id = t.id WHERE nt.note_id IN (${placeholders}) ORDER BY t.name`,
     args: noteIds as unknown as InValue[],
   })
   const tagMap = new Map<string, string[]>()
@@ -224,7 +224,7 @@ export async function getNote(id: string): Promise<Note | null> {
   const result = await db.execute({ sql: 'SELECT * FROM notes WHERE id = ?', args: [id] })
   if (result.rows.length === 0) return null
   const tagsResult = await db.execute({
-    sql: 'SELECT t.name FROM note_tags nt JOIN tags t ON nt.tag_id = t.id WHERE nt.note_id = ?',
+    sql: 'SELECT t.name FROM note_tags nt JOIN tags t ON nt.tag_id = t.id WHERE nt.note_id = ? ORDER BY t.name',
     args: [id],
   })
   const tags = tagsResult.rows.map(r => r.name as string)

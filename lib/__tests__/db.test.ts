@@ -307,7 +307,7 @@ describe('Database - Search and Tags', () => {
     expect(tags.find(t => t.name === 'personal')!.count).toBe(1)
 
     const updated = await getNote(note.id)
-    expect(updated!.tags).toEqual(['work', 'personal'])
+    expect(updated!.tags).toEqual(['personal', 'work'])
   })
 
   it('should delete non-existent tag without error', async () => {

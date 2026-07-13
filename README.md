@@ -4,13 +4,13 @@
 
 ## 技术栈
 
-Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 + shadcn/ui · Turso (libSQL) · Zustand · date-fns v4 · lucide-react
+Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 + shadcn/ui (`base-nova`, `@base-ui/react`) · Turso (libSQL) · Zustand v5 · date-fns v4 · lucide-react · sonner · `@tanstack/react-virtual` · `@vercel/blob`
 
 ## 快速开始
 
 ```bash
 npm install
-cp .env.example .env.local   # 填入 Turso 数据库信息
+cp .env.example .env.local   # 填入 Turso 数据库信息（及可选的 Blob Token）
 npm run dev                   # http://localhost:3000
 ```
 
@@ -24,17 +24,20 @@ git push origin main          # Vercel 自动部署
 
 ### 环境变量
 
-| 变量 | 说明 |
-|------|------|
-| `TURSO_DATABASE_URL` | Turso 数据库地址 |
-| `TURSO_AUTH_TOKEN` | Turso 认证 Token |
-| `APP_PASSWORD` | 登录密码（可选，留空则不启用） |
+| 变量 | 必需 | 说明 |
+|------|------|------|
+| `TURSO_DATABASE_URL` | 是 | Turso 数据库地址 |
+| `TURSO_AUTH_TOKEN` | 是 | Turso 认证 Token |
+| `APP_PASSWORD` | 否 | 登录密码（不设置则跳过认证，.env.example 默认 `demo`）|
+| `BLOB_READ_WRITE_TOKEN` | 否（附件功能） | Vercel Blob 存储 Token |
+| `DATABASE_URL` | 否 | 本地 SQLite（仅测试用，默认 `:memory:`）|
 
 ## 测试
 
 ```bash
-npm test           # 47 单元测试
+npm test           # vitest 单元测试（6 文件，72 测试）
 npm run test:e2e   # Playwright E2E（TODO）
+npm run analyze    # 分析构建产物体积（需要 ANALYZE=true）
 ```
 
-> 详细项目文档见 `AGENTS.md`（目录结构、关键约定、性能优化约定、PWA 安装约定等）。
+> 详细项目文档见 `AGENTS.md`（目录结构、关键约定、性能优化约定、PWA 说明等）。

@@ -45,12 +45,13 @@ describe('NoteList', () => {
     })
   })
 
-  it('should render loading skeleton initially when initialLoading is true', () => {
+  it('should render loading skeleton initially when initialLoading is true', async () => {
     useAppStore.setState({ initialLoading: true, notes: [] })
     render(<NoteList />)
-    // The SkeletonNoteList should render when loading
-    // Check that no note content is shown
-    expect(screen.queryByText('Test content')).not.toBeInTheDocument()
+    // Let async effects (fetch) settle, then verify skeleton is still shown
+    await waitFor(() => {
+      expect(screen.queryByText('Test content')).not.toBeInTheDocument()
+    })
   })
 
   it('should render notes from store after fetch resolves', async () => {
