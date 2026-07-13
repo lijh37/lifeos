@@ -26,6 +26,8 @@ export function getClient() {
   client = tursoUrl
     ? createClient({ url: tursoUrl, authToken })
     : createClient({ url })
+  // 启用外键约束（SQLite 默认关闭）
+  try { client.execute('PRAGMA foreign_keys = ON') } catch { /* 某些托管环境可能不支持 */ }
   initDB()
   return client
 }
@@ -40,7 +42,13 @@ export async function initDB() {
   dbInitialized = true
 
   if (process.env.TURSO_DATABASE_URL) {
-    fts5Available = true
+    // 探测 FTS5 在 Turso 中是否可用（表结构已存在于云端）
+    client!.execute("SELECT count(*) FROM notes_fts")
+      .then(() => { fts5Available = true })
+      .catch(() => {
+        console.warn('[fts5] Turso 中 FTS5 不可用（notes_fts 表不存在），回退到 LIKE 搜索')
+        fts5Available = false
+      })
     return
   }
 
@@ -115,7 +123,9 @@ export async function initDB() {
     CREATE TABLE IF NOT EXISTS note_tags (
       note_id TEXT NOT NULL,
       tag_id TEXT NOT NULL,
-      PRIMARY KEY (note_id, tag_id)
+      PRIMARY KEY (note_id, tag_id),
+      FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+      FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
     )
   `)
 

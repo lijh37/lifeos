@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { deleteNote, getNote, updateNote } from '@/lib/db'
+import { getNote, updateNote, getClient } from '@/lib/db'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -10,17 +10,46 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'delete') {
-    await Promise.all(ids.map(id => deleteNote(id)))
+    const db = getClient()
+    const tx = await db.transaction()
+    try {
+      for (const noteId of ids) {
+        await tx.execute({ sql: 'DELETE FROM note_tags WHERE note_id = ?', args: [noteId] })
+        await tx.execute({ sql: 'DELETE FROM attachments WHERE note_id = ?', args: [noteId] })
+        await tx.execute({ sql: 'DELETE FROM notes WHERE id = ?', args: [noteId] })
+      }
+      await tx.commit()
+    } catch (e) {
+      await tx.rollback()
+      console.error('[batch] 批量删除事务失败:', e)
+      return NextResponse.json({ error: '批量删除失败' }, { status: 500 })
+    }
   } else if (action === 'tag') {
     if (!tag) {
       return NextResponse.json({ error: 'Tag name required' }, { status: 400 })
     }
-    await Promise.all(ids.map(async (id) => {
-      const note = await getNote(id)
-      if (!note) return
-      const tags = note.tags.includes(tag) ? note.tags : [...note.tags, tag]
-      await updateNote(id, { tags })
-    }))
+    const db = getClient()
+    const tx = await db.transaction()
+    try {
+      for (const noteId of ids) {
+        const result = await tx.execute({
+          sql: 'SELECT tags FROM notes WHERE id = ?',
+          args: [noteId],
+        })
+        if (result.rows.length === 0) continue
+        const currentTags = JSON.parse(result.rows[0].tags as string) as string[]
+        const newTags = currentTags.includes(tag) ? currentTags : [...currentTags, tag]
+        await tx.execute({
+          sql: "UPDATE notes SET tags = ?, updated_at = ? WHERE id = ?",
+          args: [JSON.stringify(newTags), new Date().toISOString(), noteId],
+        })
+      }
+      await tx.commit()
+    } catch (e) {
+      await tx.rollback()
+      console.error('[batch] 批量打标签事务失败:', e)
+      return NextResponse.json({ error: '批量打标签失败' }, { status: 500 })
+    }
   }
 
   return NextResponse.json({ success: true })
