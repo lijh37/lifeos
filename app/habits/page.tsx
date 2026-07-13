@@ -60,6 +60,11 @@ function HabitsPageInner() {
     })
     const data = await res.json()
     setTodayMap((prev) => ({ ...prev, [habitId]: data.completed }))
+    setStreaks((prev) => ({ ...prev, [habitId]: data.streak }))
+    setBestStreaks((prev) => ({ ...prev, [habitId]: data.bestStreak }))
+    setPerHabitTotals((prev) => ({ ...prev, [habitId]: data.totalCompletions }))
+    setPerHabitWeek((prev) => ({ ...prev, [habitId]: data.weekCount }))
+    setPerHabitMonth((prev) => ({ ...prev, [habitId]: data.monthCount }))
   }
 
   function handleDelete(id: string) {
