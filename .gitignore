@@ -40,7 +40,6 @@ yarn-error.log*
 /笔记.md
 
 # auto-generated scripts
-/port-forward.ps1
 
 # turso cli artifacts
 /auth

@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createHabit, getHabits, deleteHabit, toggleCompletion, getTodayCompletions, getStreaks, getClient } from '@/lib/db'
+import {
+  createHabit, getHabits, deleteHabit, updateHabit, toggleCompletion,
+  getTodayCompletions, getStreaks, getBestStreaks,
+  getMonthlyStats, getClient,
+} from '@/lib/db'
 import type { Habit } from '@/lib/types'
 
 export async function GET() {
@@ -7,59 +11,56 @@ export async function GET() {
   const habits = await getHabits()
   const todayCompletions = await getTodayCompletions()
   const streaks = await getStreaks()
+  const bestStreaks = await getBestStreaks()
+  const monthlyStats = await getMonthlyStats()
 
+  // Per-habit total completions
+  const perHabitTotalsRows = await db.execute(`SELECT habit_id, COUNT(*) as count FROM habit_completions WHERE completed=1 GROUP BY habit_id`)
+  const perHabitTotals: Record<string, number> = {}
+  perHabitTotalsRows.rows.forEach(r => {
+    perHabitTotals[r.habit_id as string] = r.count as number
+  })
+
+  // Per-habit weekly completions (Monday this week onward)
+  const weekStart = new Date()
+  const dayOfWeek = weekStart.getDay()
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+  const monday = new Date(weekStart)
+  monday.setDate(weekStart.getDate() + mondayOffset)
+  const mondayStr = monday.toISOString().slice(0, 10)
+
+  const perHabitWeekRows = await db.execute({
+    sql: `SELECT habit_id, COUNT(*) as count FROM habit_completions WHERE completed=1 AND date >= ? GROUP BY habit_id`,
+    args: [mondayStr],
+  })
+  const perHabitWeek: Record<string, number> = {}
+  perHabitWeekRows.rows.forEach(r => {
+    perHabitWeek[r.habit_id as string] = r.count as number
+  })
+
+  // Per-habit monthly completions (month start onward)
   const monthStart = new Date()
   monthStart.setDate(1)
   const monthStartStr = monthStart.toISOString().slice(0, 10)
 
-  const [monthlyStats, trend7d, totalCount] = await Promise.all([
-    db.execute({
-      sql: `SELECT date, COUNT(*) as count FROM habit_completions WHERE completed=1 AND date >= ? GROUP BY date ORDER BY date ASC`,
-      args: [monthStartStr],
-    }),
-    db.execute({
-      sql: `SELECT date, COUNT(*) as count FROM habit_completions WHERE completed=1 AND date >= date('now', '-6 days') GROUP BY date ORDER BY date ASC`,
-    }),
-    db.execute(`SELECT COUNT(*) as count FROM habit_completions WHERE completed=1`),
-  ])
-
-  // 生成精确7天日期范围，缺失天数补0
-  const countMap: Record<string, number> = {}
-  trend7d.rows.forEach(r => {
-    countMap[r.date as string] = r.count as number
+  const perHabitMonthRows = await db.execute({
+    sql: `SELECT habit_id, COUNT(*) as count FROM habit_completions WHERE completed=1 AND date >= ? GROUP BY habit_id`,
+    args: [monthStartStr],
   })
-  const trend7dFilled: { date: string; count: number }[] = []
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    const dateStr = d.toISOString().slice(0, 10)
-    trend7dFilled.push({
-      date: dateStr,
-      count: countMap[dateStr] || 0,
-    })
-  }
-
-  const daysInMonth = new Date(
-    monthStart.getFullYear(),
-    monthStart.getMonth() + 1,
-    0
-  ).getDate()
-
-  const monthCompletions = monthlyStats.rows.reduce((sum, r) => sum + (r.count as number), 0)
-  const totalHabits = habits.length
-  const maxDaily = totalHabits * daysInMonth
-  const monthlyRate = maxDaily > 0 ? Math.round((monthCompletions / maxDaily) * 100) : 0
+  const perHabitMonth: Record<string, number> = {}
+  perHabitMonthRows.rows.forEach(r => {
+    perHabitMonth[r.habit_id as string] = r.count as number
+  })
 
   return NextResponse.json({
     habits,
     todayCompletions,
     streaks,
-    stats: {
-      monthlyRate,
-      monthCompletions,
-      totalCompletions: (totalCount.rows[0]?.count as number) || 0,
-      trend7d: trend7dFilled,
-    },
+    bestStreaks,
+    perHabitRates: monthlyStats.perHabitRates,
+    perHabitTotals,
+    perHabitWeek,
+    perHabitMonth,
   })
 }
 
@@ -78,6 +79,16 @@ export async function POST(req: NextRequest) {
   }
   await createHabit(habit)
   return NextResponse.json({ habit })
+}
+
+export async function PATCH(req: NextRequest) {
+  const body = await req.json()
+  const { id, name, description } = body
+  if (!id || !name?.trim()) {
+    return NextResponse.json({ error: 'Missing id or name' }, { status: 400 })
+  }
+  await updateHabit(id, name.trim(), description || '')
+  return NextResponse.json({ success: true })
 }
 
 export async function DELETE(req: NextRequest) {

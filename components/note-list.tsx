@@ -4,7 +4,6 @@ import { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   CheckSquare,
   Search,
@@ -28,7 +27,7 @@ export function NoteList() {
   const router = useRouter()
   const { notes, setNotes, initialLoading, setInitialLoading, removeNote, updateNote } = useAppStore()
   const [mounted, setMounted] = useState(false)
-  // Wait for ScrollArea to mount so VirtualNoteList gets a valid scrollRef
+  // Wait for mount so VirtualNoteList gets a valid scrollRef
   useLayoutEffect(() => { setMounted(true) }, [])
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -73,11 +72,9 @@ export function NoteList() {
   // Save scroll position before navigating away
   useEffect(() => {
     return () => {
-      if (scrollRef.current) {
-        try {
-          sessionStorage.setItem(SCROLL_POSITION_KEY, String(scrollRef.current.scrollTop))
-        } catch { /* quota exceeded, ignore */ }
-      }
+      try {
+        sessionStorage.setItem(SCROLL_POSITION_KEY, String(window.scrollY))
+      } catch { /* quota exceeded, ignore */ }
     }
   }, [])
 
@@ -170,9 +167,7 @@ export function NoteList() {
       const savedScroll = sessionStorage.getItem(SCROLL_POSITION_KEY)
       if (savedScroll !== null) {
         requestAnimationFrame(() => {
-          if (scrollRef.current) {
-            scrollRef.current.scrollTop = parseInt(savedScroll, 10)
-          }
+          window.scrollTo(0, parseInt(savedScroll, 10))
         })
         sessionStorage.removeItem(SCROLL_POSITION_KEY)
       }
@@ -341,7 +336,7 @@ export function NoteList() {
         ))}
       </div>
 
-      <ScrollArea ref={scrollRef} className="flex-1 p-4 pb-20">
+      <div ref={scrollRef} className="flex-1 p-4 pb-20">
         {initialLoading && notes.length === 0 ? (
           <SkeletonNoteList count={5} />
         ) : displayNotes.length === 0 ? (
@@ -395,7 +390,7 @@ export function NoteList() {
 
           </>
         )}
-      </ScrollArea>
+      </div>
 
       {showBatchBar && (
         <BatchActionsBar

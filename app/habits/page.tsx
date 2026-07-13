@@ -3,28 +3,57 @@
 import { useEffect, useState, memo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ErrorBoundary } from '@/components/error-boundary'
-import { CheckCircle, Circle, Plus, Trash2, Trophy, Flame, CalendarCheck, Target, TrendingUp } from 'lucide-react'
+import { CheckCircle, Circle, Plus, Trash2, Trophy, Flame, Pencil, Check, X } from 'lucide-react'
 import { SkeletonHabits } from '@/components/skeleton-card'
-import { format } from 'date-fns'
-import { zhCN } from 'date-fns/locale'
 import type { Habit } from '@/lib/types'
+import {
+  AlertDialogRoot,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog'
 
 const HabitRow = memo(function HabitRow({
   habit,
   done,
   streak,
+  bestStreak,
+  weekCount,
+  monthCount,
+  totalCompletions,
   today,
   onToggle,
   onDelete,
+  onEdit,
+  isEditing,
+  editValue,
+  onEditValueChange,
+  onEditConfirm,
+  onEditCancel,
 }: {
   habit: Habit
   done: boolean
   streak: number
+  bestStreak: number
+  weekCount: number
+  monthCount: number
+  totalCompletions: number
   today: string
   onToggle: (habitId: string, date: string) => void
   onDelete: (id: string) => void
+  onEdit: (habit: Habit) => void
+  isEditing: boolean
+  editValue: string
+  onEditValueChange: (value: string) => void
+  onEditConfirm: () => void
+  onEditCancel: () => void
 }) {
   return (
     <Card className="card-hover">
@@ -37,21 +66,65 @@ const HabitRow = memo(function HabitRow({
           )}
         </button>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className={`text-sm font-medium ${done ? 'line-through text-muted-foreground' : ''}`}>
-              {habit.name}
-            </p>
-            {streak > 0 && (
-              <span className="flex items-center gap-0.5 text-xs text-orange-500">
-                <Flame className="h-3 w-3" />
-                {streak}天
-              </span>
-            )}
-          </div>
-          {habit.description && (
-            <p className="text-xs text-muted-foreground">{habit.description}</p>
+          {isEditing ? (
+            <div className="flex items-center gap-2">
+              <Input
+                value={editValue}
+                onChange={e => onEditValueChange(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') onEditConfirm()
+                  if (e.key === 'Escape') onEditCancel()
+                }}
+                className="h-8 text-sm"
+                autoFocus
+              />
+              <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" onClick={onEditConfirm}>
+                <Check className="h-4 w-4" />
+              </Button>
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEditCancel}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <p className={`text-sm font-medium ${done ? 'line-through text-muted-foreground' : ''}`}>
+                  {habit.name}
+                </p>
+                {streak > 0 && (
+                  <span className="flex items-center gap-0.5 text-xs text-orange-500" title={`当前连续 ${streak} 天`}>
+                    <Flame className="h-3 w-3" />
+                    {streak}天
+                  </span>
+                )}
+                {bestStreak > 0 && bestStreak !== streak && (
+                  <span className="flex items-center gap-0.5 text-xs text-muted-foreground" title={`最佳连续 ${bestStreak} 天`}>
+                    <Trophy className="h-3 w-3" />
+                    {bestStreak}天
+                  </span>
+                )}
+              </div>
+              {habit.description && (
+                <p className="text-xs text-muted-foreground">{habit.description}</p>
+              )}
+              <div className="mt-1 flex items-center gap-3 text-[10px] text-muted-foreground">
+                <span>本周 {weekCount} 次</span>
+                <span>本月 {monthCount} 次</span>
+                <span>累计 {totalCompletions} 次</span>
+              </div>
+            </>
           )}
         </div>
+        {!isEditing && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            onClick={() => onEdit(habit)}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -66,21 +139,20 @@ const HabitRow = memo(function HabitRow({
 })
 HabitRow.displayName = 'HabitRow'
 
-interface HabitStats {
-  monthlyRate: number
-  monthCompletions: number
-  totalCompletions: number
-  trend7d: { date: string; count: number }[]
-}
-
 function HabitsPageInner() {
   const [habits, setHabits] = useState<Habit[]>([])
   const [todayMap, setTodayMap] = useState<Record<string, boolean>>({})
   const [streaks, setStreaks] = useState<Record<string, number>>({})
-  const [stats, setStats] = useState<HabitStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [newName, setNewName] = useState('')
   const [showInput, setShowInput] = useState(false)
+  const [bestStreaks, setBestStreaks] = useState<Record<string, number>>({})
+  const [perHabitTotals, setPerHabitTotals] = useState<Record<string, number>>({})
+  const [perHabitWeek, setPerHabitWeek] = useState<Record<string, number>>({})
+  const [perHabitMonth, setPerHabitMonth] = useState<Record<string, number>>({})
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/habits')
@@ -89,7 +161,10 @@ function HabitsPageInner() {
         setHabits(data.habits)
         setTodayMap(data.todayCompletions)
         setStreaks(data.streaks || {})
-        setStats(data.stats || null)
+        setBestStreaks(data.bestStreaks || {})
+        setPerHabitTotals(data.perHabitTotals || {})
+        setPerHabitWeek(data.perHabitWeek || {})
+        setPerHabitMonth(data.perHabitMonth || {})
       })
       .catch((e) => console.error('Failed to fetch habits:', e))
       .finally(() => setLoading(false))
@@ -103,23 +178,51 @@ function HabitsPageInner() {
     })
     const data = await res.json()
     setTodayMap((prev) => ({ ...prev, [habitId]: data.completed }))
-    fetch('/api/habits')
-      .then(r => r.json())
-      .then(d => setStats(d.stats || null))
-      .catch(() => {})
   }
 
-  async function handleDelete(id: string) {
+  function handleDelete(id: string) {
+    setDeleteTarget(id)
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
     try {
-      await fetch(`/api/habits?id=${id}`, { method: 'DELETE' })
-      setHabits((prev) => prev.filter((h) => h.id !== id))
-      fetch('/api/habits')
-        .then(r => r.json())
-        .then(d => setStats(d.stats || null))
-        .catch(() => {})
+      await fetch(`/api/habits?id=${deleteTarget}`, { method: 'DELETE' })
+      setHabits((prev) => prev.filter((h) => h.id !== deleteTarget))
     } catch (e) {
       console.error('Failed to delete habit:', e)
     }
+    setDeleteTarget(null)
+  }
+
+  function handleEdit(habit: Habit) {
+    setEditingId(habit.id)
+    setEditValue(habit.name)
+  }
+
+  async function handleEditConfirm() {
+    if (!editingId || !editValue.trim()) return
+    try {
+      const res = await fetch('/api/habits', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingId, name: editValue.trim(), description: '' }),
+      })
+      if (res.ok) {
+        setHabits((prev) =>
+          prev.map((h) => (h.id === editingId ? { ...h, name: editValue.trim() } : h))
+        )
+      }
+    } catch (e) {
+      console.error('Failed to edit habit:', e)
+    }
+    setEditingId(null)
+    setEditValue('')
+  }
+
+  function handleEditCancel() {
+    setEditingId(null)
+    setEditValue('')
   }
 
   async function handleCreate() {
@@ -133,15 +236,9 @@ function HabitsPageInner() {
     setHabits((prev) => [data.habit, ...prev])
     setNewName('')
     setShowInput(false)
-    fetch('/api/habits')
-      .then(r => r.json())
-      .then(d => setStats(d.stats || null))
-      .catch(() => {})
   }
 
   const today = new Date().toISOString().slice(0, 10)
-  const completedCount = habits.filter((h) => todayMap[h.id]).length
-  const allDone = habits.length > 0 && completedCount === habits.length
 
   return (
     <div className="flex h-full flex-col">
@@ -182,68 +279,35 @@ function HabitsPageInner() {
           </div>
         ) : (
           <div className="space-y-4 p-4">
-            {stats && (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <div className="rounded-lg bg-card p-3 text-center card-hover">
-                  <Flame className="mx-auto mb-1 h-4 w-4 text-orange-500" />
-                  <p className="text-lg font-bold">{completedCount}/{habits.length}</p>
-                  <p className="text-[10px] text-muted-foreground">今日</p>
-                </div>
-                <div className="rounded-lg bg-card p-3 text-center">
-                  <CalendarCheck className="mx-auto mb-1 h-4 w-4 text-green-500" />
-                  <p className="text-lg font-bold">{stats.monthlyRate}%</p>
-                  <p className="text-[10px] text-muted-foreground">月完成率</p>
-                </div>
-                <div className="rounded-lg bg-card p-3 text-center">
-                  <Target className="mx-auto mb-1 h-4 w-4 text-blue-500" />
-                  <p className="text-lg font-bold">{stats.monthCompletions}</p>
-                  <p className="text-[10px] text-muted-foreground">本月打卡</p>
-                </div>
-                <div className="rounded-lg bg-card p-3 text-center">
-                  <Trophy className="mx-auto mb-1 h-4 w-4 text-purple-500" />
-                  <p className="text-lg font-bold">{stats.totalCompletions}</p>
-                  <p className="text-[10px] text-muted-foreground">累计</p>
-                </div>
-              </div>
-            )}
-
-            {stats && (
-              <div className="rounded-lg bg-card p-3">
-                <div className="mb-2 flex items-center gap-1.5">
-                  <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">近7天趋势</span>
-                </div>
-                <div className="flex gap-1.5" style={{ height: 48 }}>
-                  {stats.trend7d.map((d) => {
-                    const maxCount = Math.max(...stats.trend7d.map(x => x.count), 1)
-                    const height = (d.count / maxCount) * 100
-                    return (
-                      <div key={d.date} className="flex flex-1 flex-col items-center justify-end gap-0.5">
-                        <div
-                          className="w-full rounded-t bg-orange-400"
-                          style={{ height: `${Math.max(height, 8)}%` }}
-                        />
-                        <span className="text-[9px] text-muted-foreground">
-                          {format(new Date(d.date), 'E', { locale: zhCN }).charAt(0)}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
             <div className="animate-stagger space-y-2">
               {habits.map((habit) => {
                 const done = todayMap[habit.id] ?? false
                 return (
-                  <HabitRow key={habit.id} habit={habit} done={done} streak={streaks[habit.id] ?? 0} today={today} onToggle={handleToggle} onDelete={handleDelete} />
+                  <HabitRow key={habit.id} habit={habit} done={done} streak={streaks[habit.id] ?? 0} bestStreak={bestStreaks[habit.id] ?? 0} weekCount={perHabitWeek[habit.id] ?? 0} monthCount={perHabitMonth[habit.id] ?? 0} totalCompletions={perHabitTotals[habit.id] ?? 0} today={today} onToggle={handleToggle} onDelete={handleDelete} onEdit={handleEdit} isEditing={editingId === habit.id} editValue={editValue} onEditValueChange={setEditValue} onEditConfirm={handleEditConfirm} onEditCancel={handleEditCancel} />
                 )
               })}
             </div>
           </div>
         )}
       </ScrollArea>
+
+      <AlertDialogRoot open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确定删除该习惯？</AlertDialogTitle>
+            <AlertDialogDescription>此操作不可撤销，相关的打卡记录也会被删除。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialogRoot>
     </div>
   )
 }

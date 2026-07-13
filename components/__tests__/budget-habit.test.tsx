@@ -67,18 +67,18 @@ describe('HabitRow', () => {
   const onDelete = vi.fn()
 
   it('should render habit name and description', () => {
-    render(<HabitRow habit={habit} done={false} streak={0} today="2026-07-01" onToggle={onToggle} onDelete={onDelete} />)
+    render(<HabitRow habit={habit} done={false} streak={0} bestStreak={0} weekCount={0} monthCount={0} totalCompletions={0} today="2026-07-01" onToggle={onToggle} onDelete={onDelete} />)
     expect(screen.getByText('每天跑步')).toBeInTheDocument()
     expect(screen.getByText('跑5公里')).toBeInTheDocument()
   })
 
   it('should show streak when > 0', () => {
-    render(<HabitRow habit={habit} done={true} streak={5} today="2026-07-01" onToggle={onToggle} onDelete={onDelete} />)
+    render(<HabitRow habit={habit} done={true} streak={5} bestStreak={10} weekCount={0} monthCount={0} totalCompletions={0} today="2026-07-01" onToggle={onToggle} onDelete={onDelete} />)
     expect(screen.getByText(/5天/)).toBeInTheDocument()
   })
 
   it('should show completion check when done', () => {
-    const { container } = render(<HabitRow habit={habit} done={true} streak={0} today="2026-07-01" onToggle={onToggle} onDelete={onDelete} />)
+    const { container } = render(<HabitRow habit={habit} done={true} streak={0} bestStreak={0} weekCount={0} monthCount={0} totalCompletions={0} today="2026-07-01" onToggle={onToggle} onDelete={onDelete} />)
     // The CheckCircle icon has text-green-500 class when done
     expect(container.querySelector('.text-green-500')).toBeTruthy()
   })
