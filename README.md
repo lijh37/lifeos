@@ -12,9 +12,6 @@ Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 + shadcn/ui · Turso (l
 npm install
 cp .env.example .env.local   # 填入 Turso 数据库信息
 npm run dev                   # http://localhost:3000
-
-# 手机端 PWA 测试（HTTPS）
-bash start.sh                 # 局域网 HTTPS，手机访问 https://<LAN-IP>:3000
 ```
 
 ## 部署

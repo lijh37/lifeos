@@ -7,7 +7,6 @@
   },
   "scripts": {
     "dev": "next dev -H 0.0.0.0 --webpack",
-    "dev:https": "next dev -H 0.0.0.0 --webpack --experimental-https --experimental-https-key ./certs/dev-key.pem --experimental-https-cert ./certs/dev-cert.pem",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

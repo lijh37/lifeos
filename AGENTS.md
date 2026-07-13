@@ -65,7 +65,6 @@ store/                  # Zustand 全局状态
   ├── index.ts          # useAppStore（笔记列表缓存，MAX_CACHED_NOTES=500）
   └── __tests__/        # 状态管理测试（10 测试）
 scripts/
-  └── tunnel.sh         # HTTPS 隧道启动（cloudflared/ngrok/localtunnel）
 lib/__tests__/             # 库测试
   ├── db.test.ts        # 数据库测试（27 测试）
   └── utils.test.ts     # 工具函数测试（5 测试）
@@ -114,7 +113,7 @@ public/
 - `public/manifest.json`：standalone 模式，192x192 + 512x512 PNG 图标（SVG 已弃用）
 - `components/pwa-handler.tsx`：beforeinstallprompt 用 useRef 保存（不用 state）以保证手势上下文；安装按钮用 onPointerDown 同步触发 prompt()
 - 诊断面板：右上角 Bug 图标，`?debug=1` 自动展开
-- 测试命令：`bash scripts/tunnel.sh` 创建 HTTPS 隧道供手机安装
+- 测试命令：`npm run dev` 启动开发服务器后打开 `http://localhost:3000`
 
 ## 部署
 
@@ -127,7 +126,7 @@ public/
 本项目运行在 WSL2 中，WSL2 有独立的虚拟 IP（如 `192.168.82.x`），无法从局域网其他设备直接访问。
 
 - **PC 端开发**：Windows 浏览器打开 `http://localhost:3000`（Windows 自动转发到 WSL2）
-- **手机端测试**：执行 `bash start.sh` 生成 HTTPS 证书后，手机可直接访问 `https://<LAN-IP>:3000` 安装 PWA；或执行 `setup-wsl.ps1` 端口转发后用 `bash scripts/tunnel.sh` 创建 HTTPS 隧道
+- **手机端测试**：`npm run dev` 后手机访问 `http://<LAN-IP>:3000`
 - **生产部署**：`git push origin main` → Vercel 自动部署
 
 ## 添加新模块
