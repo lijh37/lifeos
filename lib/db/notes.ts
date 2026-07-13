@@ -4,19 +4,37 @@ import { getClient, fts5Available } from './client'
 import { syncNoteTags } from './tags'
 import { deleteAttachmentsByNoteId } from './attachments'
 
-function rowToNote(row: Record<string, unknown>): Note {
+function rowToNote(row: Record<string, unknown>, tags: string[] = []): Note {
   return {
     id: row.id as string,
     content: (row.content as string) || '',
     title: row.title as string | null,
     type: 'note',
-    tags: JSON.parse(row.tags as string) as string[],
+    tags,
     dueDate: row.due_date as string | null,
     done: (row.done as number) === 1,
     pinned: (row.pinned as number) === 1,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   }
+}
+
+/** 批量查询多条笔记的标签（通过 note_tags 规范化表） */
+async function fetchTagsForNotes(noteIds: string[]): Promise<Map<string, string[]>> {
+  if (noteIds.length === 0) return new Map()
+  const db = getClient()
+  const placeholders = noteIds.map(() => '?').join(',')
+  const result = await db.execute({
+    sql: `SELECT nt.note_id, t.name FROM note_tags nt JOIN tags t ON nt.tag_id = t.id WHERE nt.note_id IN (${placeholders})`,
+    args: noteIds as unknown as InValue[],
+  })
+  const tagMap = new Map<string, string[]>()
+  for (const row of result.rows) {
+    const noteId = row.note_id as string
+    if (!tagMap.has(noteId)) tagMap.set(noteId, [])
+    tagMap.get(noteId)!.push(row.name as string)
+  }
+  return tagMap
 }
 
 /**
@@ -27,11 +45,10 @@ function rowToNote(row: Record<string, unknown>): Note {
 export async function createNote(note: Note): Promise<Note> {
   const db = getClient()
   await db.execute({
-    sql: `INSERT INTO notes (id, content, title, type, tags, due_date, done, pinned, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO notes (id, content, title, type, due_date, done, pinned, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
-      note.id, note.content, note.title, note.type,
-      JSON.stringify(note.tags), note.dueDate,
+      note.id, note.content, note.title, note.type, note.dueDate,
       note.done ? 1 : 0, note.pinned ? 1 : 0, note.createdAt, note.updatedAt,
     ] as InValue[],
   })
@@ -53,7 +70,6 @@ export async function updateNote(id: string, updates: Partial<Note>): Promise<vo
   if (updates.content !== undefined) { fields.push('content = ?'); args.push(updates.content) }
   if (updates.title !== undefined) { fields.push('title = ?'); args.push(updates.title) }
   if (updates.type !== undefined) { fields.push('type = ?'); args.push(updates.type) }
-  if (updates.tags !== undefined) { fields.push('tags = ?'); args.push(JSON.stringify(updates.tags)) }
   if (updates.dueDate !== undefined) { fields.push('due_date = ?'); args.push(updates.dueDate) }
   if (updates.done !== undefined) { fields.push('done = ?'); args.push(updates.done ? 1 : 0) }
   if (updates.pinned !== undefined) { fields.push('pinned = ?'); args.push(updates.pinned ? 1 : 0) }
@@ -99,7 +115,9 @@ export async function getNotes(type?: 'note', limit = 200, offset = 0): Promise<
   sql += ' ORDER BY pinned DESC, created_at DESC LIMIT ? OFFSET ?'
   args.push(limit, offset)
   const result = await db.execute({ sql, args })
-  return result.rows.map(rowToNote)
+  const ids = result.rows.map(r => r.id as string)
+  const tagMap = await fetchTagsForNotes(ids)
+  return result.rows.map(row => rowToNote(row, tagMap.get(row.id as string) || []))
 }
 
 /**
@@ -115,7 +133,7 @@ export async function getNotesCursor(type?: 'note', limit = 50, cursor?: string,
   // Use table-qualified columns so we can add JOINs for tag filtering
   // Summary mode only fetches first 80 chars of content (for list preview)
   const selectColumns = summary
-    ? "notes.id, notes.title, notes.type, notes.tags, notes.pinned, notes.done, notes.created_at, notes.updated_at, notes.due_date, substr(notes.content, 1, 80) AS content"
+    ? "notes.id, notes.title, notes.type, notes.pinned, notes.done, notes.created_at, notes.updated_at, notes.due_date, substr(notes.content, 1, 80) AS content"
     : 'notes.*'
   let sql = `SELECT ${selectColumns} FROM notes`
   const args: InValue[] = []
@@ -155,16 +173,18 @@ export async function getNotesCursor(type?: 'note', limit = 50, cursor?: string,
   args.push(limit + 1)
 
   const result = await db.execute({ sql, args })
-  const rawRows = result.rows
-  const notes = rawRows.map(rowToNote)
+  const rawRows = [...result.rows]
 
   let nextCursor: string | null = null
   if (rawRows.length > limit) {
     rawRows.pop()
-    notes.pop()
     const last = rawRows[rawRows.length - 1]
     nextCursor = JSON.stringify({ p: (Number(last.pinned ?? 0)), c: last.created_at as string })
   }
+
+  const ids = rawRows.map(r => r.id as string)
+  const tagMap = await fetchTagsForNotes(ids)
+  const notes = rawRows.map(row => rowToNote(row, tagMap.get(row.id as string) || []))
 
   return { notes, nextCursor }
 }
@@ -189,7 +209,9 @@ export async function getNotesByDateRange(startDate: string, endDate: string, ty
   sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
   args.push(limit, offset)
   const result = await db.execute({ sql, args })
-  return result.rows.map(rowToNote)
+  const ids = result.rows.map(r => r.id as string)
+  const tagMap = await fetchTagsForNotes(ids)
+  return result.rows.map(row => rowToNote(row, tagMap.get(row.id as string) || []))
 }
 
 /**
@@ -201,7 +223,12 @@ export async function getNote(id: string): Promise<Note | null> {
   const db = getClient()
   const result = await db.execute({ sql: 'SELECT * FROM notes WHERE id = ?', args: [id] })
   if (result.rows.length === 0) return null
-  return rowToNote(result.rows[0])
+  const tagsResult = await db.execute({
+    sql: 'SELECT t.name FROM note_tags nt JOIN tags t ON nt.tag_id = t.id WHERE nt.note_id = ?',
+    args: [id],
+  })
+  const tags = tagsResult.rows.map(r => r.name as string)
+  return rowToNote(result.rows[0], tags)
 }
 
 /**
@@ -225,7 +252,9 @@ export async function searchNotes(query: string): Promise<Note[]> {
         args: [ftsQuery],
       })
       if (result.rows.length > 0) {
-        return result.rows.map(rowToNote)
+        const ids = result.rows.map(r => r.id as string)
+        const tagMap = await fetchTagsForNotes(ids)
+        return result.rows.map(row => rowToNote(row, tagMap.get(row.id as string) || []))
       }
     } catch (e) { console.warn('[fts5] 全文搜索查询失败，回退到 LIKE:', e) }
   }
@@ -235,7 +264,9 @@ export async function searchNotes(query: string): Promise<Note[]> {
     sql: `SELECT * FROM notes WHERE content LIKE ? OR title LIKE ? ORDER BY created_at DESC LIMIT 50`,
     args: [term, term],
   })
-  return result.rows.map(rowToNote)
+  const ids = result.rows.map(r => r.id as string)
+  const tagMap = await fetchTagsForNotes(ids)
+  return result.rows.map(row => rowToNote(row, tagMap.get(row.id as string) || []))
 }
 
 

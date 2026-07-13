@@ -59,7 +59,6 @@ export async function initDB() {
       content TEXT NOT NULL,
       title TEXT,
       type TEXT NOT NULL DEFAULT 'note',
-      tags TEXT DEFAULT '[]',
       due_date TEXT,
       done INTEGER DEFAULT 0,
       pinned INTEGER DEFAULT 0,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getNote, updateNote, getClient } from '@/lib/db'
+import { getClient } from '@/lib/db'
+import { genId } from '@/lib/utils'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -9,8 +10,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No ids provided' }, { status: 400 })
   }
 
+  const db = getClient()
+
   if (action === 'delete') {
-    const db = getClient()
     const tx = await db.transaction()
     try {
       for (const noteId of ids) {
@@ -28,20 +30,24 @@ export async function POST(req: NextRequest) {
     if (!tag) {
       return NextResponse.json({ error: 'Tag name required' }, { status: 400 })
     }
-    const db = getClient()
     const tx = await db.transaction()
     try {
-      for (const noteId of ids) {
-        const result = await tx.execute({
-          sql: 'SELECT tags FROM notes WHERE id = ?',
-          args: [noteId],
-        })
-        if (result.rows.length === 0) continue
-        const currentTags = JSON.parse(result.rows[0].tags as string) as string[]
-        const newTags = currentTags.includes(tag) ? currentTags : [...currentTags, tag]
+      // Ensure tag exists
+      const existing = await tx.execute({ sql: 'SELECT id FROM tags WHERE name = ?', args: [tag] })
+      const tagId = existing.rows.length > 0
+        ? existing.rows[0].id as string
+        : genId()
+      if (existing.rows.length === 0) {
         await tx.execute({
-          sql: "UPDATE notes SET tags = ?, updated_at = ? WHERE id = ?",
-          args: [JSON.stringify(newTags), new Date().toISOString(), noteId],
+          sql: 'INSERT INTO tags (id, name, created_at) VALUES (?, ?, ?)',
+          args: [tagId, tag, new Date().toISOString()],
+        })
+      }
+      // Link all notes to tag (IGNORE skips duplicates)
+      for (const noteId of ids) {
+        await tx.execute({
+          sql: 'INSERT OR IGNORE INTO note_tags (note_id, tag_id) VALUES (?, ?)',
+          args: [noteId, tagId],
         })
       }
       await tx.commit()

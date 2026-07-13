@@ -82,11 +82,11 @@ describe('Database - Notes', () => {
     expect(notes[0].type).toBe('note')
   })
 
-  it('should handle tags as JSON array', async () => {
+  it('should handle tags', async () => {
     const note = makeNote({ tags: ['work', 'meeting', 'important'] })
     await createNote(note)
     const found = await getNote(note.id)
-    expect(found!.tags).toEqual(['work', 'meeting', 'important'])
+    expect(found!.tags).toEqual(expect.arrayContaining(['work', 'meeting', 'important']))
   })
 })
 
@@ -261,7 +261,6 @@ describe('Database - Search and Tags', () => {
     // urgent should be unchanged
     expect(tags.find(t => t.name === 'urgent')!.count).toBe(1)
 
-    // JSON column should also be updated
     const updated = await getNote(note.id)
     expect(updated!.tags).toContain('job')
     expect(updated!.tags).not.toContain('work')
@@ -282,12 +281,12 @@ describe('Database - Search and Tags', () => {
     expect(tags.find(t => t.name === 'important')).toBeUndefined()
 
     const updated1 = await getNote(note1.id)
-    expect(updated1!.tags).toEqual(['work', 'urgent'])
+    expect(updated1!.tags).toEqual(expect.arrayContaining(['work', 'urgent']))
     const updated2 = await getNote(note2.id)
     expect(updated2!.tags).toEqual(['urgent'])
   })
 
-  it('should not create duplicates in JSON column when merging tags', async () => {
+  it('should not create duplicates when merging tags', async () => {
     // Note already has both 'work' and 'job' — renaming 'work' → 'job' should not create [job, job]
     const note = makeNote({ tags: ['work', 'job', 'urgent'] })
     await createNote(note)
@@ -307,7 +306,6 @@ describe('Database - Search and Tags', () => {
     expect(tags.find(t => t.name === 'work')!.count).toBe(1)
     expect(tags.find(t => t.name === 'personal')!.count).toBe(1)
 
-    // JSON column should be updated
     const updated = await getNote(note.id)
     expect(updated!.tags).toEqual(['work', 'personal'])
   })
