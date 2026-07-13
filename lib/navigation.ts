@@ -2,7 +2,6 @@ import {
   Notebook,
   PiggyBank,
   Trophy,
-  Tags,
   Settings,
   type LucideIcon,
 } from 'lucide-react'
@@ -19,7 +18,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/notes', label: '笔记', icon: Notebook },
   { href: '/expenses', label: '预算', icon: PiggyBank },
   { href: '/habits', label: '习惯', icon: Trophy },
-  { href: '/tags', label: '标签', icon: Tags },
   { href: '/settings', label: '设置', icon: Settings },
 ]
 

@@ -11,7 +11,9 @@ import {
   Square,
   Loader2,
   Download,
+  Settings2,
 } from 'lucide-react'
+import { TagManagerSheet } from '@/components/tag-manager-sheet'
 import { Input } from '@/components/ui/input'
 import { SkeletonNoteList } from '@/components/skeleton-card'
 import type { Note } from '@/lib/types'
@@ -38,6 +40,7 @@ export function NoteList() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [activeTag, setActiveTag] = useState<string | null>(null)
   const [availableTags, setAvailableTags] = useState<{ name: string; count: number }[]>([])
+  const [tagManagerOpen, setTagManagerOpen] = useState(false)
   const activeTagRef = useRef<string | null>(null)
   activeTagRef.current = activeTag
 
@@ -146,6 +149,10 @@ export function NoteList() {
       }
     }, 300)
   }, [activeTag])
+
+  const handleOpenTagManager = useCallback(() => {
+    setTagManagerOpen(true)
+  }, [])
 
   const handleTagSelect = useCallback((tag: string | null) => {
     if (tag === activeTag) return
@@ -334,6 +341,13 @@ export function NoteList() {
             <span className="text-[10px] opacity-70">({t.count})</span>
           </Badge>
         ))}
+        <button
+          onClick={handleOpenTagManager}
+          className="ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          title="管理标签"
+        >
+          <Settings2 className="h-4 w-4" />
+        </button>
       </div>
 
       <div ref={scrollRef} className="flex-1 p-4 pb-20">
@@ -401,6 +415,11 @@ export function NoteList() {
         />
       )}
 
+      <TagManagerSheet
+        open={tagManagerOpen}
+        onOpenChange={setTagManagerOpen}
+        onTagSelect={handleTagSelect}
+      />
     </div>
   )
 }
