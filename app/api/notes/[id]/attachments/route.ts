@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAttachment, getAttachmentsByNoteId, deleteAttachment, getAttachment } from '@/lib/db'
-import { writeFile, unlink, mkdir } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { put, del } from '@vercel/blob'
 import path from 'node:path'
 import crypto from 'node:crypto'
 
 export const runtime = 'nodejs'
 
-const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'notes')
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
 /** 允许上传的 MIME 类型白名单 */
@@ -121,26 +119,21 @@ export async function POST(
     )
   }
 
-  // 保存文件到 public/uploads/notes/
+  // 上传到 Vercel Blob
   const filename = uniqueFilename(file.name)
-  const filePath = path.join(UPLOAD_DIR, filename)
 
   try {
-    if (!existsSync(UPLOAD_DIR)) {
-      await mkdir(UPLOAD_DIR, { recursive: true })
-    }
+    const blob = await put(filename, file, {
+      access: 'public',
+      contentType: mimeType,
+      addRandomSuffix: true,
+    })
 
-    const buffer = Buffer.from(await file.arrayBuffer())
-    await writeFile(filePath, buffer)
-
-    // URL 路径（Next.js 将 public/ 映射到 /）
-    const url = `/uploads/notes/${filename}`
-
-    // 创建数据库记录
+    // 创建数据库记录（使用 Blob 返回的 URL）
     const attachment = await createAttachment({
       noteId,
       filename: file.name,
-      url,
+      url: blob.url,
       mimeType,
       fileSize: file.size,
     })
@@ -148,8 +141,6 @@ export async function POST(
     return NextResponse.json({ attachment }, { status: 201 })
   } catch (err) {
     console.error('[attachments] Upload failed:', err)
-    // 如果文件已写入磁盘但 DB 失败，清理残留文件
-    try { await unlink(filePath) } catch { /* ignore */ }
     return NextResponse.json({ error: '文件上传失败，请重试' }, { status: 500 })
   }
 }
@@ -176,13 +167,11 @@ export async function DELETE(
   }
 
   try {
-    // 删除物理文件
-    const filename = path.basename(attachment.url)
-    const filePath = path.join(UPLOAD_DIR, filename)
+    // 从 Vercel Blob 删除
     try {
-      await unlink(filePath)
+      await del(attachment.url)
     } catch {
-      // 文件可能已被删除，忽略
+      // Blob 可能已被删除，忽略
     }
 
     // 删除数据库记录
