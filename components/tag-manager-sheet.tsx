@@ -22,14 +22,16 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog'
+import { useAppStore } from '@/store'
 
 interface TagManagerSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onTagSelect?: (tag: string) => void
+  onTagsChanged?: () => void
 }
 
-export function TagManagerSheet({ open, onOpenChange, onTagSelect }: TagManagerSheetProps) {
+export function TagManagerSheet({ open, onOpenChange, onTagSelect, onTagsChanged }: TagManagerSheetProps) {
   const [tags, setTags] = useState<{ name: string; count: number }[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<string | null>(null)
@@ -68,6 +70,14 @@ export function TagManagerSheet({ open, onOpenChange, onTagSelect }: TagManagerS
     if (res.ok) {
       showMsg('success', `已重命名为「${newName}」`)
       setTags(prev => prev.map(t => t.name === oldName ? { ...t, name: newName } : t))
+      // 同步更新缓存笔记中的标签名
+      const store = useAppStore.getState()
+      store.notes.forEach(n => {
+        if (n.tags.includes(oldName)) {
+          store.updateNote(n.id, { tags: n.tags.map(t => t === oldName ? newName : t) })
+        }
+      })
+      onTagsChanged?.()
     } else {
       showMsg('error', '重命名失败')
     }
@@ -79,6 +89,14 @@ export function TagManagerSheet({ open, onOpenChange, onTagSelect }: TagManagerS
     if (res.ok) {
       showMsg('success', `标签「${name}」已删除`)
       setTags(prev => prev.filter(t => t.name !== name))
+      // 同步从缓存笔记中移除该标签
+      const store = useAppStore.getState()
+      store.notes.forEach(n => {
+        if (n.tags.includes(name)) {
+          store.updateNote(n.id, { tags: n.tags.filter(t => t !== name) })
+        }
+      })
+      onTagsChanged?.()
     } else {
       showMsg('error', '删除失败')
     }

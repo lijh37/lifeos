@@ -81,16 +81,29 @@ export function NoteList() {
     }
   }, [])
 
+  // Fetch available tags for the filter bar (defined early because used by handleDelete)
+  const refreshAvailableTags = useCallback(() => {
+    fetch('/api/tags')
+      .then(res => res.json())
+      .then(data => setAvailableTags(data.tags || []))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    refreshAvailableTags()
+  }, [refreshAvailableTags])
+
   const handleDelete = useCallback(async (id: string) => {
     try {
       await fetch(`/api/notes/${id}`, { method: 'DELETE' })
       removeNote(id)
+      refreshAvailableTags()
       toast.success('笔记已删除')
     } catch (e) {
       console.error('Failed to delete note:', e)
       toast.error('删除失败，请重试')
     }
-  }, [removeNote])
+  }, [removeNote, refreshAvailableTags])
 
   const handleCreateNote = useCallback(async () => {
     try {
@@ -182,14 +195,6 @@ export function NoteList() {
     }
   }, [initialLoading, displayNotes.length])
 
-  // Fetch available tags for the filter bar
-  useEffect(() => {
-    fetch('/api/tags')
-      .then(res => res.json())
-      .then(data => setAvailableTags(data.tags || []))
-      .catch(() => {})
-  }, [])
-
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev)
@@ -220,12 +225,13 @@ export function NoteList() {
       })
       ids.forEach(id => removeNote(id))
       clearSelection()
+      refreshAvailableTags()
       toast.success(`已删除 ${ids.length} 条笔记`)
     } catch (e) {
       console.error('Batch delete failed:', e)
       toast.error('批量删除失败，请重试')
     }
-  }, [selectedIds, removeNote, clearSelection])
+  }, [selectedIds, removeNote, clearSelection, refreshAvailableTags])
 
   const handleBatchTag = useCallback(async (tag: string) => {
     if (!tag.trim() || selectedIds.size === 0) return
@@ -243,12 +249,13 @@ export function NoteList() {
         }
       })
       clearSelection()
+      refreshAvailableTags()
       toast.success(`已添加标签「${tag}」`)
     } catch (e) {
       console.error('Batch tag failed:', e)
       toast.error('批量打标签失败，请重试')
     }
-  }, [notes, updateNote, clearSelection, selectedIds])
+  }, [notes, updateNote, clearSelection, selectedIds, refreshAvailableTags])
 
   const handleTogglePin = useCallback(async (note: Note) => {
     const newPinned = !note.pinned
@@ -419,6 +426,7 @@ export function NoteList() {
         open={tagManagerOpen}
         onOpenChange={setTagManagerOpen}
         onTagSelect={handleTagSelect}
+        onTagsChanged={refreshAvailableTags}
       />
     </div>
   )
