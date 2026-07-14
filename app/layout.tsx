@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Sidebar, MobileNav } from "@/components/sidebar"
 import { PwaHandler } from "@/components/pwa-handler"
 import { PageAnimation } from "@/components/page-animation"
+import { RouteLoadingBar } from "@/components/route-loading-bar"
 import { Toaster } from "sonner"
 
 const geistSans = Geist({
@@ -56,6 +57,7 @@ export default function RootLayout({
             }}
           />
           <PwaHandler />
+          <RouteLoadingBar />
           <div className="flex h-full">
             <Sidebar />
             <PageAnimation>

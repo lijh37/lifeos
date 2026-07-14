@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import {
   Bold,
   Heading2,
@@ -32,7 +32,7 @@ const TOOLBAR_ITEMS: { action: ToolbarAction; icon: typeof Bold; title: string }
   { action: 'code', icon: Code, title: '代码' },
 ]
 
-export function MarkdownEditor({ content: initialContent, onSave, placeholder = '开始写笔记...' }: MarkdownEditorProps) {
+const MarkdownEditor = memo(function MarkdownEditor({ content: initialContent, onSave, placeholder = '开始写笔记...' }: MarkdownEditorProps) {
   const [content, setContent] = useState(initialContent)
   const [showingPreview, setShowingPreview] = useState(false)
   const [isDesktop, setIsDesktop] = useState(true)
@@ -292,4 +292,6 @@ export function MarkdownEditor({ content: initialContent, onSave, placeholder = 
       </div>
     </div>
   )
-}
+})
+
+export { MarkdownEditor }

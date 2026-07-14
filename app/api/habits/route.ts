@@ -1,67 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
-  createHabit, getHabits, deleteHabit, updateHabit, toggleCompletion,
-  getTodayCompletions, getStreaks, getBestStreaks,
-  getMonthlyStats, getClient,
+  createHabit, deleteHabit, updateHabit, toggleCompletion,
+  getHabitsDashboard, getClient,
 } from '@/lib/db'
 import type { Habit } from '@/lib/types'
 
 export async function GET() {
-  const db = getClient()
-  const habits = await getHabits()
-  const todayCompletions = await getTodayCompletions()
-  const streaks = await getStreaks()
-  const bestStreaks = await getBestStreaks()
-  const monthlyStats = await getMonthlyStats()
-
-  // Per-habit total completions
-  const perHabitTotalsRows = await db.execute(`SELECT habit_id, COUNT(*) as count FROM habit_completions WHERE completed=1 GROUP BY habit_id`)
-  const perHabitTotals: Record<string, number> = {}
-  perHabitTotalsRows.rows.forEach(r => {
-    perHabitTotals[r.habit_id as string] = r.count as number
-  })
-
-  // Per-habit weekly completions (Monday this week onward)
-  const weekStart = new Date()
-  const dayOfWeek = weekStart.getDay()
-  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
-  const monday = new Date(weekStart)
-  monday.setDate(weekStart.getDate() + mondayOffset)
-  const mondayStr = monday.toISOString().slice(0, 10)
-
-  const perHabitWeekRows = await db.execute({
-    sql: `SELECT habit_id, COUNT(*) as count FROM habit_completions WHERE completed=1 AND date >= ? GROUP BY habit_id`,
-    args: [mondayStr],
-  })
-  const perHabitWeek: Record<string, number> = {}
-  perHabitWeekRows.rows.forEach(r => {
-    perHabitWeek[r.habit_id as string] = r.count as number
-  })
-
-  // Per-habit monthly completions (month start onward)
-  const monthStart = new Date()
-  monthStart.setDate(1)
-  const monthStartStr = monthStart.toISOString().slice(0, 10)
-
-  const perHabitMonthRows = await db.execute({
-    sql: `SELECT habit_id, COUNT(*) as count FROM habit_completions WHERE completed=1 AND date >= ? GROUP BY habit_id`,
-    args: [monthStartStr],
-  })
-  const perHabitMonth: Record<string, number> = {}
-  perHabitMonthRows.rows.forEach(r => {
-    perHabitMonth[r.habit_id as string] = r.count as number
-  })
-
-  return NextResponse.json({
-    habits,
-    todayCompletions,
-    streaks,
-    bestStreaks,
-    perHabitRates: monthlyStats.perHabitRates,
-    perHabitTotals,
-    perHabitWeek,
-    perHabitMonth,
-  })
+  const dashboard = await getHabitsDashboard()
+  return NextResponse.json(dashboard)
 }
 
 export async function POST(req: NextRequest) {
@@ -69,17 +15,40 @@ export async function POST(req: NextRequest) {
   if (body._action === 'toggle') {
     const completed = await toggleCompletion(body.habitId, body.date)
     const db = getClient()
-    const streaks = await getStreaks()
-    const bestStreaks = await getBestStreaks()
 
-    // Per-habit total completions
-    const totalResult = await db.execute({
-      sql: 'SELECT COUNT(*) as count FROM habit_completions WHERE habit_id = ? AND completed=1',
+    // Get completion dates for this specific habit only — O(streak_length) per habit
+    const streakRows = await db.execute({
+      sql: 'SELECT date FROM habit_completions WHERE habit_id = ? AND completed = 1 ORDER BY date DESC',
       args: [body.habitId],
     })
-    const totalCompletions = (totalResult.rows[0]?.count as number) || 0
 
-    // Per-habit weekly completions
+    // Calculate current streak for this habit
+    const dates = new Set(streakRows.rows.map(r => r.date as string))
+    const today = new Date()
+    let streak = 0
+    const cursor = new Date(today)
+    for (let j = 0; j < 365; j++) {
+      const dateStr = cursor.toISOString().slice(0, 10)
+      if (dates.has(dateStr)) streak++
+      else if (j > 0) break
+      cursor.setDate(cursor.getDate() - 1)
+    }
+
+    // Calculate best streak for this habit
+    const bestStreakRows = await db.execute({
+      sql: 'SELECT date FROM habit_completions WHERE habit_id = ? AND completed = 1 ORDER BY date ASC',
+      args: [body.habitId],
+    })
+    const bestDates = Array.from(new Set(bestStreakRows.rows.map(r => r.date as string))).sort()
+    let best = bestDates.length > 0 ? 1 : 0
+    let current = 1
+    for (let i = 1; i < bestDates.length; i++) {
+      const diffDays = Math.round((new Date(bestDates[i]).getTime() - new Date(bestDates[i - 1]).getTime()) / (1000 * 60 * 60 * 24))
+      if (diffDays === 1) { current++; best = Math.max(best, current) }
+      else { current = 1 }
+    }
+
+    // Merged query for total/week/month counts for this habit
     const weekStart = new Date()
     const dayOfWeek = weekStart.getDay()
     const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
@@ -87,30 +56,26 @@ export async function POST(req: NextRequest) {
     monday.setDate(weekStart.getDate() + mondayOffset)
     const mondayStr = monday.toISOString().slice(0, 10)
 
-    const weekResult = await db.execute({
-      sql: 'SELECT COUNT(*) as count FROM habit_completions WHERE habit_id = ? AND completed=1 AND date >= ?',
-      args: [body.habitId, mondayStr],
-    })
-    const weekCount = (weekResult.rows[0]?.count as number) || 0
-
-    // Per-habit monthly completions
     const monthStart = new Date()
     monthStart.setDate(1)
     const monthStartStr = monthStart.toISOString().slice(0, 10)
 
-    const monthResult = await db.execute({
-      sql: 'SELECT COUNT(*) as count FROM habit_completions WHERE habit_id = ? AND completed=1 AND date >= ?',
-      args: [body.habitId, monthStartStr],
+    const countResult = await db.execute({
+      sql: `SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN date >= ? THEN 1 ELSE 0 END) as week_count,
+        SUM(CASE WHEN date >= ? THEN 1 ELSE 0 END) as month_count
+      FROM habit_completions WHERE habit_id = ? AND completed = 1`,
+      args: [mondayStr, monthStartStr, body.habitId],
     })
-    const monthCount = (monthResult.rows[0]?.count as number) || 0
 
     return NextResponse.json({
       completed,
-      streak: streaks[body.habitId] ?? 0,
-      bestStreak: bestStreaks[body.habitId] ?? 0,
-      weekCount,
-      monthCount,
-      totalCompletions,
+      streak,
+      bestStreak: best,
+      weekCount: (countResult.rows[0]?.week_count as number) || 0,
+      monthCount: (countResult.rows[0]?.month_count as number) || 0,
+      totalCompletions: (countResult.rows[0]?.total as number) || 0,
     })
   }
   const habit: Habit = {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, memo } from 'react'
 import { Download, Loader2, Check } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -10,7 +10,7 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
-export function PwaHandler() {
+const PwaHandler = memo(function PwaHandler() {
   const [isOffline, setIsOffline] = useState(false)
   const [showInstall, setShowInstall] = useState(false)
   const [installed, setInstalled] = useState(false)
@@ -104,4 +104,6 @@ export function PwaHandler() {
       )}
     </>
   )
-}
+})
+
+export { PwaHandler }

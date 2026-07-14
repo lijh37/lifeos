@@ -237,20 +237,42 @@ export async function getNote(id: string): Promise<Note | null> {
  * @param query - 搜索关键词
  * @returns 匹配的笔记数组
  */
-export async function searchNotes(query: string): Promise<Note[]> {
+export async function searchNotes(query: string, tag?: string): Promise<Note[]> {
   const db = getClient()
   const term = `%${query}%`
+  const UNTAGGED = '__untagged__'
 
   // Try FTS5 first, fall back to LIKE
   if (fts5Available) {
     try {
       const ftsQuery = query.replace(/['"]/g, '').split(/\s+/).filter(Boolean).join(' AND ')
       if (!ftsQuery) return []
-      const result = await db.execute({
-        sql: `SELECT n.* FROM notes n INNER JOIN notes_fts fts ON n.rowid = fts.rowid 
-              WHERE notes_fts MATCH ? ORDER BY rank LIMIT 50`,
-        args: [ftsQuery],
-      })
+
+      let sql: string
+      const sqlArgs: InValue[] = [ftsQuery]
+
+      if (tag === UNTAGGED) {
+        sql = `SELECT n.* FROM notes n
+               INNER JOIN notes_fts fts ON n.rowid = fts.rowid
+               LEFT JOIN note_tags nt ON n.id = nt.note_id
+               WHERE notes_fts MATCH ? AND nt.note_id IS NULL
+               ORDER BY rank LIMIT 50`
+      } else if (tag) {
+        sql = `SELECT n.* FROM notes n
+               INNER JOIN notes_fts fts ON n.rowid = fts.rowid
+               INNER JOIN note_tags nt ON n.id = nt.note_id
+               INNER JOIN tags t ON nt.tag_id = t.id
+               WHERE notes_fts MATCH ? AND t.name = ?
+               ORDER BY rank LIMIT 50`
+        sqlArgs.push(tag)
+      } else {
+        sql = `SELECT n.* FROM notes n
+               INNER JOIN notes_fts fts ON n.rowid = fts.rowid
+               WHERE notes_fts MATCH ?
+               ORDER BY rank LIMIT 50`
+      }
+
+      const result = await db.execute({ sql, args: sqlArgs })
       if (result.rows.length > 0) {
         const ids = result.rows.map(r => r.id as string)
         const tagMap = await fetchTagsForNotes(ids)
@@ -260,10 +282,19 @@ export async function searchNotes(query: string): Promise<Note[]> {
   }
 
   // Fallback: LIKE search
-  const result = await db.execute({
-    sql: `SELECT * FROM notes WHERE content LIKE ? OR title LIKE ? ORDER BY created_at DESC LIMIT 50`,
-    args: [term, term],
-  })
+  let sql = `SELECT * FROM notes WHERE (content LIKE ? OR title LIKE ?)`
+  const sqlArgs: InValue[] = [term, term]
+
+  if (tag === UNTAGGED) {
+    sql += ` AND id NOT IN (SELECT note_id FROM note_tags)`
+  } else if (tag) {
+    sql += ` AND id IN (SELECT nt.note_id FROM note_tags nt INNER JOIN tags t ON nt.tag_id = t.id WHERE t.name = ?)`
+    sqlArgs.push(tag)
+  }
+
+  sql += ` ORDER BY created_at DESC LIMIT 50`
+
+  const result = await db.execute({ sql, args: sqlArgs })
   const ids = result.rows.map(r => r.id as string)
   const tagMap = await fetchTagsForNotes(ids)
   return result.rows.map(row => rowToNote(row, tagMap.get(row.id as string) || []))

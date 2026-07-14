@@ -13,7 +13,7 @@ import {
   Download,
   Settings2,
 } from 'lucide-react'
-import { TagManagerSheet } from '@/components/tag-manager-sheet'
+import dynamic from 'next/dynamic'
 import { Input } from '@/components/ui/input'
 import { SkeletonNoteList } from '@/components/skeleton-card'
 import type { Note } from '@/lib/types'
@@ -21,7 +21,14 @@ import { useAppStore } from '@/store'
 import { toast } from 'sonner'
 import { NoteCard } from '@/components/note-card'
 import { VirtualNoteList } from '@/components/virtual-note-list'
-import { BatchActionsBar } from '@/components/batch-actions-bar'
+
+const TagManagerSheet = dynamic(() => import('@/components/tag-manager-sheet').then(mod => ({ default: mod.TagManagerSheet })), {
+  loading: () => null,
+})
+
+const BatchActionsBar = dynamic(() => import('@/components/batch-actions-bar').then(mod => ({ default: mod.BatchActionsBar })), {
+  loading: () => null,
+})
 
 const SCROLL_POSITION_KEY = 'note_list_scroll'
 
@@ -396,9 +403,10 @@ export function NoteList() {
               />
             ) : (
               <div className="space-y-1.5">
-                {displayNotes.map((note) => <NoteCard
+                {displayNotes.map((note, index) => <NoteCard
                   key={note.id}
                   note={note}
+                  enablePrefetch={index < 20}
                   onEdit={(note) => router.push(`/notes/${note.id}`)}
                   onDelete={handleDelete}
                   onTogglePin={handleTogglePin}

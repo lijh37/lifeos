@@ -44,6 +44,7 @@ const VirtualNoteList = memo(function VirtualNoteList({
           >
             <NoteCard
               note={note}
+              enablePrefetch={virtualItem.index < 20}
               onEdit={onEdit}
               onDelete={onDelete}
               onTogglePin={onTogglePin}

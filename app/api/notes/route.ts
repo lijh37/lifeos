@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createNote, getNotesCursor, deleteNote, searchNotes, getNotesByDateRange } from '@/lib/db'
 import type { Note } from '@/lib/types'
-import { UNTAGGED } from '@/lib/db/tags'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -15,12 +14,7 @@ export async function GET(req: NextRequest) {
   const tag = searchParams.get('tag')
 
   if (q) {
-    let notes = await searchNotes(q)
-    if (tag === UNTAGGED) {
-      notes = notes.filter(n => n.tags.length === 0)
-    } else if (tag) {
-      notes = notes.filter(n => n.tags.includes(tag))
-    }
+    let notes = await searchNotes(q, tag || undefined)
     return NextResponse.json({ notes: summary ? notes.map(stripContent) : notes })
   }
 

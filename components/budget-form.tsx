@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, memo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Target, Loader2 } from 'lucide-react'
 import type { Budget } from '@/lib/types'
 
-function BudgetForm({ budget, onSave }: { budget: Budget | null; onSave: (data: Record<string, unknown>) => void }) {
+const BudgetForm = memo(function BudgetForm({ budget, onSave }: { budget: Budget | null; onSave: (data: Record<string, unknown>) => void }) {
   const [fixedBudgetInput, setFixedBudgetInput] = useState('')
   const [variableBudgetInput, setVariableBudgetInput] = useState('')
   const [saving, setSaving] = useState(false)
@@ -82,6 +82,6 @@ function BudgetForm({ budget, onSave }: { budget: Budget | null; onSave: (data: 
       </CardContent>
     </Card>
   )
-}
+})
 
 export { BudgetForm }

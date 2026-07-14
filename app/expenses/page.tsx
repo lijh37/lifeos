@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { format, subMonths, addMonths } from 'date-fns'
-import { zhCN } from 'date-fns/locale'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { subMonths, addMonths } from 'date-fns'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +25,8 @@ export default function BudgetPage() {
 
   const [fixedActualInput, setFixedActualInput] = useState('')
   const [variableActualInput, setVariableActualInput] = useState('')
+  const [notesText, setNotesText] = useState(budget?.notes || '')
+  const notesTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const fixedBudget = budget?.fixedBudget ?? 0
   const variableBudget = budget?.variableBudget ?? 0
@@ -64,6 +65,19 @@ export default function BudgetPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
+  useEffect(() => {
+    setNotesText(budget?.notes || '')
+  }, [budget?.notes])
+
+  useEffect(() => {
+    if (notesText === (budget?.notes || '')) return
+    clearTimeout(notesTimerRef.current)
+    notesTimerRef.current = setTimeout(() => {
+      saveBudgetData({ notes: notesText })
+    }, 500)
+    return () => clearTimeout(notesTimerRef.current)
+  }, [notesText, budget?.notes])
+
   async function saveBudgetData(data: Record<string, unknown>) {
     const res = await fetch('/api/budgets', {
       method: 'POST',
@@ -88,14 +102,15 @@ export default function BudgetPage() {
   }
 
   function handlePrev() {
-    setCurrentMonth(format(subMonths(new Date(currentMonth + '-01'), 1), 'yyyy-MM'))
+    setCurrentMonth(subMonths(new Date(currentMonth + '-01'), 1).toISOString().slice(0, 7))
   }
 
   function handleNext() {
-    setCurrentMonth(format(addMonths(new Date(currentMonth + '-01'), 1), 'yyyy-MM'))
+    setCurrentMonth(addMonths(new Date(currentMonth + '-01'), 1).toISOString().slice(0, 7))
   }
 
-  const monthLabel = format(new Date(currentMonth + '-01'), 'yyyy年M月', { locale: zhCN })
+  const [year, month] = currentMonth.split('-')
+  const monthLabel = `${year}年${parseInt(month)}月`
 
   return (
     <div className="flex h-full flex-col">
@@ -225,8 +240,8 @@ export default function BudgetPage() {
                         <h2 className="text-sm font-medium">超支说明</h2>
                       </div>
                       <Textarea
-                        value={budget?.notes || ''}
-                        onChange={(e) => saveBudgetData({ notes: e.target.value })}
+                        value={notesText}
+                        onChange={(e) => setNotesText(e.target.value)}
                         placeholder="注明超支原因..."
                         className="min-h-[80px]"
                       />

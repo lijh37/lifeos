@@ -92,6 +92,7 @@ export async function toggleCompletion(habitId: string, date: string): Promise<b
 
 /**
  * 计算每个习惯的连续打卡天数，从今天开始向前追溯最多 365 天。
+ * 使用 Set 实现 O(1) 日期查找，大幅减少比较次数。
  * @returns 以 habit_id 为键、连续打卡天数为值的映射
  */
 export async function getStreaks(): Promise<Record<string, number>> {
@@ -100,24 +101,28 @@ export async function getStreaks(): Promise<Record<string, number>> {
     `SELECT habit_id, date FROM habit_completions WHERE completed = 1 ORDER BY habit_id, date DESC`
   )).rows
 
+  // Group dates by habit_id into Sets for O(1) lookup
+  const byHabit: Record<string, Set<string>> = {}
+  for (const row of rows) {
+    const hid = row.habit_id as string
+    if (!byHabit[hid]) byHabit[hid] = new Set()
+    byHabit[hid].add(row.date as string)
+  }
+
   const streaks: Record<string, number> = {}
-  const today = new Date().toISOString().slice(0, 10)
+  const today = new Date()
 
-  for (let i = 0; i < rows.length; ) {
-    const hid = rows[i].habit_id as string
-    if (streaks[hid] !== undefined) { i++; continue }
-
+  for (const [hid, dates] of Object.entries(byHabit)) {
     let streak = 0
-    const cutoff = new Date()
+    const cursor = new Date(today)
     for (let j = 0; j < 365; j++) {
-      const dateStr = cutoff.toISOString().slice(0, 10)
-      if (i < rows.length && rows[i].habit_id === hid && rows[i].date === dateStr) {
+      const dateStr = cursor.toISOString().slice(0, 10)
+      if (dates.has(dateStr)) {
         streak++
-        i++
-      } else if (j > 0 || dateStr !== today) {
+      } else if (j > 0) {
         break
       }
-      cutoff.setDate(cutoff.getDate() - 1)
+      cursor.setDate(cursor.getDate() - 1)
     }
     streaks[hid] = streak
   }
@@ -153,9 +158,6 @@ export async function getBestStreaks(): Promise<Record<string, number>> {
     `SELECT habit_id, date FROM habit_completions WHERE completed = 1 ORDER BY habit_id, date ASC`
   )).rows
 
-  const bestStreaks: Record<string, number> = {}
-
-  // Group by habit_id
   const byHabit: Record<string, string[]> = {}
   for (const row of rows) {
     const hid = row.habit_id as string
@@ -163,19 +165,15 @@ export async function getBestStreaks(): Promise<Record<string, number>> {
     byHabit[hid].push(row.date as string)
   }
 
+  const bestStreaks: Record<string, number> = {}
   for (const [hid, dates] of Object.entries(byHabit)) {
     if (dates.length === 0) { bestStreaks[hid] = 0; continue }
-
-    // Remove duplicates and sort
     const uniqueDates = Array.from(new Set(dates)).sort()
-
-    let best = 1
-    let current = 1
+    let best = 1, current = 1
     for (let i = 1; i < uniqueDates.length; i++) {
       const prev = new Date(uniqueDates[i - 1])
       const curr = new Date(uniqueDates[i])
-      const diffMs = curr.getTime() - prev.getTime()
-      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
+      const diffDays = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24))
       if (diffDays === 1) {
         current++
         best = Math.max(best, current)
@@ -282,4 +280,159 @@ export async function getMonthlyStats(): Promise<{ monthCompletions: number; mon
   return { monthCompletions: totalCompletions, monthlyRate, perHabitRates }
 }
 
+/**
+ * 获取本周周一日期（YYYY-MM-DD）。
+ */
+function getWeekStart(): string {
+  const now = new Date()
+  const dayOfWeek = now.getDay()
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+  const monday = new Date(now)
+  monday.setDate(now.getDate() + mondayOffset)
+  return monday.toISOString().slice(0, 10)
+}
 
+/**
+ * 获取本月第一天日期（YYYY-MM-DD）。
+ */
+function getMonthStart(): string {
+  const monthStart = new Date()
+  monthStart.setDate(1)
+  return monthStart.toISOString().slice(0, 10)
+}
+
+/**
+ * 一次性获取仪表盘所需的所有数据，相比独立调用各函数显著减少数据库查询次数。
+ *
+ * 执行 4 次查询（原方案 8 次）：
+ *   1. 查询所有习惯
+ *   2. 查询今日打卡状态
+ *   3. 加载所有完成记录（用于 streak + bestStreak）
+ *   4. 单次 GROUP BY 查询（合并 total/week/month 统计 + perHabitRates）
+ *
+ * @returns 合并后的仪表盘数据结构
+ */
+export async function getHabitsDashboard(): Promise<{
+  habits: Habit[],
+  todayCompletions: Record<string, boolean>,
+  streaks: Record<string, number>,
+  bestStreaks: Record<string, number>,
+  perHabitRates: Record<string, number>,
+  perHabitTotals: Record<string, number>,
+  perHabitWeek: Record<string, number>,
+  perHabitMonth: Record<string, number>,
+}> {
+  const db = getClient()
+
+  // 1. 查询所有习惯
+  const habits = await getHabits()
+
+  // 2. 查询今日打卡状态
+  const todayCompletions = await getTodayCompletions()
+
+  // 3. 一次加载所有完成记录，用于 streak + bestStreak
+  const allRows = (await db.execute(
+    `SELECT habit_id, date FROM habit_completions WHERE completed = 1 ORDER BY habit_id, date DESC`
+  )).rows
+
+  // 按 habit_id 分组为 Set（O(1) 查找）和数组（排序去重）
+  const byHabitSet: Record<string, Set<string>> = {}
+  const byHabitArray: Record<string, string[]> = {}
+  for (const row of allRows) {
+    const hid = row.habit_id as string
+    if (!byHabitSet[hid]) byHabitSet[hid] = new Set()
+    byHabitSet[hid].add(row.date as string)
+    if (!byHabitArray[hid]) byHabitArray[hid] = []
+    byHabitArray[hid].push(row.date as string)
+  }
+
+  // 3a. 计算当前 streak（Set 向后遍历）
+  const streaks: Record<string, number> = {}
+  const today = new Date()
+  for (const [hid, dates] of Object.entries(byHabitSet)) {
+    let streak = 0
+    const cursor = new Date(today)
+    for (let j = 0; j < 365; j++) {
+      const dateStr = cursor.toISOString().slice(0, 10)
+      if (dates.has(dateStr)) {
+        streak++
+      } else if (j > 0) {
+        break
+      }
+      cursor.setDate(cursor.getDate() - 1)
+    }
+    streaks[hid] = streak
+  }
+
+  // 3b. 计算最佳 streak
+  const bestStreaks: Record<string, number> = {}
+  for (const [hid, dates] of Object.entries(byHabitArray)) {
+    if (dates.length === 0) { bestStreaks[hid] = 0; continue }
+    const uniqueDates = Array.from(new Set(dates)).sort()
+    let best = 1, current = 1
+    for (let i = 1; i < uniqueDates.length; i++) {
+      const prev = new Date(uniqueDates[i - 1])
+      const curr = new Date(uniqueDates[i])
+      const diffDays = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24))
+      if (diffDays === 1) {
+        current++
+        best = Math.max(best, current)
+      } else {
+        current = 1
+      }
+    }
+    bestStreaks[hid] = best
+  }
+
+  // 4. 单次 GROUP BY 查询：合并 total/week/month → perHabitTotals / perHabitWeek / perHabitMonth / perHabitRates
+  const weekStart = getWeekStart()
+  const monthStart = getMonthStart()
+  const daysInMonth = new Date(
+    new Date().getFullYear(),
+    new Date().getMonth() + 1,
+    0
+  ).getDate()
+
+  const countResult = await db.execute({
+    sql: `SELECT 
+      habit_id,
+      COUNT(*) as total,
+      SUM(CASE WHEN date >= ? THEN 1 ELSE 0 END) as week_count,
+      SUM(CASE WHEN date >= ? THEN 1 ELSE 0 END) as month_count
+    FROM habit_completions WHERE completed = 1 GROUP BY habit_id`,
+    args: [weekStart, monthStart],
+  })
+
+  const perHabitTotals: Record<string, number> = {}
+  const perHabitWeek: Record<string, number> = {}
+  const perHabitMonth: Record<string, number> = {}
+  const perHabitRates: Record<string, number> = {}
+
+  for (const row of countResult.rows) {
+    const hid = row.habit_id as string
+    const total = (row.total as number) || 0
+    const week = (row.week_count as number) || 0
+    const month = (row.month_count as number) || 0
+
+    perHabitTotals[hid] = total
+    perHabitWeek[hid] = week
+    perHabitMonth[hid] = month
+
+    const habit = habits.find(h => h.id === hid)
+    if (habit) {
+      const maxDays = habit.frequency === 'daily' ? daysInMonth : Math.ceil(daysInMonth / 7)
+      perHabitRates[hid] = maxDays > 0 ? Math.round((month / maxDays) * 100) : 0
+    }
+  }
+
+  return {
+    habits,
+    todayCompletions,
+    streaks,
+    bestStreaks,
+    perHabitRates,
+    perHabitTotals,
+    perHabitWeek,
+    perHabitMonth,
+  }
+}

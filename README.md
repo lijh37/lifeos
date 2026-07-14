@@ -35,7 +35,7 @@ git push origin main          # Vercel 自动部署
 ## 测试
 
 ```bash
-npm test           # vitest 单元测试（6 文件，72 测试）
+npm test           # vitest 单元测试（9 文件，146 测试）
 npm run test:e2e   # Playwright E2E（TODO）
 npm run analyze    # 分析构建产物体积（需要 ANALYZE=true）
 ```
