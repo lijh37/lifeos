@@ -15,6 +15,7 @@ export async function POST(req: Request) {
       maxAge: 60 * 60 * 24 * 30,
       sameSite: 'lax',
       secure: true,
+      httpOnly: true,
     })
     return res
   }

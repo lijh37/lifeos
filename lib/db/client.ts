@@ -43,12 +43,13 @@ export async function initDB() {
 
   if (process.env.TURSO_DATABASE_URL) {
     // 探测 FTS5 在 Turso 中是否可用（表结构已存在于云端）
-    client!.execute("SELECT count(*) FROM notes_fts")
-      .then(() => { fts5Available = true })
-      .catch(() => {
-        console.warn('[fts5] Turso 中 FTS5 不可用（notes_fts 表不存在），回退到 LIKE 搜索')
-        fts5Available = false
-      })
+    try {
+      await client!.execute("SELECT count(*) FROM notes_fts")
+      fts5Available = true
+    } catch {
+      console.warn('[fts5] Turso 中 FTS5 不可用（notes_fts 表不存在），回退到 LIKE 搜索')
+      fts5Available = false
+    }
     return
   }
 

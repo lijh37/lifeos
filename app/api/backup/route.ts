@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getNotes, getBudgets, getHabits, createNote, upsertBudget } from '@/lib/db'
+import { getNotes, getBudgets, getHabits } from '@/lib/db'
 import { getClient } from '@/lib/db/client'
 
 export async function GET() {
@@ -53,76 +53,135 @@ export async function POST(req: NextRequest) {
 
   const db = getClient()
 
-  // Clear existing data in FK-safe order
-  await db.execute('DELETE FROM habit_completions')
-  await db.execute('DELETE FROM habits')
-  await db.execute('DELETE FROM note_tags')
-  await db.execute('DELETE FROM tags')
-  await db.execute('DELETE FROM budgets')
-  await db.execute('DELETE FROM notes')
+  const tx = await db.transaction()
+  try {
+    // Clear existing data in FK-safe order
+    await tx.execute('DELETE FROM habit_completions')
+    await tx.execute('DELETE FROM habits')
+    await tx.execute('DELETE FROM note_tags')
+    await tx.execute('DELETE FROM tags')
+    await tx.execute('DELETE FROM budgets')
+    await tx.execute('DELETE FROM notes')
 
-  let imported = 0
+    let imported = 0
 
-  // Import notes (use createNote for tag syncing)
-  for (const n of data.notes as any[]) {
-    await createNote({
-      id: n.id,
-      content: n.content ?? '',
-      title: n.title ?? null,
-      type: n.type ?? 'note',
-      tags: n.tags ?? [],
-      dueDate: n.dueDate ?? n.due_date ?? null,
-      done: n.done ?? false,
-      pinned: n.pinned ?? false,
-      createdAt: n.createdAt ?? n.created_at ?? new Date().toISOString(),
-      updatedAt: n.updatedAt ?? n.updated_at ?? new Date().toISOString(),
-    })
-    imported++
-  }
-
-  // Import budgets
-  if (Array.isArray(data.budgets)) {
-    for (const b of data.budgets as any[]) {
-      await upsertBudget(b.month, {
-        fixedBudget: b.fixedBudget ?? b.fixed_budget ?? 0,
-        variableBudget: b.variableBudget ?? b.variable_budget ?? 0,
-        fixedActual: b.fixedActual ?? b.fixed_actual ?? null,
-        variableActual: b.variableActual ?? b.variable_actual ?? null,
-        notes: b.notes ?? '',
-        isCompleted: b.isCompleted ?? b.is_completed ?? false,
-        savingsCompleted: b.savingsCompleted ?? b.savings_completed ?? false,
-      })
-      imported++
-    }
-  }
-
-  // Import habits
-  if (Array.isArray(data.habits)) {
-    for (const h of data.habits as any[]) {
-      await db.execute({
-        sql: 'INSERT INTO habits (id, name, description, frequency, created_at) VALUES (?, ?, ?, ?, ?)',
-        args: [h.id, h.name, h.description || '', h.frequency || 'daily', h.createdAt || h.created_at || new Date().toISOString()],
-      })
-      imported++
-    }
-  }
-
-  // Import habit completions
-  if (Array.isArray(data.habitCompletions)) {
-    for (const hc of data.habitCompletions as any[]) {
-      await db.execute({
-        sql: 'INSERT INTO habit_completions (id, habit_id, date, completed, created_at) VALUES (?, ?, ?, ?, ?)',
+    // Import notes (raw INSERT to avoid FTS5 trigger issues inside tx)
+    for (const n of data.notes as any[]) {
+      await tx.execute({
+        sql: `INSERT INTO notes (id, content, title, type, due_date, done, pinned, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
-          hc.id,
-          hc.habit_id,
-          hc.date,
-          hc.completed ? 1 : 0,
-          hc.created_at || new Date().toISOString(),
+          n.id,
+          n.content ?? '',
+          n.title ?? null,
+          n.type ?? 'note',
+          n.dueDate ?? n.due_date ?? null,
+          n.done ? 1 : 0,
+          n.pinned ? 1 : 0,
+          n.createdAt ?? n.created_at ?? new Date().toISOString(),
+          n.updatedAt ?? n.updated_at ?? new Date().toISOString(),
         ],
       })
+      // Re-sync tags
+      const tags = (n.tags ?? []) as string[]
+      for (const tagName of tags) {
+        if (!tagName.trim()) continue
+        const existing = await tx.execute({ sql: 'SELECT id FROM tags WHERE name = ?', args: [tagName.trim()] })
+        let tagId: string
+        if (existing.rows.length > 0) {
+          tagId = existing.rows[0].id as string
+        } else {
+          tagId = crypto.randomUUID()
+          await tx.execute({
+            sql: 'INSERT OR IGNORE INTO tags (id, name, created_at) VALUES (?, ?, ?)',
+            args: [tagId, tagName.trim(), new Date().toISOString()],
+          })
+        }
+        await tx.execute({
+          sql: 'INSERT OR IGNORE INTO note_tags (note_id, tag_id) VALUES (?, ?)',
+          args: [n.id, tagId],
+        })
+      }
       imported++
     }
-  }
 
-  return NextResponse.json({ success: true, imported })
+    // Import budgets
+    if (Array.isArray(data.budgets)) {
+      for (const b of data.budgets as any[]) {
+        const month = b.month
+        const existing = await tx.execute({ sql: 'SELECT id FROM budgets WHERE month = ?', args: [month] })
+        const now = new Date().toISOString()
+        if (existing.rows.length > 0) {
+          await tx.execute({
+            sql: `UPDATE budgets SET fixed_budget=?, variable_budget=?, fixed_actual=?, variable_actual=?,
+                  notes=?, is_completed=?, savings_completed=?, updated_at=? WHERE month=?`,
+            args: [
+              b.fixedBudget ?? b.fixed_budget ?? 0,
+              b.variableBudget ?? b.variable_budget ?? 0,
+              b.fixedActual ?? b.fixed_actual ?? null,
+              b.variableActual ?? b.variable_actual ?? null,
+              b.notes ?? '',
+              b.isCompleted ?? b.is_completed ?? false ? 1 : 0,
+              b.savingsCompleted ?? b.savings_completed ?? false ? 1 : 0,
+              now,
+              month,
+            ],
+          })
+        } else {
+          await tx.execute({
+            sql: `INSERT INTO budgets (id, month, fixed_budget, variable_budget, fixed_actual, variable_actual,
+                  notes, is_completed, savings_completed, created_at, updated_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [
+              crypto.randomUUID(), month,
+              b.fixedBudget ?? b.fixed_budget ?? 0,
+              b.variableBudget ?? b.variable_budget ?? 0,
+              b.fixedActual ?? b.fixed_actual ?? null,
+              b.variableActual ?? b.variable_actual ?? null,
+              b.notes ?? '',
+              b.isCompleted ?? b.is_completed ?? false ? 1 : 0,
+              b.savingsCompleted ?? b.savings_completed ?? false ? 1 : 0,
+              now, now,
+            ],
+          })
+        }
+        imported++
+      }
+    }
+
+    // Import habits
+    if (Array.isArray(data.habits)) {
+      for (const h of data.habits as any[]) {
+        await tx.execute({
+          sql: 'INSERT INTO habits (id, name, description, frequency, created_at) VALUES (?, ?, ?, ?, ?)',
+          args: [h.id, h.name, h.description || '', h.frequency || 'daily', h.createdAt || h.created_at || new Date().toISOString()],
+        })
+        imported++
+      }
+    }
+
+    // Import habit completions
+    if (Array.isArray(data.habitCompletions)) {
+      for (const hc of data.habitCompletions as any[]) {
+        await tx.execute({
+          sql: 'INSERT INTO habit_completions (id, habit_id, date, completed, created_at) VALUES (?, ?, ?, ?, ?)',
+          args: [
+            hc.id,
+            hc.habit_id,
+            hc.date,
+            hc.completed ? 1 : 0,
+            hc.created_at || new Date().toISOString(),
+          ],
+        })
+        imported++
+      }
+    }
+
+    await tx.commit()
+    return NextResponse.json({ success: true, imported })
+  } catch (e) {
+    await tx.rollback()
+    console.error('[backup] 恢复事务失败，已回滚:', e)
+    return NextResponse.json({ error: '恢复失败，数据已回滚' }, { status: 500 })
+  }
 }

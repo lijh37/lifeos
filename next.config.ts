@@ -14,6 +14,7 @@ let nextConfig: NextConfig = {
 };
 
 if (process.env.ANALYZE === 'true') {
+  // next.config.ts 被 Next.js 转译为 CJS，require() 在此安全
   const withBundleAnalyzer = require('@next/bundle-analyzer')({
     enabled: true,
   })
