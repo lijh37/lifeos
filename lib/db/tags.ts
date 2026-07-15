@@ -5,26 +5,41 @@ import { genId } from '../utils'
 export async function syncNoteTags(noteId: string, tags: string[]): Promise<void> {
   const db = getClient()
   try {
+    const trimmed = [...new Set(tags.map(t => t.trim()).filter(Boolean))]
+
+    // 清除旧关联
     await db.execute({ sql: 'DELETE FROM note_tags WHERE note_id = ?', args: [noteId] })
-    for (const tagName of tags) {
-      if (!tagName.trim()) continue
-      const existing = await db.execute({
-        sql: 'SELECT id FROM tags WHERE name = ?',
-        args: [tagName.trim()],
-      })
-      let tagId: string
-      if (existing.rows.length > 0) {
-        tagId = existing.rows[0].id as string
-      } else {
-        tagId = genId()
-        await db.execute({
-          sql: 'INSERT OR IGNORE INTO tags (id, name, created_at) VALUES (?, ?, ?)',
-          args: [tagId, tagName.trim(), new Date().toISOString()],
-        })
-      }
+    if (trimmed.length === 0) return
+
+    // 批量创建不存在的标签（INSERT OR IGNORE 跳过已存在）
+    const now = new Date().toISOString()
+    const tagPlaceholders = trimmed.map(() => '(?, ?, ?)').join(', ')
+    await db.execute({
+      sql: `INSERT OR IGNORE INTO tags (id, name, created_at) VALUES ${tagPlaceholders}`,
+      args: trimmed.flatMap(name => [genId(), name, now]) as InValue[],
+    })
+
+    // 一次性查询所有标签 ID
+    const tagResult = await db.execute({
+      sql: `SELECT id, name FROM tags WHERE name IN (${trimmed.map(() => '?').join(',')})`,
+      args: trimmed as unknown as InValue[],
+    })
+    const tagMap = new Map<string, string>()
+    for (const row of tagResult.rows) {
+      tagMap.set(row.name as string, row.id as string)
+    }
+
+    // 批量插入 note_tags
+    const ntPairs: [string, string][] = []
+    for (const name of trimmed) {
+      const id = tagMap.get(name)
+      if (id) ntPairs.push([noteId, id])
+    }
+    if (ntPairs.length > 0) {
+      const ntPlaceholders = ntPairs.map(() => '(?, ?)').join(', ')
       await db.execute({
-        sql: 'INSERT OR IGNORE INTO note_tags (note_id, tag_id) VALUES (?, ?)',
-        args: [noteId, tagId],
+        sql: `INSERT OR IGNORE INTO note_tags (note_id, tag_id) VALUES ${ntPlaceholders}`,
+        args: ntPairs.flat() as InValue[],
       })
     }
   } catch (e) { console.warn(`[tags] 同步标签失败(noteId=${noteId}, tags=${JSON.stringify(tags)}):`, e) }

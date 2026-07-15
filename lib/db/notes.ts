@@ -2,7 +2,7 @@ import type { InValue } from '@libsql/client'
 import type { Note } from '../types'
 import { getClient, fts5Available } from './client'
 import { syncNoteTags } from './tags'
-import { deleteAttachmentsByNoteId } from './attachments'
+
 
 function rowToNote(row: Record<string, unknown>, tags: string[] = []): Note {
   return {
@@ -92,8 +92,7 @@ export async function updateNote(id: string, updates: Partial<Note>): Promise<vo
  */
 export async function deleteNote(id: string): Promise<void> {
   const db = getClient()
-  await db.execute({ sql: 'DELETE FROM note_tags WHERE note_id = ?', args: [id] })
-  try { await deleteAttachmentsByNoteId(id) } catch (e) { console.warn('[attachments] 删除笔记附件失败:', e) }
+  // note_tags 和 attachments 通过 FK CASCADE 自动清理
   await db.execute({ sql: 'DELETE FROM notes WHERE id = ?', args: [id] })
 }
 
