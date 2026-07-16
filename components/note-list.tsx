@@ -268,8 +268,18 @@ export function NoteList() {
 
   const handleTogglePin = useCallback(async (note: Note) => {
     const newPinned = !note.pinned
-    // Optimistic update: just flip pinned on the one note, no full re-sort
-    setNotes(notes.map(n => n.id === note.id ? { ...n, pinned: newPinned } : n))
+    // Optimistic update: move note to correct section O(n) — no full sort
+    const updatedNote = { ...note, pinned: newPinned }
+    const withOutNote = notes.filter(n => n.id !== note.id)
+    if (newPinned) {
+      // Insert after last pinned item (pinned section is at front)
+      const insertAt = withOutNote.findLastIndex(n => n.pinned) + 1
+      withOutNote.splice(insertAt, 0, updatedNote)
+    } else {
+      // Append to end (unpinned section)
+      withOutNote.push(updatedNote)
+    }
+    setNotes(withOutNote)
     try {
       await fetch(`/api/notes/${note.id}`, {
         method: 'PATCH',
@@ -280,6 +290,7 @@ export function NoteList() {
     } catch (e) {
       console.error('Failed to toggle pin:', e)
       toast.error('操作失败，请重试')
+      // Rollback: restore original position
       setNotes(notes.map(n => n.id === note.id ? { ...n, pinned: !newPinned } : n))
     }
   }, [notes, setNotes])
