@@ -57,7 +57,6 @@ export function NoteList() {
       const params = new URLSearchParams()
       params.set('limit', '500')
       params.set('summary', 'true')
-      if (activeTag) params.set('tag', activeTag)
       const res = await fetch(`/api/notes?${params}`)
       const data = await res.json()
       setNotes(data.notes)
@@ -66,7 +65,7 @@ export function NoteList() {
     } finally {
       setInitialLoading(false)
     }
-  }, [activeTag, setInitialLoading, setNotes])
+  }, [setInitialLoading, setNotes])
 
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -182,10 +181,13 @@ export function NoteList() {
     setActiveTag(tag)
     setSearchQuery('')
     setSearchResults(null)
-    setNotes([])
-  }, [activeTag, setNotes])
+  }, [activeTag])
 
-  const displayNotes = searchResults ?? notes
+  const displayNotes = searchResults ?? (
+    activeTag
+      ? notes.filter(n => activeTag === '__untagged__' ? n.tags.length === 0 : n.tags.includes(activeTag))
+      : notes
+  )
 
   // Restore scroll position after data is ready (from cache or fresh fetch)
   const scrollRestored = useRef(false)
@@ -266,14 +268,8 @@ export function NoteList() {
 
   const handleTogglePin = useCallback(async (note: Note) => {
     const newPinned = !note.pinned
-    // Build updated array with the new pinned value, then sort by pinned DESC, created_at DESC
-    const sorted = notes
-      .map(n => n.id === note.id ? { ...n, pinned: newPinned } : n)
-      .sort((a, b) => {
-        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      })
-    setNotes(sorted)
+    // Optimistic update: just flip pinned on the one note, no full re-sort
+    setNotes(notes.map(n => n.id === note.id ? { ...n, pinned: newPinned } : n))
     try {
       await fetch(`/api/notes/${note.id}`, {
         method: 'PATCH',
@@ -284,13 +280,7 @@ export function NoteList() {
     } catch (e) {
       console.error('Failed to toggle pin:', e)
       toast.error('操作失败，请重试')
-      const rolledBack = notes
-        .map(n => n.id === note.id ? { ...n, pinned: !newPinned } : n)
-        .sort((a, b) => {
-          if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        })
-      setNotes(rolledBack)
+      setNotes(notes.map(n => n.id === note.id ? { ...n, pinned: !newPinned } : n))
     }
   }, [notes, setNotes])
 
