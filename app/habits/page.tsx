@@ -53,18 +53,28 @@ function HabitsPageInner() {
   }, [])
 
   async function handleToggle(habitId: string, date: string) {
-    const res = await fetch('/api/habits', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ _action: 'toggle', habitId, date }),
-    })
-    const data = await res.json()
-    setTodayMap((prev) => ({ ...prev, [habitId]: data.completed }))
-    setStreaks((prev) => ({ ...prev, [habitId]: data.streak }))
-    setBestStreaks((prev) => ({ ...prev, [habitId]: data.bestStreak }))
-    setPerHabitTotals((prev) => ({ ...prev, [habitId]: data.totalCompletions }))
-    setPerHabitWeek((prev) => ({ ...prev, [habitId]: data.weekCount }))
-    setPerHabitMonth((prev) => ({ ...prev, [habitId]: data.monthCount }))
+    // Optimistic update: flip UI immediately
+    setTodayMap((prev) => ({ ...prev, [habitId]: !(prev[habitId] ?? false) }))
+
+    try {
+      const res = await fetch('/api/habits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ _action: 'toggle', habitId, date }),
+      })
+      const data = await res.json()
+      // Sync server state (may differ from optimistic guess for edge cases)
+      setTodayMap((prev) => ({ ...prev, [habitId]: data.completed }))
+      setStreaks((prev) => ({ ...prev, [habitId]: data.streak }))
+      setBestStreaks((prev) => ({ ...prev, [habitId]: data.bestStreak }))
+      setPerHabitTotals((prev) => ({ ...prev, [habitId]: data.totalCompletions }))
+      setPerHabitWeek((prev) => ({ ...prev, [habitId]: data.weekCount }))
+      setPerHabitMonth((prev) => ({ ...prev, [habitId]: data.monthCount }))
+    } catch (e) {
+      // Revert optimistic update on error
+      setTodayMap((prev) => ({ ...prev, [habitId]: !(prev[habitId] ?? false) }))
+      console.error('Failed to toggle habit:', e)
+    }
   }
 
   function handleDelete(id: string) {

@@ -27,6 +27,7 @@ export default function BudgetPage() {
   const [variableActualInput, setVariableActualInput] = useState('')
   const [notesText, setNotesText] = useState(budget?.notes || '')
   const notesTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const budgetAbortRef = useRef<AbortController | undefined>(undefined)
 
   const fixedBudget = budget?.fixedBudget ?? 0
   const variableBudget = budget?.variableBudget ?? 0
@@ -79,14 +80,34 @@ export default function BudgetPage() {
   }, [notesText, budget?.notes])
 
   async function saveBudgetData(data: Record<string, unknown>) {
-    const res = await fetch('/api/budgets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ month: currentMonth, ...data }),
-    })
-    if (res.ok) {
-      const result = await res.json()
-      setBudget(result.budget)
+    // Optimistic update for checkbox toggles (instant UI feedback)
+    if (data.isCompleted !== undefined || data.savingsCompleted !== undefined) {
+      setBudget((prev) => prev ? { ...prev, ...data } : prev)
+    }
+
+    // Abort previous in-flight request to avoid race conditions
+    budgetAbortRef.current?.abort()
+    const controller = new AbortController()
+    budgetAbortRef.current = controller
+
+    try {
+      const res = await fetch('/api/budgets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month: currentMonth, ...data }),
+        signal: controller.signal,
+      })
+      if (res.ok) {
+        const result = await res.json()
+        setBudget(result.budget)
+      }
+    } catch (e) {
+      // AbortError is expected when user clicks rapidly - ignore
+      if ((e as DOMException)?.name === 'AbortError') return
+      console.error('Failed to save budget:', e)
+    }
+    if (budgetAbortRef.current === controller) {
+      budgetAbortRef.current = undefined
     }
   }
 
