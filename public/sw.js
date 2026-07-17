@@ -1,14 +1,15 @@
 // LifeOS Service Worker — offline caching
 //
-// Challenges with Next.js App Router:
-//   1. Page HTML loads BEFORE SW activates → first visit never caches pages
-//   2. Client navigation uses GET with `RSC: 1` header (not POST)
-//   3. PWA start_url is `/` which 307 redirects to `/notes`
+// Next.js App Router notes:
+//   - Page HTML loads BEFORE SW activates → first visit never caches pages
+//   - Client navigation = GET with `RSC: 1` header (same URL as page, different body)
+//   - PWA start_url `/` 307-redirects to `/notes`
 //
-// Solution:
-//   - Activate warm-up: proactively fetch & cache current page + root URL
-//   - Network-first for all GET: cache on success, fallback on failure
-//   - Navigation fallback: scan cache for any HTML page when exact URL missed
+// Strategy:
+//   - Static assets: cache-first (immutable hashes)
+//   - Page navigations: network-first, cache on success
+//   - RSC requests: network-first, cached under a separate key
+//   - Activate warm-up: proactively fetch known pages so offline works sooner
 
 const CACHE = 'lifeos-v1'
 
@@ -23,6 +24,9 @@ const isStatic = (p) =>
   p === '/manifest.json' ||
   p.startsWith('/icons/')
 
+const isRsc = (request, url) =>
+  request.headers.get('rsc') === '1' || url.searchParams.has('_rsc')
+
 // ─── Install ────────────────────────────────────────────
 
 self.addEventListener('install', (e) => {
@@ -36,47 +40,32 @@ self.addEventListener('install', (e) => {
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    )
+    (async () => {
+      const keys = await caches.keys()
+      await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+      await warmCache()
+    })()
   )
   self.clients.claim()
-
-  // Warm cache: fetch current page + root so next visit works offline.
-  // Runs async — doesn't block activation.
-  warmCache()
 })
 
+// Proactively fetch known pages so the next offline visit works.
+// Does NOT depend on clients.matchAll (often empty during activate).
 async function warmCache() {
-  try {
-    const clients = await self.clients.matchAll({ type: 'window' })
-    await Promise.all(clients.map(async (client) => {
-      if (!client?.url) return
-      const url = new URL(client.url)
-      if (url.origin !== self.location.origin) return
-
-      const c = await caches.open(CACHE)
-      const targets = [url.href]
-      if (url.pathname !== '/') targets.push('/')
-      // Also warm /notes since that's what start_url redirects to
-      if (url.pathname !== '/notes') targets.push('/notes')
-
-      await Promise.all(targets.map(async (target) => {
-        // Skip if already cached
-        const existing = await caches.match(target)
-        if (existing) return
-
-        try {
-          const res = await fetch(target, { credentials: 'same-origin' })
-          if (res.ok) c.put(target, res)
-        } catch {
-          // Silent — warm-cache is best-effort
-        }
-      }))
-    }))
-  } catch {
-    // Silent
-  }
+  const pages = ['/', '/notes', '/expenses', '/habits', '/settings']
+  const c = await caches.open(CACHE)
+  await Promise.all(pages.map(async (page) => {
+    try {
+      const existing = await caches.match(page)
+      if (existing) return
+      const res = await fetch(page, { credentials: 'same-origin' })
+      if (res.ok && res.type === 'basic') {
+        c.put(page, res)
+      }
+    } catch {
+      // best-effort
+    }
+  }))
 }
 
 // ─── Fetch ──────────────────────────────────────────────
@@ -88,20 +77,22 @@ self.addEventListener('fetch', (e) => {
   if (request.method !== 'GET') return
   if (url.origin !== self.location.origin) return
 
-  // Static assets (immutable, content-hashed): cache-first
   if (isStatic(url.pathname)) {
     e.respondWith(cacheFirst(request))
     return
   }
 
-  // Everything else (pages, RSC data, API): network-first
+  if (isRsc(request, url)) {
+    e.respondWith(networkFirstRsc(request))
+    return
+  }
+
   e.respondWith(networkFirst(request))
 })
 
 async function cacheFirst(req) {
   const hit = await caches.match(req)
   if (hit) return hit
-
   try {
     const res = await fetch(req)
     if (res.ok) {
@@ -120,14 +111,16 @@ async function networkFirst(req) {
     if (res.ok) {
       const c = await caches.open(CACHE)
       c.put(req, res.clone())
+      // Also cache under start_url so PWA launch works offline
+      if (req.mode === 'navigate' && new URL(req.url).pathname !== '/') {
+        c.put('/', res.clone())
+      }
     }
     return res
   } catch {
-    // 1. Exact match
     const exact = await caches.match(req)
     if (exact) return exact
 
-    // 2. Navigation: try root, then any cached document
     if (req.mode === 'navigate' || req.destination === 'document') {
       const root = await caches.match('/')
       if (root) return root
@@ -138,12 +131,34 @@ async function networkFirst(req) {
         const doc = await c.match(key)
         if (!doc) continue
         const ct = doc.headers.get('content-type') || ''
-        if (ct.includes('text/html') || ct.includes('text/x-component')) {
+        if (ct.includes('text/html')) {
           return doc
         }
       }
     }
 
+    return offlinePage()
+  }
+}
+
+async function networkFirstRsc(req) {
+  const rscKey = new URL(req.url)
+  rscKey.searchParams.set('__sw_rsc', '1')
+  const rscKeyStr = rscKey.toString()
+
+  try {
+    const res = await fetch(req)
+    if (res.ok) {
+      const c = await caches.open(CACHE)
+      c.put(rscKeyStr, res.clone())
+    }
+    return res
+  } catch {
+    const cached = await caches.match(rscKeyStr)
+    if (cached) return cached
+    // Fallback: serve cached page HTML — Next.js will do a full reload
+    const page = await caches.match(req.url)
+    if (page) return page
     return offlinePage()
   }
 }
