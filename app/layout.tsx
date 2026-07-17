@@ -45,7 +45,7 @@ export default function RootLayout({
     >
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-512.png" />
-        <meta name="theme-color" content="#ffffff" id="theme-color" />
+        <meta name="theme-color" content="#0f172a" id="theme-color" />
       </head>
       <body className="h-full overflow-x-hidden">
         <ThemeProvider>

@@ -3,7 +3,7 @@ import { getAllTags, renameTag, deleteTag } from '@/lib/db'
 
 export async function GET() {
   const tags = await getAllTags()
-  return NextResponse.json({ tags })
+  return NextResponse.json({ tags }, { headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300' } })
 }
 
 export async function PATCH(req: NextRequest) {

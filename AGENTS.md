@@ -70,7 +70,7 @@ components/             # React 组件
   ├── error-boundary.tsx # React Error Boundary（含重试按钮）
   ├── theme-provider.tsx # 主题上下文（light/dark/system，localStorage 持久化）
   ├── theme-toggle.tsx  # 深色模式切换（Sun/Moon/Monitor 三态循环）
-  ├── pwa-handler.tsx   # PWA 安装管理（memo，beforeinstallprompt useRef 保存 + 离线黄色横幅）
+  ├── pwa-handler.tsx   # PWA 处理（memo，注册 Service Worker + 离线黄色横幅；安装引导已移除）
   ├── page-animation.tsx # 页面过渡动效（useSelectedLayoutSegment key 驱动 fadeIn）
   └── skeleton-card.tsx # 骨架屏（SkeletonNoteList / SkeletonHabits）
 lib/                    # 核心逻辑
@@ -165,11 +165,11 @@ DDL 不放在应用代码中。迁移通过 `migrations/*.sql` 文件管理：
 
 ### PWA 约定
 
-- 使用 **原生 `beforeinstallprompt`** 事件实现安装提示（事件对象存于 `useRef`，非 state）
-- `components/pwa-handler.tsx`：显示安装横幅和离线提示（黄色 "当前离线" 横幅）
-- 注意：**无 Service Worker**（`public/sw.js` 已在清理中被移除），因此无离线缓存能力
-- `public/manifest.json`：standalone 模式，portrait 锁定，192x192 + 512x512 PNG 图标
-- PWA 安装按钮使用 `onClick`（非 `onPointerDown`）
+- `components/pwa-handler.tsx`：注册 Service Worker + 监听 `online`/`offline` 事件，离线时显示黄色 "当前离线" 横幅（memo 组件）
+- **Service Worker 存在**：`public/sw.js` 提供离线缓存能力（install 预缓存静态资源 + activate 清理旧缓存并预热已知页面；静态资源 cache-first，页面与 RSC 请求 network-first，含离线 fallback 页）
+- **安装引导已移除**：当前未捕获 `beforeinstallprompt` 事件，无主动"安装到主屏"横幅（仅依赖浏览器原生安装提示，属有意设计）
+- `public/manifest.json`：standalone 模式，portrait 锁定，192x192 + 512x512 PNG 图标（含 maskable）
+- `theme-color`：深色模式运行时与 `manifest.json` 统一为 `#0f172a`，浅色模式为 `#ffffff`
 
 ## 部署
 

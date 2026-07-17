@@ -13,16 +13,18 @@ export async function GET(req: NextRequest) {
   const summary = searchParams.get('summary') === 'true'
   const tag = searchParams.get('tag')
 
+  const cacheHeaders = { headers: { 'Cache-Control': 'public, max-age=10, stale-while-revalidate=60' } }
+
   if (q) {
     let notes = await searchNotes(q, tag || undefined)
-    return NextResponse.json({ notes: summary ? notes.map(stripContent) : notes })
+    return NextResponse.json({ notes: summary ? notes.map(stripContent) : notes }, cacheHeaders)
   }
 
   const noteType = type && type !== 'all' ? type as Note['type'] : undefined
 
   if (startDate && endDate) {
     const notes = await getNotesByDateRange(startDate, endDate, noteType, limit, offset)
-    return NextResponse.json({ notes: summary ? notes.map(stripContent) : notes })
+    return NextResponse.json({ notes: summary ? notes.map(stripContent) : notes }, cacheHeaders)
   }
 
   const cursor = searchParams.get('cursor')
@@ -31,7 +33,7 @@ export async function GET(req: NextRequest) {
   const notes = result.notes
   const nextCursor = result.nextCursor
 
-  return NextResponse.json({ notes, nextCursor })
+  return NextResponse.json({ notes, nextCursor }, cacheHeaders)
 }
 
 function stripContent(note: Note): Note {

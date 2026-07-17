@@ -4,12 +4,13 @@ import { getBudget, getBudgets, upsertBudget } from '@/lib/db'
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const month = searchParams.get('month')
+  const cacheHeaders = { headers: { 'Cache-Control': 'public, max-age=30, stale-while-revalidate=120' } }
   if (month) {
     const budget = await getBudget(month)
-    return NextResponse.json({ budget })
+    return NextResponse.json({ budget }, cacheHeaders)
   }
   const budgets = await getBudgets()
-  return NextResponse.json({ budgets })
+  return NextResponse.json({ budgets }, cacheHeaders)
 }
 
 export async function POST(req: NextRequest) {

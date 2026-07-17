@@ -8,7 +8,7 @@ import { genId } from '@/lib/utils'
 
 export async function GET() {
   const dashboard = await getHabitsDashboard()
-  return NextResponse.json(dashboard)
+  return NextResponse.json(dashboard, { headers: { 'Cache-Control': 'public, max-age=20, stale-while-revalidate=90' } })
 }
 
 export async function POST(req: NextRequest) {
