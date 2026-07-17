@@ -75,13 +75,20 @@ components/             # React 组件
   └── skeleton-card.tsx # 骨架屏（SkeletonNoteList / SkeletonHabits）
 lib/                    # 核心逻辑
   ├── db/               # 数据库模块（通过 index.ts 重导出）
-  │   ├── client.ts     # getClient() + initDB()（7 表 + FTS5 + 10 索引 + 3 触发器）
+  │   ├── client.ts     # getClient() 单例连接管理（无 DDL，纯连接）
+  │   ├── migrate.ts    # 迁移执行器（可编程 API，按版本执行 migrations/*.sql）
+  │   ├── fts5.ts       # 运行时 FTS5 可用性探测（checkFts5，缓存结果）
   │   ├── notes.ts      # 笔记 CRUD + FTS5 搜索 + 游标/偏移分页 + 日期范围查询
   │   ├── habits.ts     # 习惯 CRUD + 打卡 + streaks + 最佳记录 + 周/月统计 + getHabitsDashboard() 合并查询
   │   ├── budgets.ts    # 预算 CRUD（upsert）
   │   ├── tags.ts       # 标签同步(syncNoteTags) + getAllTags(含计数) + renameTag(合并) + deleteTag
   │   ├── attachments.ts # 附件 CRUD（createAttachment / getAttachmentsByNoteId / deleteAttachment）
   │   └── index.ts      # 重导出（import from '@/lib/db'）
+migrations/             # 数据库迁移（纯 SQL，按编号版本化）
+  ├── 001_create_tables.sql
+  └── 002_add_fulltext_search.sql
+scripts/                # 工具脚本
+  └── migrate.ts        # 迁移 CLI（npm run migrate）
   ├── types.ts          # TypeScript 类型（Note/Budget/Habit/Attachment）
   ├── markdown.tsx      # MarkdownRenderer（react-markdown + Tailwind 样式）
   ├── strip-markdown.ts # stripMarkdown 纯函数（抽离自 markdown.tsx，无 React 依赖）
@@ -115,7 +122,18 @@ public/
 - `habits` + `habit_completions` — 习惯打卡（含 UNIQUE 索引防重复）
 - `attachments` — 笔记附件（外键 CASCADE 删除）
 - `tags` + `note_tags` — 规范化标签关联（复合主键，双 FK CASCADE）
-- 详情见 `lib/db/client.ts` 的 `initDB()`
+- 详情见 `lib/db/client.ts` 的 `getClient()` 和 `lib/db/migrate.ts`
+
+#### 数据库迁移
+
+DDL 不放在应用代码中。迁移通过 `migrations/*.sql` 文件管理：
+
+- `npm run migrate` — 执行待处理迁移（连接由环境变量 `TURSO_DATABASE_URL` 或 `DATABASE_URL` 决定）
+- `npm run migrate:dry` — 仅列出待执行迁移
+- 测试中调用 `migrate(getClient())` 在 `beforeAll` 中显式建表
+- 每次迁移在一个事务中完成，失败自动回滚
+- `_migrations` 表追踪已执行的迁移及其校验和，防止篡改
+- FTS5 可用性由运行时 `checkFts5()` 探测，迁移失败时优雅降级到 LIKE 搜索
 
 ### UI 动效约定
 
@@ -158,6 +176,7 @@ public/
 - **生产环境**：`https://opencode-demo.vercel.app`（Vercel，部署区域 `hkg1` 香港）
 - **云端数据库**：Turso（`libsql://lifeos-lijh37.aws-ap-northeast-1.turso.io`）
 - **文件存储**：Vercel Blob（需配置 `BLOB_READ_WRITE_TOKEN` 环境变量）
+- **数据库迁移**：部署前执行 `npm run migrate`（若使用 `TURSO_DATABASE_URL` 则连接 Turso 远程库执行迁移）
 - **密码保护**：`proxy.ts`（Next.js 16 Middleware，matcher 匹配全部路由）+ `/login` 页 + `/api/auth` 接口
   - 认证方式：`app_auth` cookie（30 天）/ `Authorization: Bearer` 头
   - 公开路径免认证：`/login`, `/api/auth`, `/manifest.json`, `/icons/`, `/uploads/`
@@ -193,7 +212,7 @@ public/
 ## 测试
 
 ```bash
-npm test          # vitest 单元测试（9 文件，146 测试）
+npm test          # vitest 单元测试（9 文件，141 测试）
 npm run test:e2e  # Playwright E2E（TODO）
 ```
 

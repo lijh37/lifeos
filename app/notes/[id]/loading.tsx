@@ -6,28 +6,28 @@ export default function NoteDetailLoading() {
     <div className="flex min-h-dvh flex-col">
       {/* Header */}
       <header className="flex items-center gap-3 border-b px-4 py-3 shrink-0">
-        <div className="h-8 w-8 rounded-md bg-muted animate-pulse" />
-        <div className="h-6 flex-1 rounded bg-muted animate-pulse" />
-        <div className="h-8 w-8 rounded-md bg-muted animate-pulse" />
+        <div className="h-8 w-8 rounded-md skeleton-pulse" />
+        <div className="h-6 flex-1 rounded skeleton-pulse" />
+        <div className="h-8 w-8 rounded-md skeleton-pulse" />
       </header>
 
       {/* Editor area */}
       <div className="flex min-h-0 flex-1">
         <div className="m-4 flex flex-1 flex-col gap-3">
-          <div className="h-4 w-3/4 rounded bg-muted animate-pulse" />
-          <div className="h-4 w-full rounded bg-muted animate-pulse" />
-          <div className="h-4 w-5/6 rounded bg-muted animate-pulse" />
-          <div className="h-4 w-2/3 rounded bg-muted animate-pulse" />
-          <div className="mt-2 h-4 w-full rounded bg-muted animate-pulse" />
-          <div className="h-4 w-4/5 rounded bg-muted animate-pulse" />
+          <div className="h-4 w-3/4 rounded skeleton-pulse" />
+          <div className="h-4 w-full rounded skeleton-pulse" />
+          <div className="h-4 w-5/6 rounded skeleton-pulse" />
+          <div className="h-4 w-2/3 rounded skeleton-pulse" />
+          <div className="mt-2 h-4 w-full rounded skeleton-pulse" />
+          <div className="h-4 w-4/5 rounded skeleton-pulse" />
         </div>
       </div>
 
       {/* Tags bar */}
       <div className="flex items-center gap-1.5 border-t px-4 py-2 shrink-0">
-        <div className="h-5 w-14 rounded-full bg-muted animate-pulse" />
-        <div className="h-5 w-20 rounded-full bg-muted animate-pulse" />
-        <div className="h-5 w-16 rounded-full bg-muted animate-pulse" />
+        <div className="h-5 w-14 rounded-full skeleton-pulse" />
+        <div className="h-5 w-20 rounded-full skeleton-pulse" />
+        <div className="h-5 w-16 rounded-full skeleton-pulse" />
       </div>
     </div>
   )

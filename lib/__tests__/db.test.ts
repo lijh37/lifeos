@@ -3,7 +3,7 @@ delete process.env.TURSO_DATABASE_URL
 process.env.DATABASE_URL = ':memory:'
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
-import { initDB, createNote, getNotes, getNote, updateNote, deleteNote, getClient, createHabit, getHabits, toggleCompletion, getTodayCompletions, deleteHabit, upsertBudget, getBudget, getBudgets, searchNotes, getAllTags, renameTag, deleteTag } from '@/lib/db'
+import { createNote, getNotes, getNote, updateNote, deleteNote, getClient, createHabit, getHabits, toggleCompletion, getTodayCompletions, deleteHabit, upsertBudget, getBudget, getBudgets, searchNotes, getAllTags, renameTag, deleteTag, migrate } from '@/lib/db'
 import type { Note } from '@/lib/types'
 
 function makeNote(overrides: Partial<Note> = {}): Note {
@@ -24,7 +24,7 @@ function makeNote(overrides: Partial<Note> = {}): Note {
 
 describe('Database - Notes', () => {
   beforeAll(async () => {
-    await initDB()
+    await migrate(getClient())
   })
 
   beforeEach(async () => {
@@ -92,7 +92,7 @@ describe('Database - Notes', () => {
 
 describe('Database - Habits', () => {
   beforeAll(async () => {
-    await initDB()
+    await migrate(getClient())
   })
 
   beforeEach(async () => {
@@ -170,7 +170,7 @@ describe('Database - Habits', () => {
 
 describe('Database - Budgets', () => {
   beforeAll(async () => {
-    await initDB()
+    await migrate(getClient())
   })
 
   beforeEach(async () => {
@@ -210,7 +210,7 @@ describe('Database - Budgets', () => {
 
 describe('Database - Search and Tags', () => {
   beforeAll(async () => {
-    await initDB()
+    await migrate(getClient())
   })
 
   beforeEach(async () => {

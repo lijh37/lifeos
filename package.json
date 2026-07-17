@@ -10,6 +10,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "migrate": "tsx scripts/migrate.ts",
+    "migrate:dry": "tsx scripts/migrate.ts --dry-run",
     "test": "vitest run",
     "test:watch": "vitest",
     "analyze": "ANALYZE=true next build"
@@ -48,6 +50,7 @@
     "eslint-config-next": "16.2.9",
     "jsdom": "^29.1.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.1",
     "typescript": "^5",
     "vitest": "^4.1.9"
   }

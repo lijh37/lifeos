@@ -1,6 +1,7 @@
 import type { InValue } from '@libsql/client'
 import type { Note } from '../types'
-import { getClient, fts5Available } from './client'
+import { getClient } from './client'
+import { checkFts5 } from './fts5'
 import { syncNoteTags } from './tags'
 
 
@@ -242,7 +243,7 @@ export async function searchNotes(query: string, tag?: string): Promise<Note[]> 
   const UNTAGGED = '__untagged__'
 
   // Try FTS5 first, fall back to LIKE
-  if (fts5Available) {
+  if (await checkFts5()) {
     try {
       const ftsQuery = query.replace(/['"]/g, '').split(/\s+/).filter(Boolean).join(' AND ')
       if (!ftsQuery) return []

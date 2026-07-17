@@ -9,17 +9,17 @@ import { Badge } from '@/components/ui/badge'
 const MarkdownEditor = dynamic(() => import('@/components/markdown-editor').then(mod => ({ default: mod.MarkdownEditor })), {
   loading: () => (
     <div className="flex min-h-0 flex-1 flex-col min-w-0">
-      <div className="h-10 w-full bg-muted/30 animate-pulse rounded-none" />
+      <div className="h-10 w-full skeleton-pulse rounded-none" />
       <div className="flex min-h-0 flex-1 gap-4 p-4">
         <div className="flex-1 space-y-3">
-          <div className="h-4 w-3/4 rounded bg-muted animate-pulse" />
-          <div className="h-4 w-full rounded bg-muted animate-pulse" />
-          <div className="h-4 w-5/6 rounded bg-muted animate-pulse" />
-          <div className="h-4 w-2/3 rounded bg-muted animate-pulse" />
+          <div className="h-4 w-3/4 rounded skeleton-pulse" />
+          <div className="h-4 w-full rounded skeleton-pulse" />
+          <div className="h-4 w-5/6 rounded skeleton-pulse" />
+          <div className="h-4 w-2/3 rounded skeleton-pulse" />
         </div>
         <div className="hidden w-1/2 space-y-3 sm:block">
-          <div className="h-4 w-3/4 rounded bg-muted animate-pulse" />
-          <div className="h-4 w-full rounded bg-muted animate-pulse" />
+          <div className="h-4 w-3/4 rounded skeleton-pulse" />
+          <div className="h-4 w-full rounded skeleton-pulse" />
         </div>
       </div>
     </div>
