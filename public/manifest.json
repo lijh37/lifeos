@@ -3,6 +3,7 @@
   "short_name": "LifeOS",
   "description": "你的个人 AI 生活助手",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0f172a",

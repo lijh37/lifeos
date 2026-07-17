@@ -39,6 +39,15 @@ const PwaHandler = memo(function PwaHandler() {
     })
   }
 
+  // Register Service Worker for offline caching
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {
+        // SW registration failed — app still works, just no offline cache
+      })
+    }
+  }, [])
+
   useEffect(() => {
     setIsOffline(!navigator.onLine)
     const onOnline = () => setIsOffline(false)
