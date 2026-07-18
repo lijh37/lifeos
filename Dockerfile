@@ -9,7 +9,8 @@ WORKDIR /app
 RUN npm config set registry https://registry.npmmirror.com
 # 仅复制依赖清单，利用层缓存
 COPY package.json package-lock.json* ./
-RUN npm ci --maxsockets 3 --no-audit --no-fund
+# 用 npm install 而非 npm ci：规避 Docker buildkit 下 npm "Exit handler never called" 信号处理 bug
+RUN npm install --maxsockets 3 --no-audit --no-fund
 
 # ── 构建阶段 ──
 FROM node:22-slim AS builder

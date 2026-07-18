@@ -11,6 +11,9 @@ services:
       dockerfile: Dockerfile
     container_name: lifeos-next
     restart: unless-stopped
+    # 放宽 seccomp，规避 npm 构建期信号处理异常
+    security_opt:
+      - seccomp:unconfined
     environment:
       # ── 数据库：本地 SQLite（解耦 Turso）──
       - DATABASE_URL=file:./data/db/lifeos.db
