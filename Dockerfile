@@ -5,8 +5,9 @@
 # ── 依赖阶段 ──
 FROM node:22-slim AS deps
 WORKDIR /app
-# 使用国内 npm 镜像源，提升阿里云环境拉取速度
-RUN npm config set registry https://registry.npmmirror.com
+# 使用国内 npm 镜像源，提升阿里云环境拉取速度（可用 build-arg 覆盖）
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+RUN npm config set registry ${NPM_REGISTRY}
 # node:22-slim 已自带 yarn，无需安装
 # 仅复制依赖清单，利用层缓存
 COPY package.json package-lock.json* ./
@@ -17,7 +18,8 @@ RUN yarn install --frozen-lockfile --non-interactive
 FROM node:22-slim AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm config set registry https://registry.npmmirror.com
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+RUN npm config set registry ${NPM_REGISTRY}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # 构建期不注入生产环境变量；运行时由容器 env 提供

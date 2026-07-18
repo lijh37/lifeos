@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 let nextConfig: NextConfig = {
-  allowedDevOrigins: ['*'],
   serverExternalPackages: ['@libsql/client'],
   experimental: {
     proxyClientMaxBodySize: '10mb',

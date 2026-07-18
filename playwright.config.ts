@@ -34,10 +34,9 @@ export default defineConfig({
       // Bypass password auth so E2E can hit protected routes directly.
       APP_PASSWORD: '',
       // CRITICAL: isolate E2E from the production Turso database.
-      // Next.js loads .env.local (which sets TURSO_DATABASE_URL to the live
-      // remote DB). Explicitly unset it and point at a throwaway local SQLite
-      // file so test data never touches production. The file is wiped before
-      // each run via the `pretest:e2e` hook.
+      // Explicitly unset TURSO_* and point at a throwaway local SQLite file
+      // so test data never touches production. The file is wiped before each
+      // run via the `pretest:e2e` hook.
       TURSO_DATABASE_URL: '',
       TURSO_AUTH_TOKEN: '',
       DATABASE_URL: 'file:./.e2e-test.db',
