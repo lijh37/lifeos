@@ -16,7 +16,7 @@ function LoginForm() {
     const from = searchParams.get('from') || '/'
     fetch('/api/auth', { method: 'POST', body: JSON.stringify({ password: '' }) })
       .then(r => r.json())
-      .then(d => { if (d.ok) router.replace(from) })
+      .then(d => { if (d.ok) window.location.href = from })
       .catch(() => {})
   }, [])
 
@@ -32,7 +32,7 @@ function LoginForm() {
     const data = await res.json()
     setLoading(false)
     if (data.ok) {
-      router.replace(searchParams.get('from') || '/')
+      window.location.href = searchParams.get('from') || '/'
     } else {
       setError('密码错误')
     }

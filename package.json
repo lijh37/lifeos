@@ -14,7 +14,8 @@
     "migrate:dry": "tsx scripts/migrate.ts --dry-run",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "LD_LIBRARY_PATH=\"$PWD/.pw-libs/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\" playwright test",
+    "pretest:e2e": "rm -f .e2e-test.db",
+    "test:e2e": "LD_LIBRARY_PATH=\"$PWD/.pw-libs/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\" playwright test && rm -f .e2e-test.db",
     "analyze": "ANALYZE=true next build"
   },
   "dependencies": {

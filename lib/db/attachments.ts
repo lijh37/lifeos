@@ -83,12 +83,3 @@ export async function deleteAttachment(id: string): Promise<boolean> {
   const result = await db.execute({ sql: 'DELETE FROM attachments WHERE id = ?', args: [id] })
   return result.rowsAffected > 0
 }
-
-/**
- * 删除指定笔记的所有附件。
- * @param noteId - 笔记 ID
- */
-export async function deleteAttachmentsByNoteId(noteId: string): Promise<void> {
-  const db = getClient()
-  await db.execute({ sql: 'DELETE FROM attachments WHERE note_id = ?', args: [noteId] })
-}

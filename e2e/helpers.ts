@@ -17,9 +17,3 @@ export async function createNoteViaApi(
 export async function deleteNoteViaApi(id: string): Promise<void> {
   await fetch(`${BASE_URL}/api/notes/${id}`, { method: 'DELETE' })
 }
-
-export async function listNotesViaApi(): Promise<Array<{ id: string; title: string }>> {
-  const res = await fetch(`${BASE_URL}/api/notes?summary=true`)
-  const data = (await res.json()) as { notes: Array<{ id: string; title: string }> }
-  return data.notes ?? []
-}

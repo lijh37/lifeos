@@ -1,16 +1,6 @@
 -- 001: 创建核心表与索引
 --
--- 本迁移定义应用当前正在使用的表结构，不含已废弃的遗留表/字段。
---
--- 生产 Turso 库中遗留的废弃表（不会影响功能，不会被删除）：
---   - chat_messages    — AI 对话消息（已废弃功能）
---   - conversations    — AI 对话会话（已废弃功能）
---   - expenses         — 独立支出记录（已废弃功能）
---
--- 生产 Turso 库中遗留的废弃字段（不会影响功能，不会被删除）：
---   - notes.tags TEXT DEFAULT '[]'    — 旧版内联 JSON 标签（已迁移到 note_tags）
---   - notes.sort_order INTEGER DEFAULT 0 — 未使用的排序字段
---   - note_tags / tags 缺少 FK 约束   — 生产以 ALTER TABLE 追加，旧表从未启用外键
+-- 本迁移定义应用当前正在使用的表结构。
 --
 -- 外键约束：本地 SQLite 需手动启用 PRAGMA foreign_keys = ON
 --          Turso/libSQL 云端原生支持外键

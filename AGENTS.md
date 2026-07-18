@@ -183,6 +183,16 @@ DDL 不放在应用代码中。迁移通过 `migrations/*.sql` 文件管理：
   - 未认证 API 返回 401 JSON；未认证页面重定向到 `/login?from=<original_path>`
   - 若 `APP_PASSWORD` 未设置，则自动跳过认证
 
+### 环境隔离设计
+
+三个环境通过数据库连接配置隔离，避免测试/开发污染生产：
+
+- **prod**：Vercel 环境变量 `TURSO_DATABASE_URL` → 生产 Turso 实例 `lifeos-lijh37`。部署时手动 `npm run migrate` 建表。
+- **test**：CI 单元测用 `:memory:`；E2E 用本地 SQLite 文件 `.e2e-test.db`（见上「数据库隔离」）。均不连生产。
+- **dev**：本地 `npm run dev` 应连独立数据库，**不要指向生产实例**。推荐 `.env.local` 用 `DATABASE_URL=file:./data/dev.db`（本地 SQLite），而非 `TURSO_DATABASE_URL` 生产库——否则本地调试会直接读写生产数据。
+
+> 注意：`getClient()` 优先使用 `TURSO_DATABASE_URL`，只要该变量存在就忽略 `DATABASE_URL`。因此 dev 要脱离生产，必须确保 `.env.local` 不含 `TURSO_DATABASE_URL`。
+
 ## 环境变量
 
 | 变量 | 必需 | 说明 |
@@ -191,7 +201,7 @@ DDL 不放在应用代码中。迁移通过 `migrations/*.sql` 文件管理：
 | `TURSO_AUTH_TOKEN` | 是 | Turso 认证 Token |
 | `APP_PASSWORD` | 否 | 登录密码（不设置则跳过认证，.env.example 默认 `demo`）|
 | `BLOB_READ_WRITE_TOKEN` | 否（附件功能） | Vercel Blob 存储 Token |
-| `DATABASE_URL` | 否 | 本地 SQLite 路径（仅 CI 测试用，默认使用 `:memory:`）|
+| `DATABASE_URL` | 否 | 本地 SQLite 路径。CI 单元测用 `:memory:`；E2E 用 `file:./.e2e-test.db` 隔离；本地开发可选 `file:./data/dev.db` 以避免连生产 |
 
 ## WSL2 环境说明
 
@@ -222,6 +232,7 @@ npm run test:e2e  # Playwright E2E（13 测试，见下）
 - 覆盖：登陆重定向与 PWA manifest、笔记 CRUD + 搜索 + 标签 + 置顶、预算设置与结算、习惯创建/打卡/删除
 - 运行方式：`npm run test:e2e`（自动启动 `npm run dev` 作为 webServer）
 - **认证绕过**：测试以空 `APP_PASSWORD` 启动 dev server，`app/api/auth` 在 `APP_PASSWORD` 为空时自动放行，因此测试可直接访问受保护页面，无需登录
+- **数据库隔离（关键）**：`playwright.config.ts` 的 `webServer.env` 显式清空 `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` 并设 `DATABASE_URL=file:./.e2e-test.db`，且启动前先 `npm run migrate` 建本地表。**E2E 绝不连接生产 Turso 库**，跑完自动删除 `.e2e-test.db`。切勿移除该隔离——否则测试数据会写入生产库（曾发生过的事故）
 - **辅助工具**：`e2e/helpers.ts` 提供 `BASE_URL`、API 建数据/清理、自动认证等
 - **本地 Chromium 系统库**：本环境缺少 `libnspr4` / `libnss3` / `libasound2`，已将对应 `.so` 解压至 `.pw-libs/lib/` 并在 `test:e2e` 脚本中自动注入 `LD_LIBRARY_PATH`（该目录已加入 `.gitignore`，不提交）
 - 测试产物 `playwright-report/` 与 `test-results/` 已加入 `.gitignore`

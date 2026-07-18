@@ -10,11 +10,12 @@ export async function POST(req: Request) {
 
   if (password === expected) {
     const res = NextResponse.json({ ok: true })
+    const secure = process.env.NODE_ENV === 'production'
     res.cookies.set('app_auth', password, {
       path: '/',
       maxAge: 60 * 60 * 24 * 30,
       sameSite: 'lax',
-      secure: true,
+      secure,
       httpOnly: true,
     })
     return res

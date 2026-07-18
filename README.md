@@ -30,12 +30,12 @@ git push origin main          # Vercel 自动部署
 | `TURSO_AUTH_TOKEN` | 是 | Turso 认证 Token |
 | `APP_PASSWORD` | 否 | 登录密码（不设置则跳过认证，.env.example 默认 `demo`）|
 | `BLOB_READ_WRITE_TOKEN` | 否（附件功能） | Vercel Blob 存储 Token |
-| `DATABASE_URL` | 否 | 本地 SQLite（仅测试用，默认 `:memory:`）|
+| `DATABASE_URL` | 否 | 本地 SQLite（CI 单元测用 `:memory:`；E2E 用 `.e2e-test.db` 隔离；本地开发可选 `file:./data/dev.db` 避免连生产）|
 
 ## 测试
 
 ```bash
-npm test           # vitest 单元测试（9 文件，146 测试）
+npm test           # vitest 单元测试（9 文件，141 测试）
 npm run test:e2e   # Playwright E2E（13 测试：smoke/notes/budgets/habits）
 npm run analyze    # 分析构建产物体积（需要 ANALYZE=true）
 ```
