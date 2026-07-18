@@ -7,8 +7,7 @@ FROM node:22-slim AS deps
 WORKDIR /app
 # 使用国内 npm 镜像源，提升阿里云环境拉取速度
 RUN npm config set registry https://registry.npmmirror.com
-# 直接用 npm 安装 Yarn，显式指定官方源避免容器内 DNS 解析失败
-RUN npm install -g yarn --registry=https://registry.npmjs.org
+# node:22-slim 已自带 yarn，无需安装
 # 仅复制依赖清单，利用层缓存
 COPY package.json package-lock.json* ./
 # 使用 Yarn 安装，规避 npm 信号处理 bug
