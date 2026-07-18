@@ -19,34 +19,42 @@
 1. 浏览器打开宝塔面板 `http://<IP>:8888`，完成初始化（设面板密码、安全入口）。
 2. 宝塔「软件商店」安装 **Docker**（一键安装，无需装 MySQL / MinIO）。
 3. 放行端口（宝塔防火墙 + 阿里云安全组都要放）：
-   - `8888` 宝塔面板
-   - `3000` 临时 Web 访问
-   - `22` SSH
-   - 备案后追加 `80`、`443`
+    - `8888` 宝塔面板
+    - `3000` 临时 Web 访问
+    - `22` SSH
+    - 备案后追加 `80`、`443`
 4. 安装 git：`yum install -y git`（阿里云 Linux）或 `apt install -y git`。
 5. 克隆仓库：`git clone <你的仓库地址> && cd opencode-demo`。
 6. **配置 Docker DNS（关键，否则 build 会 DNS 解析失败）**：
-   阿里云 ECS 默认 `/etc/resolv.conf` 是内网 DNS（`100.100.x.x`），Docker 容器网络命名空间访问不到，
-   `docker build` 会出现 `EAI_AGAIN` / `getaddrinfo failed` 报错。需给 Docker daemon 配公共 DNS：
-   ```bash
-   mkdir -p /etc/docker
-   cat > /etc/docker/daemon.json <<'EOF'
-   {
-     "dns": ["223.5.5.5", "8.8.8.8", "114.114.114.114"]
-   }
-   EOF
-   systemctl restart docker
-   ```
-   `223.5.5.5` 是阿里云公共 DNS，ECS 内网可达，优先用它。重启后容器即可正常解析域名。
+    阿里云 ECS 默认 `/etc/resolv.conf` 是内网 DNS（`100.100.x.x`），Docker 容器网络命名空间访问不到，
+    `docker build` 会出现 `EAI_AGAIN` / `getaddrinfo failed` 报错。需给 Docker daemon 配公共 DNS：
+    ```bash
+    mkdir -p /etc/docker
+    cat > /etc/docker/daemon.json <<'EOF'
+    {
+      "dns": ["223.5.5.5", "8.8.8.8", "114.114.114.114"]
+    }
+    EOF
+    systemctl restart docker
+    ```
+    `223.5.5.5` 是阿里云公共 DNS，ECS 内网可达，优先用它。重启后容器即可正常解析域名。
 
 ---
 
 ## 2. 部署
 
 ```bash
-# 复制环境变量模板
+cd /root/lifeos
+
+# 复制环境变量模板（注意是 .env.prod.example，不是 .env.example）
+# .env.example 是 Vercel 版模板，自托管用错会导致密码/存储配置不对
 cp .env.prod.example .env
-# 按需修改 .env（如改 APP_PASSWORD）
+
+# 改密码（用 sed 避免 vi 误粘注释行导致 compose 解析 .env 报错）
+sed -i 's/^APP_PASSWORD=demo/APP_PASSWORD=你的新密码/' .env
+# 密码不要含 #、空格、$ 等特殊字符（会被 shell 截断）
+# 若必须含特殊字符，用单引号包住：
+#   sed -i "s/^APP_PASSWORD=demo/APP_PASSWORD='ab#cd'/" .env
 
 # 构建镜像（首次约 3-5 分钟，使用 Yarn 规避 Docker 26.1 下 npm 信号处理 bug）
 docker build -t lifeos-next -f Dockerfile .
@@ -58,13 +66,78 @@ docker compose up -d
 docker compose logs -f next
 ```
 
-> **代码更新后重新部署**：`git pull` → `docker build -t lifeos-next -f Dockerfile .` → `docker compose up -d`
+> **代码更新后重新部署（重要）**：
+> `git pull` → **必须手动 `docker build -t lifeos-next -f Dockerfile .` 重建镜像** → `docker compose up -d`
+> 注意：`docker compose up -d` / `docker compose build` **不会自动重建已存在的本地镜像**（即使代码已更新），
+> 必须显式 `docker build` 才能用上新代码，否则容器一直跑旧镜像。
 
 启动后访问 `http://<IP>:3000` 即可使用。迁移脚本会在容器启动时自动执行建表。
 
 ---
 
-## 3. 数据备份与迁移（换机器核心）
+## 3. 常见问题排查（本会话实测踩坑）
+
+### 3.1 `docker build` 报 `EAI_AGAIN` / `getaddrinfo failed`
+容器内无法解析域名。原因：阿里云 ECS 默认内网 DNS 容器访问不到。
+解决：按「1.6」给 Docker daemon 配公共 DNS 并 `systemctl restart docker`。
+
+### 3.2 容器启动后日志报 `SQLITE_CANTOPEN` (error 14) / `Unable to open ./data/db/lifeos.db`
+`DATABASE_URL=file:./data/db/lifeos.db` 指向 `db/` 子目录，但镜像只建了 `uploads/`，且
+`lifeos-data` volume 挂载在 `/app/data` 上会**遮蔽镜像内建的目录**，导致运行时 `db/` 不存在。
+解决：compose 启动命令已改为 `mkdir -p /app/data/db && npm run migrate && npm run start`（运行时建目录，在 volume 挂载之后）。
+
+### 3.3 `cp .env.example .env` 后 `docker compose up` 报 `unexpected character "#" in variable name`
+误用了 Vercel 版模板 `.env.example`（含 Turso/Blob 配置），且 `.env` 里混入了注释文字。
+解决：用 `.env.prod.example`（自托管模板）。注意该文件曾被 `.gitignore` 的 `.env*` 规则忽略、未提交，
+现已 `git add -f` 强制跟踪；若 `git pull` 后仍无此文件，手动 `touch .env.prod.example` 并按模板内容创建。
+
+### 3.4 登录密码正确，但登录后页面刷新又回到登录页（进不去主页面）
+根因：认证 cookie 被设了 `Secure` 标记，而临时访问是 `http://IP:3000`（明文 HTTP）。
+浏览器收下 cookie 但拒绝在 HTTP 请求回传 → 中间件读不到 cookie → 重定向回 `/login`。
+解决：cookie 的 `Secure` 由 `COOKIE_SECURE` 环境变量控制（见 `app/api/auth/route.ts`）。
+`docker-compose.yml` 已设 `COOKIE_SECURE=false`（HTTP 阶段）。**备案切 HTTPS 后必须改为 `true`**。
+排查命令：
+```bash
+# 看登录接口返回的 Set-Cookie 是否还带 Secure
+curl -s -i -X POST http://127.0.0.1:3000/api/auth \
+  -H 'Content-Type: application/json' \
+  -d '{"password":"你的密码"}' | grep -i set-cookie
+# 正常（HTTP 阶段）应只有：HttpOnly; SameSite=lax，没有 Secure
+```
+
+### 3.5 `git pull` 卡住 / `Failed to connect to github.com port 443: Connection timed out`
+现象：`ping github.com` 通（ICMP），但 `git pull`（HTTPS 443）超时。
+原因：git 的 HTTP 库可能优先走 IPv6（AAAA）先连导致超时，或受 `http(s).proxy` / `HTTPS_PROXY` 环境变量影响。
+排查与解决：
+```bash
+# 看是否配了代理（元凶之一）
+git config --global --get http.proxy
+git config --global --get https.proxy
+env | grep -i proxy
+
+# 清代理 + 强制 git 走 IPv4
+git config --global --unset http.proxy 2>/dev/null
+git config --global --unset https.proxy 2>/dev/null
+git config --global http.curloptResolve 'github.com:443:20.205.243.166'
+git pull origin main
+```
+若仍不通，可临时用国内镜像拉取（拉完改回）：
+```bash
+git remote set-url origin https://gitclone.com/github.com/lijh37/lifeos.git
+git pull origin main
+git remote set-url origin https://github.com/lijh37/lifeos.git
+```
+
+### 3.6 改了代码但 `docker compose up -d` 后没生效（现象同 3.4 但 cookie 仍是 Secure）
+`docker compose up -d` 不会重建已存在的本地镜像。必须：
+```bash
+docker build -t lifeos-next -f Dockerfile .   # 手动重建
+docker compose up -d next                       # 用新镜像起
+```
+
+---
+
+## 4. 数据备份与迁移（换机器核心）
 
 数据全部在 `lifeos-data` volume（SQLite + 附件）。
 
@@ -91,26 +164,39 @@ docker compose up -d
 
 ---
 
-## 4. 备案通过后切换域名 + HTTPS
+## 5. 备案流程与切换域名 + HTTPS
 
-1. 域名在阿里云完成 ICP 备案。
-2. 域名解析 A 记录指向 `<IP>`。
-3. 宝塔「网站」添加站点（或「SSL」），申请 Let's Encrypt 免费证书。
-4. 修改 `nginx/lifeos.conf`：取消底部 `server { listen 80; ... }` 块注释，填 `server_name your-domain.com;`。
-5. 修改 `docker-compose.yml`：放开 `nginx` 的 `80:80` / `443:443` 端口映射（取消注释）。
-6. 重新部署：`docker compose up -d nginx`。
-7. 验证 `https://your-domain.com` 可访问。
+### 5.1 备案前准备
+1. 域名实名认证通过后，**至少等 3 天**信息同步到管局系统，才能发起备案（否则被打回）。
+2. 备案期间继续用 `http://<IP>:3000` 访问，**不要解析域名**。
+3. 并行准备：
+    - 阿里云控制台 → 备案 → 申请 **备案服务码**（需关联本台国内 ECS）。
+    - 准备材料：身份证正反面、手机号、应急手机号、邮箱。
+    - 确认 ECS 剩余有效期 ≥ 3 个月（不足需先续费）。
+
+### 5.2 提交备案
+阿里云控制台 → ICP 备案 → 新增网站（个人）→ 填域名 `daimoli.xyz` + 绑定备案服务码 → 上传身份证、人脸核验。
+阿里云初审 1-2 工作日 → 管局审核 1-20 工作日（整体 3-22 工作日）。
+
+### 5.3 备案通过后切换
+1. 域名 A 记录指向 `<IP>`。
+2. 宝塔「网站」添加站点（或「SSL」），申请 Let's Encrypt 免费证书。
+3. 修改 `nginx/lifeos.conf`：取消底部 `server { listen 80; ... }` 块注释，填 `server_name daimoli.xyz;`。
+4. 修改 `docker-compose.yml`：放开 `nginx` 的 `80:80` / `443:443` 端口映射（取消注释）。
+5. **改 `.env`：`COOKIE_SECURE=true`**（HTTPS 下 cookie 需要 Secure，否则浏览器不回传）。
+6. 重新部署：`docker build -t lifeos-next -f Dockerfile . && docker compose up -d`。
+7. 验证 `https://daimoli.xyz` 可访问。
 
 ---
 
-## 5. 回滚到 Vercel 行为
+## 6. 回滚到 Vercel 行为
 
 代码默认 `STORAGE_DRIVER=vercel`（即不设置该变量时），Vercel 环境变量不变则行为完全不变。
 自托管仅通过 `.env` / compose 注入 `STORAGE_DRIVER=local` 激活本地存储，不影响 Vercel 生产。
 
 ---
 
-## 6. 常用运维命令
+## 7. 常用运维命令
 
 ```bash
 docker compose ps            # 查看容器状态
