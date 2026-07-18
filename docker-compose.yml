@@ -21,6 +21,9 @@ services:
       - UPLOAD_URL_PREFIX=/uploads
       # ── 认证 ──
       - APP_PASSWORD=${APP_PASSWORD:-demo}
+      # 备案前经 http://IP:3000 访问时必须为 false（否则 Secure cookie 不被回传，登录后跳回登录页）
+      # 备案后切 HTTPS 时改为 true
+      - COOKIE_SECURE=false
       # ── 其他 ──
       - NODE_ENV=production
       - PORT=3000
