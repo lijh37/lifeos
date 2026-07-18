@@ -1,7 +1,6 @@
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
 import { Sidebar, MobileNav } from "@/components/sidebar"
 import { PwaHandler } from "@/components/pwa-handler"
 import { PageAnimation } from "@/components/page-animation"
@@ -45,27 +44,25 @@ export default function RootLayout({
     >
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-512.png" />
-        <meta name="theme-color" content="#0f172a" id="theme-color" />
+        <meta name="theme-color" content="#0f172a" />
       </head>
       <body className="h-full overflow-x-hidden">
-        <ThemeProvider>
-          <Toaster
-            position="top-center"
-            toastOptions={{
-              className: "text-sm",
-              duration: 3000,
-            }}
-          />
-          <PwaHandler />
-          <RouteLoadingBar />
-          <div className="flex h-full">
-            <Sidebar />
-            <PageAnimation>
-              <main className="pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">{children}</main>
-            </PageAnimation>
-            <MobileNav />
-          </div>
-        </ThemeProvider>
+        <Toaster
+          position="top-center"
+          toastOptions={{
+            className: "text-sm",
+            duration: 3000,
+          }}
+        />
+        <PwaHandler />
+        <RouteLoadingBar />
+        <div className="flex h-full">
+          <Sidebar />
+          <PageAnimation>
+            <main className="pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">{children}</main>
+          </PageAnimation>
+          <MobileNav />
+        </div>
       </body>
     </html>
   )

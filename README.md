@@ -1,6 +1,6 @@
 # LifeOS - 生活助手
 
-个人生活助手应用。支持笔记管理、预算规划和习惯养成。PWA 支持手机和 PC 端，深色模式、数据备份恢复、附件上传。
+个人生活助手应用。支持笔记管理、预算规划和习惯养成。PWA 支持手机和 PC 端，数据备份恢复、附件上传。
 
 ## 技术栈
 
@@ -39,7 +39,7 @@ npm run dev                   # http://localhost:3000（首次启动自动建表
 ## 测试
 
 ```bash
-npm test           # vitest 单元测试（10 文件，151 测试）
+npm test           # vitest 单元测试（10 文件，约 146 测试）
 npm run test:e2e   # Playwright E2E（13 测试：smoke/notes/budgets/habits）
 npm run analyze    # 分析构建产物体积（需要 ANALYZE=true）
 ```

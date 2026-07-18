@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Notebook, MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { ThemeToggle } from '@/components/theme-toggle'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
@@ -36,13 +35,6 @@ export function Sidebar() {
           )
         })}
       </nav>
-
-      <div className="mt-auto space-y-2">
-        <div className="flex items-center justify-between border-t px-2 pt-2">
-          <span className="text-xs text-muted-foreground">主题</span>
-          <ThemeToggle />
-        </div>
-      </div>
     </aside>
   )
 }
@@ -104,9 +96,6 @@ export function MobileNav() {
                 </Link>
               )
             })}
-          </div>
-          <div className="flex items-center justify-center border-t py-3">
-            <ThemeToggle />
           </div>
         </SheetContent>
       </Sheet>

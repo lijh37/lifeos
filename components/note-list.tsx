@@ -17,6 +17,7 @@ import dynamic from 'next/dynamic'
 import { Input } from '@/components/ui/input'
 import { SkeletonNoteList } from '@/components/skeleton-card'
 import type { Note } from '@/lib/types'
+import { UNTAGGED } from '@/lib/db/tags'
 import { useAppStore } from '@/store'
 import { toast } from 'sonner'
 import { NoteCard } from '@/components/note-card'
@@ -193,7 +194,7 @@ export function NoteList() {
 
   const displayNotes = searchResults ?? (
     activeTag
-      ? notes.filter(n => activeTag === '__untagged__' ? n.tags.length === 0 : n.tags.includes(activeTag))
+      ? notes.filter(n => activeTag === UNTAGGED ? n.tags.length === 0 : n.tags.includes(activeTag))
       : notes
   )
 
@@ -360,7 +361,7 @@ export function NoteList() {
             className="cursor-pointer shrink-0 text-xs gap-1"
             onClick={() => handleTagSelect(t.name)}
           >
-            {t.name === '__untagged__' ? '未分类' : t.name}
+            {t.name === UNTAGGED ? '未分类' : t.name}
             <span className="text-[10px] opacity-70">({t.count})</span>
           </Badge>
         ))}
@@ -383,7 +384,7 @@ export function NoteList() {
             ) : searchQuery ? (
               '没有找到匹配的记录'
             ) : activeTag ? (
-              <>{activeTag === '__untagged__' ? '没有未分类的笔记' : <>没有标记「<span className="font-medium">{activeTag}</span>」的笔记</>}</>
+              <>{activeTag === UNTAGGED ? '没有未分类的笔记' : <>没有标记「<span className="font-medium">{activeTag}</span>」的笔记</>}</>
             ) : (
               '还没有任何记录，点击上方 + 新建笔记'
             )}

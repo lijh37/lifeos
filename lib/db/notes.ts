@@ -2,7 +2,7 @@ import type { InValue } from '@libsql/client'
 import type { Note } from '../types'
 import { getClient } from './client'
 import { checkFts5 } from './fts5'
-import { syncNoteTags } from './tags'
+import { syncNoteTags, UNTAGGED } from './tags'
 
 
 function rowToNote(row: Record<string, unknown>, tags: string[] = []): Note {
@@ -138,7 +138,6 @@ export async function getNotesCursor(type?: 'note', limit = 50, cursor?: string,
   let sql = `SELECT ${selectColumns} FROM notes`
   const args: InValue[] = []
 
-  const UNTAGGED = '__untagged__'
   if (tag === UNTAGGED) {
     sql += ' LEFT JOIN note_tags ON notes.id = note_tags.note_id'
   } else if (tag) {
@@ -240,7 +239,6 @@ export async function getNote(id: string): Promise<Note | null> {
 export async function searchNotes(query: string, tag?: string): Promise<Note[]> {
   const db = getClient()
   const term = `%${query}%`
-  const UNTAGGED = '__untagged__'
 
   // Try FTS5 first, fall back to LIKE
   if (await checkFts5()) {

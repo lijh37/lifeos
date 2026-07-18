@@ -22,6 +22,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog'
+import { UNTAGGED } from '@/lib/db/tags'
 import { useAppStore } from '@/store'
 
 interface TagManagerSheetProps {
@@ -171,7 +172,7 @@ export function TagManagerSheet({ open, onOpenChange, onTagSelect, onTagsChanged
                             #
                           </span>
                           <span className="truncate text-sm font-medium">
-                            {tag.name === '__untagged__' ? '未分类' : tag.name}
+                            {tag.name === UNTAGGED ? '未分类' : tag.name}
                           </span>
                         </button>
                         <span className="shrink-0 text-xs text-muted-foreground">{tag.count} 条</span>
