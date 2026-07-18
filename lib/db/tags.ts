@@ -1,6 +1,7 @@
 import type { InValue } from '@libsql/client'
 import { getClient } from './client'
 import { genId } from '../utils'
+import { UNTAGGED } from '../types'
 
 export async function syncNoteTags(noteId: string, tags: string[]): Promise<void> {
   const db = getClient()
@@ -48,9 +49,9 @@ export async function syncNoteTags(noteId: string, tags: string[]): Promise<void
 /**
  * 获取所有标签及其关联的笔记数量，按数量降序排列。
  * 全部从规范化标签表查询。
- * @returns 标签名和对应计数对象的数组
- */
-export const UNTAGGED = '__untagged__'
+  * @returns 标签名和对应计数对象的数组
+  */
+
 
 export async function getAllTags(): Promise<{ name: string; count: number }[]> {
   const db = getClient()

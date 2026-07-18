@@ -22,7 +22,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog'
-import { UNTAGGED } from '@/lib/db/tags'
+import { UNTAGGED } from '@/lib/types'
 import { useAppStore } from '@/store'
 
 interface TagManagerSheetProps {

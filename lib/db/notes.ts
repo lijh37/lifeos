@@ -2,7 +2,8 @@ import type { InValue } from '@libsql/client'
 import type { Note } from '../types'
 import { getClient } from './client'
 import { checkFts5 } from './fts5'
-import { syncNoteTags, UNTAGGED } from './tags'
+import { syncNoteTags } from './tags'
+import { UNTAGGED } from '../types'
 
 
 function rowToNote(row: Record<string, unknown>, tags: string[] = []): Note {

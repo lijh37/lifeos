@@ -1,3 +1,6 @@
+/** 未分类标签的常量标识（客户端与服务端共享，置于无 DB 依赖的模块） */
+export const UNTAGGED = '__untagged__'
+
 /** 笔记附件数据结构 */
 export interface Attachment {
   /** 唯一标识（UUID） */
