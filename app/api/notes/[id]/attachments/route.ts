@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAttachment, getAttachmentsByNoteId, deleteAttachment, getAttachment } from '@/lib/db'
-import { put, del } from '@vercel/blob'
-import path from 'node:path'
-import crypto from 'node:crypto'
+import { getStorageDriver } from '@/lib/storage'
 
 export const runtime = 'nodejs'
 
@@ -31,14 +29,6 @@ function isAllowedMime(mime: string): boolean {
   if (ALLOWED_MIME_TYPES.has(mime)) return true
   if (mime.startsWith('image/')) return true
   return false
-}
-
-/**
- * 生成唯一文件名：UUID + 原始扩展名
- */
-function uniqueFilename(original: string): string {
-  const ext = path.extname(original).toLowerCase() || ''
-  return `${crypto.randomUUID()}${ext}`
 }
 
 /**
@@ -119,21 +109,15 @@ export async function POST(
     )
   }
 
-  // 上传到 Vercel Blob
-  const filename = uniqueFilename(file.name)
-
+  // 上传到存储后端（Vercel Blob 或本地磁盘，由 STORAGE_DRIVER 决定）
   try {
-    const blob = await put(filename, file, {
-      access: 'public',
-      contentType: mimeType,
-      addRandomSuffix: true,
-    })
+    const { url } = await getStorageDriver().save(file, mimeType)
 
-    // 创建数据库记录（使用 Blob 返回的 URL）
+    // 创建数据库记录（使用存储后端返回的 URL）
     const attachment = await createAttachment({
       noteId,
       filename: file.name,
-      url: blob.url,
+      url,
       mimeType,
       fileSize: file.size,
     })
@@ -167,11 +151,11 @@ export async function DELETE(
   }
 
   try {
-    // 从 Vercel Blob 删除
+    // 从存储后端删除
     try {
-      await del(attachment.url)
+      await getStorageDriver().remove(attachment.url)
     } catch {
-      // Blob 可能已被删除，忽略
+      // 文件可能已被删除，忽略
     }
 
     // 删除数据库记录
