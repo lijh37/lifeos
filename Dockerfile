@@ -1,5 +1,5 @@
+# syntax=docker/dockerfile:1
 # 多阶段构建 LifeOS（Next.js 16）
-# 使用 node:22-slim（debian）而非 alpine：避免 alpine/musl 下 npm "Exit handler never called" 问题
 # 基础镜像 Node 22，匹配 package.json engines 要求
 
 # ── 依赖阶段 ──
@@ -9,8 +9,8 @@ WORKDIR /app
 RUN npm config set registry https://registry.npmmirror.com
 # 仅复制依赖清单，利用层缓存
 COPY package.json package-lock.json* ./
-# 用 npm install 而非 npm ci：规避 Docker buildkit 下 npm "Exit handler never called" 信号处理 bug
-RUN npm install --maxsockets 3 --no-audit --no-fund
+# RUN --security=insecure：BuildKit 原生免 seccomp，解决 npm Exit handler never called bug
+RUN --security=insecure npm install --maxsockets 3 --no-audit --no-fund
 
 # ── 构建阶段 ──
 FROM node:22-slim AS builder
