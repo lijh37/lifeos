@@ -8,6 +8,8 @@ WORKDIR /app
 # 使用国内 npm 镜像源，提升阿里云环境拉取速度
 RUN npm config set registry https://registry.npmmirror.com
 # 启用 Yarn（Node 22 内置 corepack）
+# COREPACK_REGISTRY 让 corepack 走国内镜像，避免访问 repo.yarnpkg.com 被墙
+ENV COREPACK_REGISTRY=https://registry.npmmirror.com
 RUN corepack enable && corepack prepare yarn@stable --activate
 # 仅复制依赖清单，利用层缓存
 COPY package.json package-lock.json* ./
