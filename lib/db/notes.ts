@@ -245,7 +245,16 @@ export async function searchNotes(query: string, tag?: string): Promise<Note[]> 
   // Try FTS5 first, fall back to LIKE
   if (await checkFts5()) {
     try {
-      const ftsQuery = query.replace(/['"]/g, '').split(/\s+/).filter(Boolean).join(' AND ')
+      // Build a safe FTS5 MATCH query: each whitespace-separated term is
+      // wrapped in double quotes so pure numbers / timestamps are treated as
+      // search tokens instead of column names. Internal double quotes are
+      // escaped by doubling (FTS5 string literal syntax).
+      const ftsQuery = query
+        .split(/\s+/)
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .map((t) => `"${t.replace(/"/g, '""')}"`)
+        .join(' AND ')
       if (!ftsQuery) return []
 
       let sql: string

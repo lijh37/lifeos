@@ -57,3 +57,10 @@ next-env.d.ts
 
 # uploaded attachments
 /public/uploads/*
+
+# playwright system libs (extracted locally, not committed)
+/.pw-libs/
+
+# playwright test artifacts
+/playwright-report/
+/test-results/
