@@ -69,6 +69,17 @@ docker compose logs -f next
 
 启动后访问 `http://<IP>:3000` 即可使用。迁移脚本会在容器启动时自动执行建表。
 
+### 2.1 一键重新部署
+
+仓库已提供 `deploy.sh`，把上述「拉取 → 重建镜像 → 重启」三步合并，避免漏掉 `docker build`：
+
+```bash
+cd /root/lifeos
+./deploy.sh          # git pull → docker build → docker compose up -d → 查看日志
+```
+
+脚本末尾会 `docker compose logs -f next` 跟踪启动日志，`Ctrl+C` 退出即可（容器已在后台运行）。
+
 ---
 
 ## 3. 常见问题排查
@@ -133,7 +144,7 @@ docker compose up -d
 3. 修改 `nginx/lifeos.conf`：取消底部 `server { listen 80; ... }` 块注释，填 `server_name your-domain.com;`。
 4. 修改 `docker-compose.yml`：放开 `nginx` 的 `80:80` / `443:443` 端口映射（取消注释）。
 5. **改 `.env`：`COOKIE_SECURE=true`**（HTTPS 下 cookie 需要 Secure，否则浏览器不回传）。
-6. 重新部署：`docker build -t lifeos-next -f Dockerfile . && docker compose up -d`。
+6. 重新部署：`./deploy.sh`（或 `docker build -t lifeos-next -f Dockerfile . && docker compose up -d`）。
 7. 验证 `https://your-domain.com` 可访问。
 
 ---
