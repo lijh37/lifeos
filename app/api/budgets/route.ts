@@ -16,15 +16,36 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const body = await req.json()
   const { month, fixedBudget, variableBudget, fixedActual, variableActual, notes, isCompleted, savingsCompleted } = body
-  if (!month) {
-    return NextResponse.json({ error: 'Missing month' }, { status: 400 })
+  if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+    return NextResponse.json({ error: 'month must be in YYYY-MM format' }, { status: 400 })
   }
+
+  // Numeric fields must be numbers (or null/undefined). Reject NaN / non-numeric.
+  const numOrNull = (v: unknown): number | null | undefined => {
+    if (v === undefined || v === null) return v
+    const n = Number(v)
+    return Number.isFinite(n) ? n : undefined
+  }
+  const fixedBudgetN = numOrNull(fixedBudget)
+  const variableBudgetN = numOrNull(variableBudget)
+  const fixedActualN = numOrNull(fixedActual)
+  const variableActualN = numOrNull(variableActual)
+  if (fixedBudget !== undefined && fixedBudgetN === undefined ||
+      variableBudget !== undefined && variableBudgetN === undefined ||
+      fixedActual !== undefined && fixedActualN === undefined ||
+      variableActual !== undefined && variableActualN === undefined) {
+    return NextResponse.json({ error: 'budget amounts must be numbers' }, { status: 400 })
+  }
+  if (notes !== undefined && typeof notes !== 'string') {
+    return NextResponse.json({ error: 'notes must be a string' }, { status: 400 })
+  }
+
   const budget = await upsertBudget(month, {
-    fixedBudget,
-    variableBudget,
-    fixedActual,
-    variableActual,
-    notes,
+    fixedBudget: fixedBudgetN ?? undefined,
+    variableBudget: variableBudgetN ?? undefined,
+    fixedActual: fixedActualN ?? undefined,
+    variableActual: variableActualN ?? undefined,
+    notes: typeof notes === 'string' ? notes : undefined,
     isCompleted,
     savingsCompleted,
   })

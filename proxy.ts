@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { verifyToken } from '@/lib/auth-token'
 
 const PASSWORD_COOKIE = 'app_auth'
 
@@ -11,7 +12,7 @@ const publicPaths = [
   '/uploads/',
 ]
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   if (publicPaths.some(p => pathname === p || pathname.startsWith(p))) {
@@ -25,13 +26,14 @@ export function proxy(request: NextRequest) {
   const expected = process.env.APP_PASSWORD
   if (!expected) return NextResponse.next()
 
-  const cookiePass = request.cookies.get(PASSWORD_COOKIE)?.value
-  if (cookiePass === expected) return NextResponse.next()
+  // The cookie holds a password-derived HMAC token, not the plaintext password.
+  const cookieToken = request.cookies.get(PASSWORD_COOKIE)?.value
+  if (await verifyToken(cookieToken)) return NextResponse.next()
 
   const authHeader = request.headers.get('authorization')
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7)
-    if (token === expected) return NextResponse.next()
+    if (await verifyToken(token)) return NextResponse.next()
   }
 
   if (pathname.startsWith('/api/')) {

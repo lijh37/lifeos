@@ -5,13 +5,15 @@
 //   - Client navigation = GET with `RSC: 1` header (same URL as page, different body)
 //   - PWA start_url `/` 307-redirects to `/notes`
 //
-// Strategy:
-//   - Static assets: cache-first (immutable hashes)
-//   - Page navigations: network-first, cache on success
-//   - RSC requests: network-first, cached under a separate key
-//   - Activate warm-up: proactively fetch known pages so offline works sooner
+// Strategy (deliberately conservative to avoid stale-RSC breakage after deploy):
+//   - Static assets (/_next/static, icons, manifest): cache-first (immutable hashes)
+//   - RSC requests & /api requests: NETWORK ONLY — never cached. Caching RSC
+//     across deploys causes blank screens / infinite loading on installed PWAs.
+//   - Page navigations: network-first, cache on success (for offline fallback only)
+//
+// IMPORTANT: bump CACHE on every deploy so old cached pages are purged.
 
-const CACHE = 'lifeos-v1'
+const CACHE = 'lifeos-v2'
 
 const PRECACHE = [
   '/manifest.json',
@@ -77,13 +79,15 @@ self.addEventListener('fetch', (e) => {
   if (request.method !== 'GET') return
   if (url.origin !== self.location.origin) return
 
-  if (isStatic(url.pathname)) {
-    e.respondWith(cacheFirst(request))
+  // Never cache API or RSC responses — they reference hashed chunks that
+  // change on every deploy and would otherwise serve stale, broken shells.
+  if (url.pathname.startsWith('/api/') || isRsc(request, url)) {
+    e.respondWith(fetch(request))
     return
   }
 
-  if (isRsc(request, url)) {
-    e.respondWith(networkFirstRsc(request))
+  if (isStatic(url.pathname)) {
+    e.respondWith(cacheFirst(request))
     return
   }
 
@@ -137,28 +141,6 @@ async function networkFirst(req) {
       }
     }
 
-    return offlinePage()
-  }
-}
-
-async function networkFirstRsc(req) {
-  const rscKey = new URL(req.url)
-  rscKey.searchParams.set('__sw_rsc', '1')
-  const rscKeyStr = rscKey.toString()
-
-  try {
-    const res = await fetch(req)
-    if (res.ok) {
-      const c = await caches.open(CACHE)
-      c.put(rscKeyStr, res.clone())
-    }
-    return res
-  } catch {
-    const cached = await caches.match(rscKeyStr)
-    if (cached) return cached
-    // Fallback: serve cached page HTML — Next.js will do a full reload
-    const page = await caches.match(req.url)
-    if (page) return page
     return offlinePage()
   }
 }

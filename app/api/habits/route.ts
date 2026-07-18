@@ -102,11 +102,16 @@ export async function POST(req: NextRequest) {
       totalCompletions: total,
     })
   }
+  const name = typeof body.name === 'string' ? body.name.trim() : ''
+  if (!name) {
+    return NextResponse.json({ error: 'name is required' }, { status: 400 })
+  }
+  const frequency = body.frequency === 'weekly' ? 'weekly' : 'daily'
   const habit: Habit = {
     id: crypto.randomUUID(),
-    name: body.name,
-    description: body.description || '',
-    frequency: body.frequency || 'daily',
+    name,
+    description: typeof body.description === 'string' ? body.description : '',
+    frequency,
     createdAt: new Date().toISOString(),
   }
   await createHabit(habit)

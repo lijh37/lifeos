@@ -41,16 +41,36 @@ function stripContent(note: Note): Note {
   return { ...note, content: preview }
 }
 
+const NOTE_TYPES = ['note', 'todo', 'event'] as const
+
 export async function POST(req: NextRequest) {
   const body = await req.json()
+
+  // Validate inputs — reject anything that isn't the expected shape.
+  if (body.content !== undefined && typeof body.content !== 'string') {
+    return NextResponse.json({ error: 'content must be a string' }, { status: 400 })
+  }
+  if (body.title !== undefined && typeof body.title !== 'string') {
+    return NextResponse.json({ error: 'title must be a string' }, { status: 400 })
+  }
+  if (body.type !== undefined && !NOTE_TYPES.includes(body.type)) {
+    return NextResponse.json({ error: 'invalid type' }, { status: 400 })
+  }
+  if (body.tags !== undefined && (!Array.isArray(body.tags) || body.tags.some((t: unknown) => typeof t !== 'string'))) {
+    return NextResponse.json({ error: 'tags must be an array of strings' }, { status: 400 })
+  }
+  if (body.dueDate !== undefined && body.dueDate !== null && isNaN(Date.parse(body.dueDate))) {
+    return NextResponse.json({ error: 'invalid dueDate' }, { status: 400 })
+  }
+
   const now = new Date().toISOString()
   const note: Note = {
     id: crypto.randomUUID(),
-    content: body.content,
-    title: body.title || null,
-    type: body.type || 'note',
-    tags: body.tags || [],
-    dueDate: body.dueDate || null,
+    content: typeof body.content === 'string' ? body.content : '',
+    title: typeof body.title === 'string' ? body.title : null,
+    type: NOTE_TYPES.includes(body.type) ? body.type : 'note',
+    tags: Array.isArray(body.tags) ? body.tags.filter((t: unknown) => typeof t === 'string') : [],
+    dueDate: body.dueDate ?? null,
     done: false,
     pinned: false,
     createdAt: now,

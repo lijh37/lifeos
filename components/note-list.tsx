@@ -34,7 +34,15 @@ const SCROLL_POSITION_KEY = 'note_list_scroll'
 
 export function NoteList() {
   const router = useRouter()
-  const { notes, setNotes, initialLoading, setInitialLoading, removeNote, updateNote } = useAppStore()
+  // Select each slice individually so the component only re-renders when the
+  // specific piece it uses changes (e.g. editing a note's title no longer
+  // re-renders the whole list parent). Action refs are stable across renders.
+  const notes = useAppStore((s) => s.notes)
+  const setNotes = useAppStore((s) => s.setNotes)
+  const initialLoading = useAppStore((s) => s.initialLoading)
+  const setInitialLoading = useAppStore((s) => s.setInitialLoading)
+  const removeNote = useAppStore((s) => s.removeNote)
+  const updateNote = useAppStore((s) => s.updateNote)
   const [mounted, setMounted] = useState(false)
   // Wait for mount so VirtualNoteList gets a valid scrollRef
   useLayoutEffect(() => { setMounted(true) }, [])
