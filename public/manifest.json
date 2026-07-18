@@ -1,7 +1,7 @@
 {
-  "name": "LifeOS - AI 生活助手",
+  "name": "LifeOS - 生活助手",
   "short_name": "LifeOS",
-  "description": "你的个人 AI 生活助手",
+  "description": "你的个人生活助手",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
