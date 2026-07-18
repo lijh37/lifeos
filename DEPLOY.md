@@ -25,6 +25,19 @@
    - 备案后追加 `80`、`443`
 4. 安装 git：`yum install -y git`（阿里云 Linux）或 `apt install -y git`。
 5. 克隆仓库：`git clone <你的仓库地址> && cd opencode-demo`。
+6. **配置 Docker DNS（关键，否则 build 会 DNS 解析失败）**：
+   阿里云 ECS 默认 `/etc/resolv.conf` 是内网 DNS（`100.100.x.x`），Docker 容器网络命名空间访问不到，
+   `docker build` 会出现 `EAI_AGAIN` / `getaddrinfo failed` 报错。需给 Docker daemon 配公共 DNS：
+   ```bash
+   mkdir -p /etc/docker
+   cat > /etc/docker/daemon.json <<'EOF'
+   {
+     "dns": ["223.5.5.5", "8.8.8.8", "114.114.114.114"]
+   }
+   EOF
+   systemctl restart docker
+   ```
+   `223.5.5.5` 是阿里云公共 DNS，ECS 内网可达，优先用它。重启后容器即可正常解析域名。
 
 ---
 
@@ -35,9 +48,8 @@
 cp .env.prod.example .env
 # 按需修改 .env（如改 APP_PASSWORD）
 
-# 构建镜像（首次约 3-5 分钟）
-# --allow security.insecure 绕过 Docker 26.1 下 npm Exit handler never called bug
-docker build --allow security.insecure -t lifeos-next -f Dockerfile .
+# 构建镜像（首次约 3-5 分钟，使用 Yarn 规避 Docker 26.1 下 npm 信号处理 bug）
+docker build -t lifeos-next -f Dockerfile .
 
 # 启动容器（使用上面构建好的 lifeos-next 镜像）
 docker compose up -d
@@ -46,7 +58,7 @@ docker compose up -d
 docker compose logs -f next
 ```
 
-> **代码更新后重新部署**：`git pull` → `docker build --allow security.insecure -t lifeos-next .` → `docker compose up -d`
+> **代码更新后重新部署**：`git pull` → `docker build -t lifeos-next -f Dockerfile .` → `docker compose up -d`
 
 启动后访问 `http://<IP>:3000` 即可使用。迁移脚本会在容器启动时自动执行建表。
 
