@@ -35,12 +35,18 @@
 cp .env.prod.example .env
 # 按需修改 .env（如改 APP_PASSWORD）
 
-# 构建并启动（首次会构建镜像，约几分钟）
-docker compose up -d --build
+# 构建镜像（首次约 3-5 分钟）
+# --allow security.insecure 绕过 Docker 26.1 下 npm Exit handler never called bug
+docker build --allow security.insecure -t lifeos-next -f Dockerfile .
+
+# 启动容器（使用上面构建好的 lifeos-next 镜像）
+docker compose up -d
 
 # 查看日志
 docker compose logs -f next
 ```
+
+> **代码更新后重新部署**：`git pull` → `docker build --allow security.insecure -t lifeos-next .` → `docker compose up -d`
 
 启动后访问 `http://<IP>:3000` 即可使用。迁移脚本会在容器启动时自动执行建表。
 

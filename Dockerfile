@@ -1,6 +1,7 @@
-# syntax=docker/dockerfile:1
 # 多阶段构建 LifeOS（Next.js 16）
 # 基础镜像 Node 22，匹配 package.json engines 要求
+# 注意：Docker 26.1 的 npm 有 Exit handler never called bug，
+#       构建时需传入 --allow security.insecure 绕过 seccomp 拦截
 
 # ── 依赖阶段 ──
 FROM node:22-slim AS deps
@@ -9,8 +10,7 @@ WORKDIR /app
 RUN npm config set registry https://registry.npmmirror.com
 # 仅复制依赖清单，利用层缓存
 COPY package.json package-lock.json* ./
-# RUN --security=insecure：BuildKit 原生免 seccomp，解决 npm Exit handler never called bug
-RUN --security=insecure npm install --maxsockets 3 --no-audit --no-fund
+RUN npm install --maxsockets 3 --no-audit --no-fund
 
 # ── 构建阶段 ──
 FROM node:22-slim AS builder
