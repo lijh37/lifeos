@@ -30,8 +30,8 @@ services:
       - lifeos-data:/app/data
     expose:
       - "3000"
-    # 启动后执行迁移（建表），失败则容器退出
-    command: sh -c "npm run migrate && npm run start"
+    # 启动前确保 db/ 目录存在（volume 挂载会遮蔽镜像内建的目录），再执行迁移（建表）
+    command: sh -c "mkdir -p /app/data/db && npm run migrate && npm run start"
 
   nginx:
     image: nginx:alpine

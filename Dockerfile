@@ -45,7 +45,8 @@ COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/next.config.ts ./next.config.ts
 
 # 数据目录（SQLite + 上传附件），由 volume 挂载
-RUN mkdir -p /app/data/uploads && chown -R nextjs:nodejs /app/data
+# 必须预建 db/ 子目录，否则 libsql 打开 file:./data/db/lifeos.db 时父目录不存在报 SQLITE_CANTOPEN(14)
+RUN mkdir -p /app/data/uploads /app/data/db && chown -R nextjs:nodejs /app/data
 USER nextjs
 
 EXPOSE 3000
