@@ -15,6 +15,23 @@ import { migrate } from '../lib/db/migrate'
 import fs from 'fs'
 import path from 'path'
 
+// 加载本地环境变量文件（Next.js 会自动加载 .env.local，但独立运行 tsx 时不会）。
+// 仅当对应文件存在时加载；Docker / Vercel 由平台注入环境变量，无需文件。
+function loadEnvFile(file: string) {
+  const p = path.join(process.cwd(), file)
+  if (!fs.existsSync(p)) return
+  for (const line of fs.readFileSync(p, 'utf-8').split('\n')) {
+    const m = line.match(/^\s*(?:export\s+)?([\w.]+)\s*=\s*(.*)\s*$/)
+    if (!m) continue
+    const key = m[1]
+    let val = m[2].replace(/^["']|["']$/g, '')
+    if (key in process.env) continue // 已注入的环境变量优先
+    process.env[key] = val
+  }
+}
+loadEnvFile('.env.local')
+loadEnvFile('.env')
+
 const DRY_RUN = process.argv.includes('--dry-run')
 
 async function main() {
@@ -28,6 +45,16 @@ async function main() {
   }
 
   const authToken = process.env.TURSO_AUTH_TOKEN
+
+  // 本地 SQLite 文件：先确保父目录存在（libsql 不会自动创建父目录，否则报 SQLITE_CANTOPEN(14)）
+  if (!tursoUrl && url.startsWith('file:')) {
+    const filePath = url.slice('file:'.length).replace(/^\.\//, '')
+    const dir = filePath.includes('/') ? filePath.slice(0, filePath.lastIndexOf('/')) : ''
+    if (dir) {
+      try { fs.mkdirSync(dir, { recursive: true }) } catch { /* 目录已存在 */ }
+    }
+  }
+
   const db = authToken
     ? createClient({ url, authToken })
     : createClient({ url })
