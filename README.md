@@ -36,8 +36,10 @@ git push origin main          # Vercel 自动部署
 
 ```bash
 npm test           # vitest 单元测试（9 文件，146 测试）
-npm run test:e2e   # Playwright E2E（TODO）
+npm run test:e2e   # Playwright E2E（13 测试：smoke/notes/budgets/habits）
 npm run analyze    # 分析构建产物体积（需要 ANALYZE=true）
 ```
+
+> E2E 以空 `APP_PASSWORD` 启动 dev server 绕过认证，自动覆盖笔记/预算/习惯核心流程。详见 `AGENTS.md`。
 
 > 详细项目文档见 `AGENTS.md`（目录结构、关键约定、性能优化约定、PWA 说明等）。

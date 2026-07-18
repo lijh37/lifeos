@@ -213,7 +213,17 @@ DDL 不放在应用代码中。迁移通过 `migrations/*.sql` 文件管理：
 
 ```bash
 npm test          # vitest 单元测试（9 文件，141 测试）
-npm run test:e2e  # Playwright E2E（TODO）
+npm run test:e2e  # Playwright E2E（13 测试，见下）
 ```
+
+### E2E 测试（Playwright）
+
+- 测试目录：`e2e/`，套件：`smoke` / `notes` / `budgets` / `habits`（共 13 个测试）
+- 覆盖：登陆重定向与 PWA manifest、笔记 CRUD + 搜索 + 标签 + 置顶、预算设置与结算、习惯创建/打卡/删除
+- 运行方式：`npm run test:e2e`（自动启动 `npm run dev` 作为 webServer）
+- **认证绕过**：测试以空 `APP_PASSWORD` 启动 dev server，`app/api/auth` 在 `APP_PASSWORD` 为空时自动放行，因此测试可直接访问受保护页面，无需登录
+- **辅助工具**：`e2e/helpers.ts` 提供 `BASE_URL`、API 建数据/清理、自动认证等
+- **本地 Chromium 系统库**：本环境缺少 `libnspr4` / `libnss3` / `libasound2`，已将对应 `.so` 解压至 `.pw-libs/lib/` 并在 `test:e2e` 脚本中自动注入 `LD_LIBRARY_PATH`（该目录已加入 `.gitignore`，不提交）
+- 测试产物 `playwright-report/` 与 `test-results/` 已加入 `.gitignore`
 
 
