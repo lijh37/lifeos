@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAllTags, renameTag, deleteTag } from '@/lib/db'
+import { isAuthorized } from '@/lib/auth-guard'
 
 export async function GET() {
   const tags = await getAllTags()
@@ -7,6 +8,9 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const body = await req.json()
   const { oldName, newName } = body
   if (!oldName || !newName) {
@@ -17,6 +21,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const { searchParams } = new URL(req.url)
   const name = searchParams.get('name')
   if (!name) {

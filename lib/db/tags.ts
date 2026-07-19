@@ -5,23 +5,24 @@ import { UNTAGGED } from '../types'
 
 export async function syncNoteTags(noteId: string, tags: string[]): Promise<void> {
   const db = getClient()
+  const tx = await db.transaction()
   try {
     const trimmed = [...new Set(tags.map(t => t.trim()).filter(Boolean))]
 
     // 清除旧关联
-    await db.execute({ sql: 'DELETE FROM note_tags WHERE note_id = ?', args: [noteId] })
-    if (trimmed.length === 0) return
+    await tx.execute({ sql: 'DELETE FROM note_tags WHERE note_id = ?', args: [noteId] })
+    if (trimmed.length === 0) { await tx.commit(); return }
 
     // 批量创建不存在的标签（INSERT OR IGNORE 跳过已存在）
     const now = new Date().toISOString()
     const tagPlaceholders = trimmed.map(() => '(?, ?, ?)').join(', ')
-    await db.execute({
+    await tx.execute({
       sql: `INSERT OR IGNORE INTO tags (id, name, created_at) VALUES ${tagPlaceholders}`,
       args: trimmed.flatMap(name => [genId(), name, now]) as InValue[],
     })
 
     // 一次性查询所有标签 ID
-    const tagResult = await db.execute({
+    const tagResult = await tx.execute({
       sql: `SELECT id, name FROM tags WHERE name IN (${trimmed.map(() => '?').join(',')})`,
       args: trimmed as unknown as InValue[],
     })
@@ -38,12 +39,16 @@ export async function syncNoteTags(noteId: string, tags: string[]): Promise<void
     }
     if (ntPairs.length > 0) {
       const ntPlaceholders = ntPairs.map(() => '(?, ?)').join(', ')
-      await db.execute({
+      await tx.execute({
         sql: `INSERT OR IGNORE INTO note_tags (note_id, tag_id) VALUES ${ntPlaceholders}`,
         args: ntPairs.flat() as InValue[],
       })
     }
-  } catch (e) { console.warn(`[tags] 同步标签失败(noteId=${noteId}, tags=${JSON.stringify(tags)}):`, e) }
+    await tx.commit()
+  } catch (e) {
+    await tx.rollback()
+    throw e
+  }
 }
 
 /**
@@ -88,17 +93,24 @@ export async function getAllTags(): Promise<{ name: string; count: number }[]> {
 export async function renameTag(oldName: string, newName: string): Promise<void> {
   if (oldName === newName) return
   const db = getClient()
-  // Check if newName already exists — if so, merge tags
-  const existing = await db.execute({ sql: 'SELECT id FROM tags WHERE name = ?', args: [newName] })
-  if (existing.rows.length > 0) {
-    const newId = existing.rows[0].id as string
-    await db.execute({
-      sql: 'UPDATE note_tags SET tag_id = ? WHERE tag_id IN (SELECT id FROM tags WHERE name = ?) AND note_id NOT IN (SELECT note_id FROM note_tags WHERE tag_id = ?)',
-      args: [newId, oldName, newId],
-    })
-    await db.execute({ sql: 'DELETE FROM tags WHERE name = ?', args: [oldName] })
-  } else {
-    await db.execute({ sql: 'UPDATE tags SET name = ? WHERE name = ?', args: [newName, oldName] })
+  const tx = await db.transaction()
+  try {
+    // Check if newName already exists — if so, merge tags
+    const existing = await tx.execute({ sql: 'SELECT id FROM tags WHERE name = ?', args: [newName] })
+    if (existing.rows.length > 0) {
+      const newId = existing.rows[0].id as string
+      await tx.execute({
+        sql: 'UPDATE note_tags SET tag_id = ? WHERE tag_id IN (SELECT id FROM tags WHERE name = ?) AND note_id NOT IN (SELECT note_id FROM note_tags WHERE tag_id = ?)',
+        args: [newId, oldName, newId],
+      })
+      await tx.execute({ sql: 'DELETE FROM tags WHERE name = ?', args: [oldName] })
+    } else {
+      await tx.execute({ sql: 'UPDATE tags SET name = ? WHERE name = ?', args: [newName, oldName] })
+    }
+    await tx.commit()
+  } catch (e) {
+    await tx.rollback()
+    throw e
   }
 }
 
@@ -108,9 +120,16 @@ export async function renameTag(oldName: string, newName: string): Promise<void>
  */
 export async function deleteTag(tagName: string): Promise<void> {
   const db = getClient()
-  await db.execute({
-    sql: 'DELETE FROM note_tags WHERE tag_id IN (SELECT id FROM tags WHERE name = ?)',
-    args: [tagName],
-  })
-  await db.execute({ sql: 'DELETE FROM tags WHERE name = ?', args: [tagName] })
+  const tx = await db.transaction()
+  try {
+    await tx.execute({
+      sql: 'DELETE FROM note_tags WHERE tag_id IN (SELECT id FROM tags WHERE name = ?)',
+      args: [tagName],
+    })
+    await tx.execute({ sql: 'DELETE FROM tags WHERE name = ?', args: [tagName] })
+    await tx.commit()
+  } catch (e) {
+    await tx.rollback()
+    throw e
+  }
 }

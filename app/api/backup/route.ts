@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getNotes, getBudgets, getHabits } from '@/lib/db'
 import { getClient } from '@/lib/db/client'
+import { isAuthorized } from '@/lib/auth-guard'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const [notes, budgets, habits] = await Promise.all([
-    getNotes(undefined, 10000),
+    getNotes(undefined, Number.MAX_SAFE_INTEGER),
     getBudgets(),
     getHabits(),
   ])
@@ -40,6 +44,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   let data: Record<string, unknown>
   try {
     data = await req.json()
@@ -56,6 +63,7 @@ export async function POST(req: NextRequest) {
   const tx = await db.transaction()
   try {
     // Clear existing data in FK-safe order
+    await tx.execute('DELETE FROM attachments')
     await tx.execute('DELETE FROM habit_completions')
     await tx.execute('DELETE FROM habits')
     await tx.execute('DELETE FROM note_tags')

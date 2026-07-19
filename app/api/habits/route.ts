@@ -2,16 +2,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   createHabit, deleteHabit, updateHabit,
   getHabitsDashboard, getClient,
+  computeCurrentStreak, computeBestStreak,
 } from '@/lib/db'
 import type { Habit } from '@/lib/types'
 import { genId } from '@/lib/utils'
+import { isAuthorized } from '@/lib/auth-guard'
 
 export async function GET() {
   const dashboard = await getHabitsDashboard()
-  return NextResponse.json(dashboard, { headers: { 'Cache-Control': 'public, max-age=20, stale-while-revalidate=90' } })
+  return NextResponse.json(dashboard, { headers: { 'Cache-Control': 'private, max-age=20, stale-while-revalidate=90' } })
 }
 
 export async function POST(req: NextRequest) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const body = await req.json()
   if (body._action === 'toggle') {
     const db = getClient()
@@ -70,33 +75,14 @@ export async function POST(req: NextRequest) {
 
     // 3. Calculate current streak from dates (Set for O(1) lookup)
     const datesSet = new Set(dates)
-    let streak = 0
-    const today = new Date()
-    const cursor = new Date(today)
-    for (let j = 0; j < 365; j++) {
-      const dateStr = cursor.toISOString().slice(0, 10)
-      if (datesSet.has(dateStr)) streak++
-      else if (j > 0) break
-      cursor.setDate(cursor.getDate() - 1)
-    }
-
-    // 4. Calculate best streak from sorted dates
+    const streak = computeCurrentStreak(datesSet)
     const sortedDates = [...dates].sort()
-    let best = sortedDates.length > 0 ? 1 : 0
-    let current = 1
-    for (let i = 1; i < sortedDates.length; i++) {
-      const diff = Math.round(
-        (new Date(sortedDates[i]).getTime() - new Date(sortedDates[i - 1]).getTime()) /
-          (1000 * 60 * 60 * 24)
-      )
-      if (diff === 1) { current++; best = Math.max(best, current) }
-      else { current = 1 }
-    }
+    const bestStreak = computeBestStreak(sortedDates)
 
     return NextResponse.json({
       completed,
       streak,
-      bestStreak: best,
+      bestStreak,
       weekCount,
       monthCount,
       totalCompletions: total,
@@ -119,6 +105,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const body = await req.json()
   const { id, name, description } = body
   if (!id || !name?.trim()) {
@@ -129,6 +118,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })

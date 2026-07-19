@@ -2,6 +2,49 @@ import type { Habit } from '../types'
 import { getClient } from './client'
 import { genId } from '../utils'
 
+/**
+ * 计算当前连续打卡天数（从 today 向前数，遇到断签即停）。
+ * @param datesSet 已完成日期的 Set（YYYY-MM-DD）
+ * @param from 起始日期（默认今天）
+ */
+export function computeCurrentStreak(datesSet: Set<string>, from: Date = new Date()): number {
+  let streak = 0
+  const cursor = new Date(from)
+  for (let j = 0; j < 365; j++) {
+    const dateStr = cursor.toISOString().slice(0, 10)
+    if (datesSet.has(dateStr)) {
+      streak++
+    } else if (j > 0) {
+      break
+    }
+    cursor.setDate(cursor.getDate() - 1)
+  }
+  return streak
+}
+
+/**
+ * 计算历史最长连续打卡天数。
+ * @param sortedDates 升序排列的去重日期数组（YYYY-MM-DD）
+ */
+export function computeBestStreak(sortedDates: string[]): number {
+  if (sortedDates.length === 0) return 0
+  let best = 1
+  let current = 1
+  for (let i = 1; i < sortedDates.length; i++) {
+    const diff = Math.round(
+      (new Date(sortedDates[i]).getTime() - new Date(sortedDates[i - 1]).getTime()) /
+        (1000 * 60 * 60 * 24)
+    )
+    if (diff === 1) {
+      current++
+      best = Math.max(best, current)
+    } else {
+      current = 1
+    }
+  }
+  return best
+}
+
 function rowToHabit(row: Record<string, unknown>): Habit {
   return {
     id: row.id as string,
@@ -42,8 +85,15 @@ export async function getHabits(): Promise<Habit[]> {
  */
 export async function deleteHabit(id: string): Promise<void> {
   const db = getClient()
-  await db.execute({ sql: 'DELETE FROM habits WHERE id = ?', args: [id] })
-  await db.execute({ sql: 'DELETE FROM habit_completions WHERE habit_id = ?', args: [id] })
+  const tx = await db.transaction()
+  try {
+    await tx.execute({ sql: 'DELETE FROM habits WHERE id = ?', args: [id] })
+    await tx.execute({ sql: 'DELETE FROM habit_completions WHERE habit_id = ?', args: [id] })
+    await tx.commit()
+  } catch (e) {
+    await tx.rollback()
+    throw e
+  }
 }
 
 /**
@@ -175,40 +225,14 @@ export async function getHabitsDashboard(): Promise<{
 
   // 3a. 计算当前 streak（Set 向后遍历）
   const streaks: Record<string, number> = {}
-  const today = new Date()
   for (const [hid, dates] of Object.entries(byHabitSet)) {
-    let streak = 0
-    const cursor = new Date(today)
-    for (let j = 0; j < 365; j++) {
-      const dateStr = cursor.toISOString().slice(0, 10)
-      if (dates.has(dateStr)) {
-        streak++
-      } else if (j > 0) {
-        break
-      }
-      cursor.setDate(cursor.getDate() - 1)
-    }
-    streaks[hid] = streak
+    streaks[hid] = computeCurrentStreak(dates)
   }
 
   // 3b. 计算最佳 streak
   const bestStreaks: Record<string, number> = {}
   for (const [hid, dates] of Object.entries(byHabitArray)) {
-    if (dates.length === 0) { bestStreaks[hid] = 0; continue }
-    const uniqueDates = Array.from(new Set(dates)).sort()
-    let best = 1, current = 1
-    for (let i = 1; i < uniqueDates.length; i++) {
-      const prev = new Date(uniqueDates[i - 1])
-      const curr = new Date(uniqueDates[i])
-      const diffDays = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24))
-      if (diffDays === 1) {
-        current++
-        best = Math.max(best, current)
-      } else {
-        current = 1
-      }
-    }
-    bestStreaks[hid] = best
+    bestStreaks[hid] = computeBestStreak(Array.from(new Set(dates)).sort())
   }
 
   // 4. 单次 GROUP BY 查询：合并 total/week/month → perHabitTotals / perHabitWeek / perHabitMonth / perHabitRates

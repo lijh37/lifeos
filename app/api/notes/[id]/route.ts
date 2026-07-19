@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getNote, updateNote, deleteNote } from '@/lib/db'
+import { isAuthorized } from '@/lib/auth-guard'
 
 export async function GET(
   _req: NextRequest,
@@ -15,6 +16,9 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const { id } = await params
   const body = await req.json()
   await updateNote(id, body)
@@ -23,9 +27,12 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const { id } = await params
   await deleteNote(id)
   return NextResponse.json({ success: true })

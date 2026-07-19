@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getClient } from '@/lib/db'
 import { genId } from '@/lib/utils'
+import { isAuthorized } from '@/lib/auth-guard'
 
 export async function POST(req: NextRequest) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const body = await req.json()
   const { action, ids, tag } = body as { action: 'delete' | 'tag'; ids: string[]; tag?: string }
 

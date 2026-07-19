@@ -1,10 +1,24 @@
-// IMPORTANT: Clear Turso env + set :memory: BEFORE importing db
+// IMPORTANT: Clear Turso env + set a temp FILE db BEFORE importing db.
+// NOTE: libSQL's db.transaction() is unsupported on `:memory:` in this build
+// (tx.commit() throws SQLITE_ERROR), so tests that exercise transactional
+// helpers (syncNoteTags/renameTag/deleteTag/deleteHabit) must use a file DB.
+// E2E and routes tests use the same file-DB approach.
 delete process.env.TURSO_DATABASE_URL
-process.env.DATABASE_URL = ':memory:'
+process.env.DATABASE_URL = 'file:./.db-test.sqlite'
 
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
 import { createNote, getNotes, getNote, updateNote, deleteNote, getClient, createHabit, getHabits, toggleCompletion, getTodayCompletions, deleteHabit, upsertBudget, getBudget, getBudgets, searchNotes, getAllTags, renameTag, deleteTag, migrate } from '@/lib/db'
 import type { Note } from '@/lib/types'
+
+// Clean up the temp file DB after all tests in this file.
+afterAll(async () => {
+  try {
+    await getClient().execute('DELETE FROM note_tags')
+    await getClient().execute('DELETE FROM tags')
+    await getClient().execute('DELETE FROM notes')
+  } catch { /* ignore */ }
+  try { require('node:fs').unlinkSync('./.db-test.sqlite') } catch { /* ignore */ }
+})
 
 function makeNote(overrides: Partial<Note> = {}): Note {
   return {

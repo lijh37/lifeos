@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAttachment, getAttachmentsByNoteId, deleteAttachment, getAttachment } from '@/lib/db'
 import { getStorageDriver } from '@/lib/storage'
+import { isAuthorized } from '@/lib/auth-guard'
 
 export const runtime = 'nodejs'
 
@@ -12,7 +13,6 @@ const ALLOWED_MIME_TYPES = new Set([
   'image/png',
   'image/gif',
   'image/webp',
-  'image/svg+xml',
   'application/pdf',
   'text/plain',
   'text/csv',
@@ -26,9 +26,9 @@ const ALLOWED_MIME_TYPES = new Set([
 ])
 
 function isAllowedMime(mime: string): boolean {
-  if (ALLOWED_MIME_TYPES.has(mime)) return true
-  if (mime.startsWith('image/')) return true
-  return false
+  // 仅允许白名单中显式列出的类型，不再信任 image/* 前缀，
+  // 防止客户端伪造 file.type 上传 image/svg+xml 等可执行子类型（存储型 XSS）。
+  return ALLOWED_MIME_TYPES.has(mime)
 }
 
 /**
@@ -67,6 +67,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const { id: noteId } = await params
 
   let formData: FormData
@@ -135,6 +138,9 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const { id: noteId } = await params
   const { searchParams } = new URL(req.url)
   const attachmentId = searchParams.get('attachmentId')

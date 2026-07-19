@@ -1,4 +1,6 @@
+import { NextRequest, NextResponse } from 'next/server'
 import { getNotes } from '@/lib/db'
+import { isAuthorized } from '@/lib/auth-guard'
 import type { Note } from '@/lib/types'
 
 function toBeijingTime(iso: string): string {
@@ -48,8 +50,11 @@ function notesToMarkdown(notes: Note[]): string {
   return lines.join('\n')
 }
 
-export async function GET() {
-  const notes = await getNotes(undefined, 1000)
+export async function GET(req: NextRequest) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const notes = await getNotes(undefined, Number.MAX_SAFE_INTEGER)
 
   const content = notesToMarkdown(notes)
   const filename = `lifeos-notes-${new Date().toISOString().slice(0, 10)}.md`

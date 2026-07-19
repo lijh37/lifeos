@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getBudget, getBudgets, upsertBudget } from '@/lib/db'
+import { isAuthorized } from '@/lib/auth-guard'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const month = searchParams.get('month')
-  const cacheHeaders = { headers: { 'Cache-Control': 'public, max-age=30, stale-while-revalidate=120' } }
+  const cacheHeaders = { headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=120' } }
   if (month) {
     const budget = await getBudget(month)
     return NextResponse.json({ budget }, cacheHeaders)
@@ -14,6 +15,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const body = await req.json()
   const { month, fixedBudget, variableBudget, fixedActual, variableActual, notes, isCompleted, savingsCompleted } = body
   if (!month || !/^\d{4}-\d{2}$/.test(month)) {
