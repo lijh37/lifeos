@@ -1,9 +1,10 @@
 # 多阶段构建 LifeOS（Next.js 16）
 # 使用 npm ci（与 package-lock.json 严格一致，等价于 yarn --frozen-lockfile）
-# 基础镜像 Node 22，匹配 package.json engines 要求
+# 基础镜像 Node 20：Node 22/24 的 npm 存在 "Exit handler never called" 信号处理 bug
+# （npm/cli#7639/#8974），在 Docker 内偶发崩溃；Node 20 无此问题。
 
 # ── 依赖阶段 ──
-FROM node:22-slim AS deps
+FROM node:20-slim AS deps
 WORKDIR /app
 # 默认使用国内 npm 镜像（阿里云环境拉取更快）；NODE_OPTIONS 强制 IPv4 优先，
 # 避免 npmmirror 在容器内仅解析到 IPv6 导致 EAI_AGAIN。
@@ -17,7 +18,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
 # ── 构建阶段 ──
-FROM node:22-slim AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_OPTIONS=--dns-result-order=ipv4first
@@ -29,7 +30,7 @@ COPY . .
 RUN npm run build
 
 # ── 运行阶段 ──
-FROM node:22-slim AS runner
+FROM node:20-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
