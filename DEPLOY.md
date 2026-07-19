@@ -25,19 +25,29 @@
     - 备案后追加 `80`、`443`
 4. 安装 git：`yum install -y git`（阿里云 Linux）或 `apt install -y git`。
 5. 克隆仓库：`git clone <你的仓库地址> && cd opencode-demo`。
-6. **配置 Docker DNS（关键，否则 build 会 DNS 解析失败）**：
-    阿里云 ECS 默认 `/etc/resolv.conf` 是内网 DNS（`100.100.x.x`），Docker 容器网络命名空间访问不到，
-    `docker build` 会出现 `EAI_AGAIN` / `getaddrinfo failed` 报错。需给 Docker daemon 配公共 DNS：
-    ```bash
-    mkdir -p /etc/docker
-    cat > /etc/docker/daemon.json <<'EOF'
-    {
-      "dns": ["223.5.5.5", "8.8.8.8", "114.114.114.114"]
-    }
-    EOF
-    systemctl restart docker
-    ```
-    `223.5.5.5` 是阿里云公共 DNS，ECS 内网可达，优先用它。重启后容器即可正常解析域名。
+6. **配置 Docker daemon（关键，否则 build 会失败）**：
+     阿里云 ECS 默认 `/etc/resolv.conf` 是内网 DNS（`100.100.x.x`），Docker 容器网络命名空间访问不到，
+     `docker build` 会出现 `EAI_AGAIN` / `getaddrinfo failed` 报错。同时 Docker Hub 在阿里云网络下
+     偶发不可达（`registry-1.docker.io` 连接超时），需给 Docker daemon 同时配**公共 DNS** 和
+     **国内镜像加速器**（用于拉取 `node:20-slim` 等基础镜像）：
+     ```bash
+     mkdir -p /etc/docker
+     cat > /etc/docker/daemon.json <<'EOF'
+     {
+       "dns": ["223.5.5.5", "8.8.8.8", "114.114.114.114"],
+       "registry-mirrors": [
+         "https://hub-mirror.c.163.com",
+         "https://docker.m.daocloud.io",
+         "https://registry.docker-cn.com"
+       ]
+     }
+     EOF
+     systemctl restart docker
+     ```
+     `223.5.5.5` 是阿里云公共 DNS，ECS 内网可达，优先用它。重启后容器即可正常解析域名，
+     且基础镜像改走国内镜像源，避免 Docker Hub 超时。
+     > 若你有阿里云容器镜像服务专属加速器（`https://xxxx.mirror.aliyuncs.com`），把它放在
+     > `registry-mirrors` 列表首位更快更稳。
 
 ---
 
@@ -53,7 +63,7 @@ cp .env.prod.example .env
 sed -i 's/^APP_PASSWORD=demo/APP_PASSWORD=你的新密码/' .env
 # 密码不要含 #、空格、$ 等特殊字符（会被 shell 截断）
 
-# 构建镜像（首次约 3-5 分钟，使用 Yarn 规避 Docker 26.1 下 npm 信号处理 bug）
+# 构建镜像（首次约 3-5 分钟；使用 npm ci + node:20-slim）
 docker build -t lifeos-next -f Dockerfile .
 
 # 启动容器
@@ -75,9 +85,12 @@ docker compose logs -f next
 
 ```bash
 cd /root/lifeos
-./deploy.sh          # git pull → docker build → docker compose up -d → 查看日志
+./deploy.sh          # git pull → 后台 docker build → docker compose up -d → 查看日志
 ```
 
+脚本会将 `docker build` 放到后台（nohup）运行，**SSH 断开也不会中断构建**；主进程阻塞等待
+构建完成标记（最多 30 分钟），完成后自动 `docker compose up -d`。构建日志在 `/tmp/lifeos-build.log`，
+可另开终端 `tail -f /tmp/lifeos-build.log` 看实时进度。若构建进程异常退出或超时，脚本会提示查看该日志。
 脚本末尾会 `docker compose logs -f next` 跟踪启动日志，`Ctrl+C` 退出即可（容器已在后台运行）。
 
 ---
@@ -85,8 +98,20 @@ cd /root/lifeos
 ## 3. 常见问题排查
 
 ### 3.1 `docker build` 报 `EAI_AGAIN` / `getaddrinfo failed`
-容器内无法解析域名。原因：阿里云 ECS 默认内网 DNS 容器访问不到。
-解决：按「1.6」给 Docker daemon 配公共 DNS 并 `systemctl restart docker`。
+ 容器内无法解析域名。原因：阿里云 ECS 默认内网 DNS 容器访问不到。
+ 解决：按「1.6」给 Docker daemon 配公共 DNS 并 `systemctl restart docker`。
+ 注：npm 安装阶段若用 `registry.npmmirror.com`，该域名在容器内可能只解析到 IPv6 而不可达；
+ Dockerfile 已通过 `ENV NODE_OPTIONS=--dns-result-order=ipv4first` 强制 IPv4 优先规避，无需手动处理。
+
+### 3.2 `docker build` 卡在 `FROM node:20-slim` 报 `i/o timeout` / `DeadlineExceeded`
+ 拉取基础镜像时连 `registry-1.docker.io` 超时。原因：Docker Hub 在阿里云网络下偶发不可达。
+ 解决：按「1.6」给 Docker daemon 配 `registry-mirrors` 国内镜像加速器并 `systemctl restart docker`，
+ 基础镜像即可改走国内源拉取。
+
+### 3.3 `npm ci` 报 `Exit handler never called!`
+ npm 在 Node 22/24 的 Docker 构建中存在已知信号处理 bug（npm/cli#7639、#8974），与依赖无关、偶发崩溃。
+ 本项目已通过将基础镜像降到 `node:20-slim`（`package.json` 的 `engines.node` 同步放宽到 `>=20`）
+ 彻底规避，无需在容器内升级 npm。若自行改回 Node 22/24 遇到此错，请退回 Node 20。
 
 ### 3.2 登录密码正确，但登录后页面刷新又回到登录页
 根因：认证 cookie 被设了 `Secure` 标记，而临时访问是 `http://IP:3000`（明文 HTTP）。
@@ -145,6 +170,7 @@ docker compose up -d
 4. 修改 `docker-compose.yml`：放开 `nginx` 的 `80:80` / `443:443` 端口映射（取消注释）。
 5. **改 `.env`：`COOKIE_SECURE=true`**（HTTPS 下 cookie 需要 Secure，否则浏览器不回传）。
 6. 重新部署：`./deploy.sh`（或 `docker build -t lifeos-next -f Dockerfile . && docker compose up -d`）。
+   > 注：构建用 npm ci + node:20-slim，不再依赖 Yarn。
 7. 验证 `https://your-domain.com` 可访问。
 
 ---
