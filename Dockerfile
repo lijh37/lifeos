@@ -5,9 +5,11 @@
 # ── 依赖阶段 ──
 FROM node:22-slim AS deps
 WORKDIR /app
-# 默认使用公共 npm registry（registry.npmmirror.com 在容器内仅解析到 IPv6 易失败；
-# 如需加速可传 --build-arg NPM_REGISTRY=https://registry.npmmirror.com 覆盖）
-ARG NPM_REGISTRY=https://registry.npmjs.org/
+# 默认使用国内 npm 镜像（阿里云环境拉取更快）；NODE_OPTIONS 强制 IPv4 优先，
+# 避免 npmmirror 在容器内仅解析到 IPv6 导致 EAI_AGAIN。
+# 如需换源可传 --build-arg NPM_REGISTRY=https://registry.npmjs.org/
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+ENV NODE_OPTIONS=--dns-result-order=ipv4first
 RUN npm config set registry ${NPM_REGISTRY}
 # 仅复制依赖清单，利用层缓存
 COPY package.json package-lock.json ./
@@ -18,7 +20,8 @@ RUN npm ci --no-audit --no-fund
 FROM node:22-slim AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
-ARG NPM_REGISTRY=https://registry.npmjs.org/
+ENV NODE_OPTIONS=--dns-result-order=ipv4first
+ARG NPM_REGISTRY=https://registry.npmmirror.com
 RUN npm config set registry ${NPM_REGISTRY}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
