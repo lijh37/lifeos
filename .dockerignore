@@ -1,0 +1,36 @@
+# 构建上下文排除项：避免把本地产物/缓存拷进镜像，导致构建异常或镜像膨胀
+# 关键：排除 .next/，否则旧 dev 构建缓存（含已移除的 next/font/google Geist 引用）
+# 会被 COPY . . 带入，Turbopack 复用缓存后触发离线环境无法访问的 Google Fonts 拉取。
+
+# 依赖与构建产物
+node_modules
+.next
+out
+build
+dist
+
+# 本地数据（运行时由 volume 挂载）
+data
+
+# 测试 / 覆盖率
+coverage
+.e2e-test.db
+.db-test.sqlite
+.routes-test.db
+playwright-report
+test-results
+.pw-libs
+
+# 环境 / 密钥
+.env
+.env.local
+.env.*.local
+
+# 版本控制与编辑器
+.git
+.gitignore
+.github
+.idea
+.vscode
+*.log
+.DS_Store

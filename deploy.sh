@@ -9,8 +9,8 @@ IMAGE="lifeos-next"
 echo "==> [1/4] 拉取最新代码"
 git pull --ff-only
 
-echo "==> [2/4] 重建镜像（compose up 不会自动重建已存在镜像，必须显式 build）"
-docker build -t "$IMAGE" -f Dockerfile .
+echo "==> [2/4] 重建镜像（compose up 不会自动重建已存在镜像，必须显式 build；--no-cache 确保构建上下文干净，避免旧 .next 缓存触发离线字体拉取）"
+docker build --no-cache -t "$IMAGE" -f Dockerfile .
 
 echo "==> [3/4] 用新镜像重启容器"
 docker compose up -d
