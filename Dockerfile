@@ -1,29 +1,29 @@
 # 多阶段构建 LifeOS（Next.js 16）
-# 使用 Yarn 替代 npm，绕过 Docker 26.1 下 npm "Exit handler never called" 信号处理 bug
+# 使用 npm ci（与 package-lock.json 严格一致，等价于 yarn --frozen-lockfile）
 # 基础镜像 Node 22，匹配 package.json engines 要求
 
 # ── 依赖阶段 ──
 FROM node:22-slim AS deps
 WORKDIR /app
-# 使用国内 npm 镜像源，提升阿里云环境拉取速度（可用 build-arg 覆盖）
-ARG NPM_REGISTRY=https://registry.npmmirror.com
+# 默认使用公共 npm registry（registry.npmmirror.com 在容器内仅解析到 IPv6 易失败；
+# 如需加速可传 --build-arg NPM_REGISTRY=https://registry.npmmirror.com 覆盖）
+ARG NPM_REGISTRY=https://registry.npmjs.org/
 RUN npm config set registry ${NPM_REGISTRY}
-# node:22-slim 已自带 yarn，无需安装
 # 仅复制依赖清单，利用层缓存
-COPY package.json package-lock.json* ./
-# 使用 Yarn 安装，规避 npm 信号处理 bug
-RUN yarn install --frozen-lockfile --non-interactive
+COPY package.json package-lock.json ./
+# npm ci 要求 package-lock.json 存在且严格一致
+RUN npm ci --no-audit --no-fund
 
 # ── 构建阶段 ──
 FROM node:22-slim AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
-ARG NPM_REGISTRY=https://registry.npmmirror.com
+ARG NPM_REGISTRY=https://registry.npmjs.org/
 RUN npm config set registry ${NPM_REGISTRY}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # 构建期不注入生产环境变量；运行时由容器 env 提供
-RUN yarn build
+RUN npm run build
 
 # ── 运行阶段 ──
 FROM node:22-slim AS runner
@@ -52,4 +52,4 @@ RUN mkdir -p /app/data/uploads /app/data/db && chown -R nextjs:nodejs /app/data
 USER nextjs
 
 EXPOSE 3000
-CMD ["yarn", "start"]
+CMD ["npm", "run", "start"]
