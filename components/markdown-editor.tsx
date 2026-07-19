@@ -55,6 +55,7 @@ const MarkdownEditor = memo(function MarkdownEditor({ content: initialContent, o
   // Reset when initialContent changes
   useEffect(() => {
     setContent(initialContent)
+    savedContent.current = initialContent ?? ''
   }, [initialContent])
 
   // Auto-save with debounce

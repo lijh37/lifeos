@@ -17,29 +17,22 @@ export async function GET(req: NextRequest) {
   const cacheHeaders = { headers: { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=60' } }
 
   if (q) {
-    let notes = await searchNotes(q, tag || undefined)
-    return NextResponse.json({ notes: summary ? notes.map(stripContent) : notes }, cacheHeaders)
+    const notes = await searchNotes(q, tag || undefined)
+    return NextResponse.json({ notes }, cacheHeaders)
   }
 
-  const noteType = type && type !== 'all' ? type as Note['type'] : undefined
-
   if (startDate && endDate) {
-    const notes = await getNotesByDateRange(startDate, endDate, noteType, limit, offset)
-    return NextResponse.json({ notes: summary ? notes.map(stripContent) : notes }, cacheHeaders)
+    const notes = await getNotesByDateRange(startDate, endDate, limit, offset)
+    return NextResponse.json({ notes }, cacheHeaders)
   }
 
   const cursor = searchParams.get('cursor')
 
-  const result = await getNotesCursor(noteType, limit, cursor || undefined, tag || undefined, summary)
+  const result = await getNotesCursor(limit, cursor || undefined, tag || undefined, summary)
   const notes = result.notes
   const nextCursor = result.nextCursor
 
   return NextResponse.json({ notes, nextCursor }, cacheHeaders)
-}
-
-function stripContent(note: Note): Note {
-  const preview = note.content ? note.content.slice(0, 80) : ''
-  return { ...note, content: preview }
 }
 
 const NOTE_TYPES = ['note', 'todo', 'event'] as const

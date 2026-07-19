@@ -20,8 +20,8 @@ export interface HabitRowProps {
   onDelete: (id: string) => void
   onEdit: (habit: Habit) => void
   isEditing: boolean
-  editValue: string
-  onEditValueChange: (value: string) => void
+  editValue?: string
+  onEditValueChange?: (value: string) => void
   onEditConfirm: () => void
   onEditCancel: () => void
 }
@@ -58,8 +58,8 @@ export const HabitRow = memo(function HabitRow({
           {isEditing ? (
             <div className="flex items-center gap-2">
               <Input
-                value={editValue}
-                onChange={e => onEditValueChange(e.target.value)}
+                value={editValue ?? ''}
+                onChange={e => onEditValueChange?.(e.target.value)}
                 onKeyDown={e => {
                   if (e.key === 'Enter') onEditConfirm()
                   if (e.key === 'Escape') onEditCancel()

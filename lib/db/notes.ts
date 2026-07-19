@@ -64,7 +64,7 @@ export async function createNote(note: Note): Promise<Note> {
  * @param id - 笔记 ID
  * @param updates - 包含要更新字段的部分笔记对象
  */
-export async function updateNote(id: string, updates: Partial<Note>): Promise<void> {
+export async function updateNote(id: string, updates: Partial<Note>): Promise<Note> {
   const db = getClient()
   const fields: string[] = []
   const args: InValue[] = []
@@ -86,6 +86,9 @@ export async function updateNote(id: string, updates: Partial<Note>): Promise<vo
   if (updates.tags !== undefined) {
     try { await syncNoteTags(id, updates.tags) } catch (e) { console.warn('[tags] 笔记标签同步失败(updateNote):', e) }
   }
+  const note = await getNote(id)
+  if (!note) throw new Error(`Note not found after update: ${id}`)
+  return note
 }
 
 /**
@@ -105,14 +108,10 @@ export async function deleteNote(id: string): Promise<void> {
  * @param offset - 分页偏移量（默认 0）
  * @returns 笔记对象数组
  */
-export async function getNotes(type?: 'note', limit = 200, offset = 0): Promise<Note[]> {
+export async function getNotes(limit = 200, offset = 0): Promise<Note[]> {
   const db = getClient()
   let sql = 'SELECT * FROM notes'
   const args: InValue[] = []
-  if (type) {
-    sql += ' WHERE type = ?'
-    args.push(type)
-  }
   sql += ' ORDER BY pinned DESC, created_at DESC LIMIT ? OFFSET ?'
   args.push(limit, offset)
   const result = await db.execute({ sql, args })
@@ -128,7 +127,7 @@ export async function getNotes(type?: 'note', limit = 200, offset = 0): Promise<
  * @param cursor - 上一页最后一条的 created_at 时间戳
  * @returns 包含笔记数组和下一页游标的对象
  */
-export async function getNotesCursor(type?: 'note', limit = 50, cursor?: string, tag?: string, summary = false): Promise<{ notes: Note[]; nextCursor: string | null }> {
+export async function getNotesCursor(limit = 50, cursor?: string, tag?: string, summary = false): Promise<{ notes: Note[]; nextCursor: string | null }> {
   const db = getClient()
 
   // Use table-qualified columns so we can add JOINs for tag filtering
@@ -146,10 +145,6 @@ export async function getNotesCursor(type?: 'note', limit = 50, cursor?: string,
   }
 
   const conditions: string[] = []
-  if (type) {
-    conditions.push('notes.type = ?')
-    args.push(type)
-  }
   if (tag === UNTAGGED) {
     conditions.push('note_tags.note_id IS NULL')
   } else if (tag) {
@@ -157,7 +152,13 @@ export async function getNotesCursor(type?: 'note', limit = 50, cursor?: string,
     args.push(tag.trim())
   }
   if (cursor) {
-    const parsed = JSON.parse(cursor)
+    let parsed: { p?: number; c?: string }
+    try {
+      parsed = JSON.parse(cursor)
+    } catch {
+      // Malformed cursor — treat as no cursor rather than throwing a 500.
+      return { notes: [], nextCursor: null }
+    }
     const pinned = parsed.p ?? 0
     const createdAt = parsed.c ?? ''
     conditions.push('(notes.pinned < ? OR (notes.pinned = ? AND notes.created_at < ?))')
@@ -198,14 +199,10 @@ export async function getNotesCursor(type?: 'note', limit = 50, cursor?: string,
  * @param offset - 分页偏移量（默认 0）
  * @returns 匹配日期范围的笔记数组
  */
-export async function getNotesByDateRange(startDate: string, endDate: string, type?: 'note', limit = 200, offset = 0): Promise<Note[]> {
+export async function getNotesByDateRange(startDate: string, endDate: string, limit = 200, offset = 0): Promise<Note[]> {
   const db = getClient()
   let sql = 'SELECT * FROM notes WHERE created_at >= ? AND created_at <= ?'
   const args: InValue[] = [startDate, endDate]
-  if (type) {
-    sql += ' AND type = ?'
-    args.push(type)
-  }
   sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
   args.push(limit, offset)
   const result = await db.execute({ sql, args })

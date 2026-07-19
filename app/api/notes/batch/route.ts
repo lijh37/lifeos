@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getClient } from '@/lib/db'
-import { genId } from '@/lib/utils'
+import { getClient, syncNoteTags } from '@/lib/db'
 import { isAuthorized } from '@/lib/auth-guard'
 
 export async function POST(req: NextRequest) {
@@ -19,9 +18,8 @@ export async function POST(req: NextRequest) {
   if (action === 'delete') {
     const tx = await db.transaction()
     try {
+      // FK CASCADE handles note_tags / attachments cleanup automatically
       for (const noteId of ids) {
-        await tx.execute({ sql: 'DELETE FROM note_tags WHERE note_id = ?', args: [noteId] })
-        await tx.execute({ sql: 'DELETE FROM attachments WHERE note_id = ?', args: [noteId] })
         await tx.execute({ sql: 'DELETE FROM notes WHERE id = ?', args: [noteId] })
       }
       await tx.commit()
@@ -36,23 +34,9 @@ export async function POST(req: NextRequest) {
     }
     const tx = await db.transaction()
     try {
-      // Ensure tag exists
-      const existing = await tx.execute({ sql: 'SELECT id FROM tags WHERE name = ?', args: [tag] })
-      const tagId = existing.rows.length > 0
-        ? existing.rows[0].id as string
-        : genId()
-      if (existing.rows.length === 0) {
-        await tx.execute({
-          sql: 'INSERT INTO tags (id, name, created_at) VALUES (?, ?, ?)',
-          args: [tagId, tag, new Date().toISOString()],
-        })
-      }
-      // Link all notes to tag (IGNORE skips duplicates)
+      // syncNoteTags handles tag-existence + note_tags linking per note
       for (const noteId of ids) {
-        await tx.execute({
-          sql: 'INSERT OR IGNORE INTO note_tags (note_id, tag_id) VALUES (?, ?)',
-          args: [noteId, tagId],
-        })
+        await syncNoteTags(noteId, [tag], tx)
       }
       await tx.commit()
     } catch (e) {

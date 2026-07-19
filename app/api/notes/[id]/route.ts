@@ -21,8 +21,7 @@ export async function PATCH(
   }
   const { id } = await params
   const body = await req.json()
-  await updateNote(id, body)
-  const note = await getNote(id)
+  const note = await updateNote(id, body)
   return NextResponse.json({ note })
 }
 

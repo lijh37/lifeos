@@ -2,42 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAttachment, getAttachmentsByNoteId, deleteAttachment, getAttachment } from '@/lib/db'
 import { getStorageDriver } from '@/lib/storage'
 import { isAuthorized } from '@/lib/auth-guard'
+import { formatFileSize } from '@/lib/utils'
+import { ALLOWED_MIME_TYPES } from '@/lib/attachments'
 
 export const runtime = 'nodejs'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
-/** 允许上传的 MIME 类型白名单 */
-const ALLOWED_MIME_TYPES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-  'application/pdf',
-  'text/plain',
-  'text/csv',
-  'application/json',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/zip',
-  'application/gzip',
-])
-
 function isAllowedMime(mime: string): boolean {
   // 仅允许白名单中显式列出的类型，不再信任 image/* 前缀，
   // 防止客户端伪造 file.type 上传 image/svg+xml 等可执行子类型（存储型 XSS）。
   return ALLOWED_MIME_TYPES.has(mime)
-}
-
-/**
- * 格式化文件大小
- */
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 /**

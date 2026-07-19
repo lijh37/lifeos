@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
   createHabit, deleteHabit, updateHabit,
-  getHabitsDashboard, getClient,
-  computeCurrentStreak, computeBestStreak,
+  getHabitsDashboard, toggleCompletion,
 } from '@/lib/db'
 import type { Habit } from '@/lib/types'
-import { genId } from '@/lib/utils'
 import { isAuthorized } from '@/lib/auth-guard'
 
 export async function GET() {
@@ -19,65 +17,18 @@ export async function POST(req: NextRequest) {
   }
   const body = await req.json()
   if (body._action === 'toggle') {
-    const db = getClient()
+    // Toggle completion state via shared DB helper
+    const completed = await toggleCompletion(body.habitId, body.date)
 
-    // 1. Toggle completion state (inline toggleCompletion)
-    const existing = await db.execute({
-      sql: 'SELECT id, completed FROM habit_completions WHERE habit_id = ? AND date = ?',
-      args: [body.habitId, body.date],
-    })
-    let completed: boolean
-    if (existing.rows.length > 0) {
-      const row = existing.rows[0]
-      const newCompleted = (row.completed as number) === 0 ? 1 : 0
-      await db.execute({
-        sql: 'UPDATE habit_completions SET completed = ? WHERE id = ?',
-        args: [newCompleted, row.id],
-      })
-      completed = newCompleted === 1
-    } else {
-      await db.execute({
-        sql: 'INSERT INTO habit_completions (id, habit_id, date, completed, created_at) VALUES (?, ?, ?, ?, ?)',
-        args: [genId(), body.habitId, body.date, 1, new Date().toISOString()],
-      })
-      completed = true
-    }
-
-    // 2. Single combined query: dates + stats via window functions
-    //    Replaces 3 separate queries (streak, bestStreak, counts)
-    const weekStart = new Date()
-    const dayOfWeek = weekStart.getDay()
-    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
-    const monday = new Date(weekStart)
-    monday.setDate(weekStart.getDate() + mondayOffset)
-    const mondayStr = monday.toISOString().slice(0, 10)
-
-    const monthStart = new Date()
-    monthStart.setDate(1)
-    const monthStartStr = monthStart.toISOString().slice(0, 10)
-
-    const combinedResult = await db.execute({
-      sql: `SELECT 
-        date,
-        COUNT(*) OVER () as total,
-        SUM(CASE WHEN date >= ? THEN 1 ELSE 0 END) OVER () as week_count,
-        SUM(CASE WHEN date >= ? THEN 1 ELSE 0 END) OVER () as month_count
-      FROM habit_completions 
-      WHERE habit_id = ? AND completed = 1 
-      ORDER BY date DESC`,
-      args: [mondayStr, monthStartStr, body.habitId],
-    })
-
-    const dates = combinedResult.rows.map(r => r.date as string)
-    const total = (combinedResult.rows[0]?.total as number) || 0
-    const weekCount = (combinedResult.rows[0]?.week_count as number) || 0
-    const monthCount = (combinedResult.rows[0]?.month_count as number) || 0
-
-    // 3. Calculate current streak from dates (Set for O(1) lookup)
-    const datesSet = new Set(dates)
-    const streak = computeCurrentStreak(datesSet)
-    const sortedDates = [...dates].sort()
-    const bestStreak = computeBestStreak(sortedDates)
+    // Reuse the dashboard query to compute per-habit stats (streak, bestStreak,
+    // weekCount, monthCount, totalCompletions) for the toggled habit.
+    const dashboard = await getHabitsDashboard()
+    const id = body.habitId
+    const streak = dashboard.streaks[id] ?? 0
+    const bestStreak = dashboard.bestStreaks[id] ?? 0
+    const weekCount = dashboard.perHabitWeek[id] ?? 0
+    const monthCount = dashboard.perHabitMonth[id] ?? 0
+    const totalCompletions = dashboard.perHabitTotals[id] ?? 0
 
     return NextResponse.json({
       completed,
@@ -85,7 +36,7 @@ export async function POST(req: NextRequest) {
       bestStreak,
       weekCount,
       monthCount,
-      totalCompletions: total,
+      totalCompletions,
     })
   }
   const name = typeof body.name === 'string' ? body.name.trim() : ''

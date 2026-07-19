@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -46,7 +46,7 @@ export function NoteList() {
   const updateNote = useAppStore((s) => s.updateNote)
   const [mounted, setMounted] = useState(false)
   // Wait for mount so VirtualNoteList gets a valid scrollRef
-  useLayoutEffect(() => { setMounted(true) }, [])
+  useEffect(() => { setMounted(true) }, [])
 
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Note[] | null>(null)
@@ -182,6 +182,10 @@ export function NoteList() {
     setTagManagerOpen(true)
   }, [])
 
+  const handleEdit = useCallback((note: Note) => {
+    router.push(`/notes/${note.id}`)
+  }, [router])
+
   const handleTagSelect = useCallback((tag: string | null) => {
     if (tag === activeTag) return
     // Cancel pending search when switching tag
@@ -192,11 +196,13 @@ export function NoteList() {
     setSearchResults(null)
   }, [activeTag])
 
-  const displayNotes = searchResults ?? (
-    activeTag
-      ? notes.filter(n => activeTag === UNTAGGED ? n.tags.length === 0 : n.tags.includes(activeTag))
-      : notes
-  )
+  const displayNotes = useMemo(() => (
+    searchResults ?? (
+      activeTag
+        ? notes.filter(n => activeTag === UNTAGGED ? n.tags.length === 0 : n.tags.includes(activeTag))
+        : notes
+    )
+  ), [searchResults, notes, activeTag])
 
   // Restore scroll position after data is ready (from cache or fresh fetch)
   const scrollRestored = useRef(false)
@@ -403,7 +409,7 @@ export function NoteList() {
             {displayNotes.length > 50 && mounted ? (
               <VirtualNoteList
                 notes={displayNotes}
-                onEdit={(note) => router.push(`/notes/${note.id}`)}
+                onEdit={handleEdit}
                 onDelete={handleDelete}
                 onTogglePin={handleTogglePin}
                 selectedIds={selectedIds}
@@ -417,7 +423,7 @@ export function NoteList() {
                   key={note.id}
                   note={note}
                   enablePrefetch={index < 20}
-                  onEdit={(note) => router.push(`/notes/${note.id}`)}
+                  onEdit={handleEdit}
                   onDelete={handleDelete}
                   onTogglePin={handleTogglePin}
                   selectedIds={selectedIds}

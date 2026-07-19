@@ -4,15 +4,22 @@ import { isAuthorized } from '@/lib/auth-guard'
 import type { Note } from '@/lib/types'
 
 function toBeijingTime(iso: string): string {
-  return new Date(iso).toLocaleString('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).replace(/\//g, '-')
+  try {
+    return new Date(iso).toLocaleString('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).replace(/\//g, '-')
+  } catch {
+    // Fallback: manual ISO-slice formatting (YYYY-MM-DD HH:mm) if locale/timezone fails.
+    const d = new Date(iso)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
 }
 
 function notesToMarkdown(notes: Note[]): string {
@@ -54,7 +61,7 @@ export async function GET(req: NextRequest) {
   if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  const notes = await getNotes(undefined, Number.MAX_SAFE_INTEGER)
+  const notes = await getNotes(Number.MAX_SAFE_INTEGER)
 
   const content = notesToMarkdown(notes)
   const filename = `lifeos-notes-${new Date().toISOString().slice(0, 10)}.md`

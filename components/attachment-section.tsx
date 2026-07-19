@@ -12,7 +12,8 @@ import {
   Upload,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
+import { cn, formatFileSize } from '@/lib/utils'
+import { buildAcceptAttribute } from '@/lib/attachments'
 import type { Attachment } from '@/lib/types'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -20,13 +21,10 @@ import type { Attachment } from '@/lib/types'
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB，与服务端一致
 const UPLOAD_TIMEOUT = 60000 // 60s 超时
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// 由服务端白名单派生，保证文件选择器与服务端接受的类型永远一致。
+const ACCEPT_ATTRIBUTE = buildAcceptAttribute()
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function getFileIcon(mimeType: string) {
   if (mimeType.startsWith('image/')) return Image
@@ -248,7 +246,7 @@ export function AttachmentSection({ noteId }: AttachmentSectionProps) {
             multiple
             className="hidden"
             onChange={handleFileChange}
-            accept="image/*,.pdf,.txt,.csv,.json,.doc,.docx,.xls,.xlsx,.zip,.gz"
+            accept={ACCEPT_ATTRIBUTE}
           />
 
           {/* Attachment list */}

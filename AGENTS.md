@@ -31,13 +31,13 @@ app/                  # Next.js App Router 页面和 API
   │   ├── route.ts    # 列表（搜索+游标分页+标签筛选+摘要模式）
   │   ├── [id]/       # 单条笔记操作
   │   │   ├── route.ts
-  │   │   └── attachments/   # 附件上传/列表/删除（存储驱动抽象，10MB 限制，MIME 白名单；SVG 已禁用以防存储型 XSS）
+  │   │   └── attachments/   # 附件上传/列表/删除（存储驱动抽象，10MB 限制，MIME 白名单见 lib/attachments.ts；SVG 已禁用以防存储型 XSS）
   │   │       └── route.ts
-  │   └── batch/      # 批量操作（事务性删除/加标签）
+  │   └── batch/      # 批量操作（事务性删除/加标签；删除走 FK CASCADE，加标签复用 syncNoteTags(tx)）
   │       └── route.ts
   ├── api/budgets/    # 预算 CRUD（upsert）
-  ├── api/habits/     # 习惯 CRUD + 打卡 + streaks + 趋势 + 统计（getHabitsDashboard 合并查询）
-  ├── api/backup/     # 备份导出/恢复 JSON（FK 安全顺序清空/导入，含 attachments 表，避免恢复后孤儿附件）
+  ├── api/habits/     # 习惯 CRUD + 打卡 + streaks + 趋势 + 统计（toggle 复用 toggleCompletion + getHabitsDashboard 合并查询）
+  ├── api/backup/     # 备份导出/恢复 JSON（恢复前 validateBackup 校验，非法返回 400；FK 安全顺序清空/导入，含 attachments 表，避免恢复后孤儿附件）
   ├── api/tags/       # 标签列表/重命名/删除
   ├── api/export/     # 导出全部笔记为 Markdown 文件
   ├── api/auth/       # 密码验证（cookie 30 天）
@@ -76,11 +76,12 @@ lib/                    # 核心逻辑
   │   ├── client.ts     # getClient() 单例连接管理（无 DDL，纯连接）
   │   ├── migrate.ts    # 迁移执行器（可编程 API，按版本执行 migrations/*.sql）
   │   ├── fts5.ts       # 运行时 FTS5 可用性探测（checkFts5，缓存结果）
-  │   ├── notes.ts      # 笔记 CRUD + FTS5 搜索 + 游标/偏移分页 + 日期范围查询
+  │   ├── notes.ts      # 笔记 CRUD + FTS5 搜索 + 游标/偏移分页 + 日期范围查询；updateNote 返回更新后的 Note；getNotes 系列不再按 type 过滤（Note.type 恒为 'note'）
   │   ├── habits.ts     # 习惯 CRUD + 打卡 + streaks + 最佳记录 + 周/月统计 + getHabitsDashboard() 合并查询；computeCurrentStreak/computeBestStreak 为纯函数，dashboard 与 habits 路由共用（消除双份实现）
   │   ├── budgets.ts    # 预算 CRUD（upsert）
-  │   ├── tags.ts       # 标签同步(syncNoteTags) + getAllTags(含计数) + renameTag(合并) + deleteTag
+  │   ├── tags.ts       # 标签同步(syncNoteTags，可选 tx 参数支持外部事务) + getAllTags(含计数) + renameTag(合并) + deleteTag
   │   ├── attachments.ts # 附件 CRUD（createAttachment / getAttachmentsByNoteId / deleteAttachment）
+  │   └── attachments.ts # 注意：另有 lib/attachments.ts 存放 ALLOWED_MIME_TYPES 白名单 + buildAcceptAttribute()，供服务端路由与客户端附件组件共用（避免 accept 与白名单漂移）
   │   └── index.ts      # 重导出（import from '@/lib/db'）
 migrations/             # 数据库迁移（纯 SQL，按编号版本化）
   ├── 001_create_tables.sql
@@ -92,7 +93,7 @@ lib/                    # 核心逻辑
   ├── markdown.tsx      # MarkdownRenderer（react-markdown + Tailwind 样式）
   ├── strip-markdown.ts # stripMarkdown 纯函数（抽离自 markdown.tsx，无 React 依赖）
   ├── navigation.ts     # 共享导航配置（NAV_ITEMS 4 项 / PRIMARY_MOBILE_NAV / MORE_MOBILE_NAV）
-  └── utils.ts          # cn() + genId() + cn 内部使用 tailwind-merge + clsx
+  └── utils.ts          # cn() + genId() + formatFileSize()（附件大小格式化，服务端路由与客户端组件共用）+ cn 内部使用 tailwind-merge + clsx
 store/                  # Zustand 全局状态
   ├── index.ts          # useAppStore（笔记列表缓存，MAX_CACHED_NOTES=500，5 个 action）
   └── __tests__/        # 状态管理测试（11 测试）

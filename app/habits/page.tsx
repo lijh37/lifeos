@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -52,7 +52,7 @@ function HabitsPageInner() {
       .finally(() => setLoading(false))
   }, [])
 
-  async function handleToggle(habitId: string, date: string) {
+  const handleToggle = useCallback(async (habitId: string, date: string) => {
     // Optimistic update: flip UI immediately
     setTodayMap((prev) => ({ ...prev, [habitId]: !(prev[habitId] ?? false) }))
 
@@ -75,13 +75,13 @@ function HabitsPageInner() {
       setTodayMap((prev) => ({ ...prev, [habitId]: !(prev[habitId] ?? false) }))
       console.error('Failed to toggle habit:', e)
     }
-  }
+  }, [])
 
-  function handleDelete(id: string) {
+  const handleDelete = useCallback((id: string) => {
     setDeleteTarget(id)
-  }
+  }, [])
 
-  async function confirmDelete() {
+  const confirmDelete = useCallback(async () => {
     if (!deleteTarget) return
     try {
       await fetch(`/api/habits?id=${deleteTarget}`, { method: 'DELETE' })
@@ -90,20 +90,21 @@ function HabitsPageInner() {
       console.error('Failed to delete habit:', e)
     }
     setDeleteTarget(null)
-  }
+  }, [deleteTarget])
 
-  function handleEdit(habit: Habit) {
+  const handleEdit = useCallback((habit: Habit) => {
     setEditingId(habit.id)
     setEditValue(habit.name)
-  }
+  }, [])
 
-  async function handleEditConfirm() {
+  const handleEditConfirm = useCallback(async () => {
     if (!editingId || !editValue.trim()) return
+    const editingHabit = habits.find((h) => h.id === editingId)
     try {
       const res = await fetch('/api/habits', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: editingId, name: editValue.trim(), description: '' }),
+        body: JSON.stringify({ id: editingId, name: editValue.trim(), description: editingHabit?.description ?? '' }),
       })
       if (res.ok) {
         setHabits((prev) =>
@@ -115,14 +116,14 @@ function HabitsPageInner() {
     }
     setEditingId(null)
     setEditValue('')
-  }
+  }, [editingId, editValue, habits])
 
-  function handleEditCancel() {
+  const handleEditCancel = useCallback(() => {
     setEditingId(null)
     setEditValue('')
-  }
+  }, [])
 
-  async function handleCreate() {
+  const handleCreate = useCallback(async () => {
     if (!newName.trim()) return
     const res = await fetch('/api/habits', {
       method: 'POST',
@@ -133,7 +134,7 @@ function HabitsPageInner() {
     setHabits((prev) => [data.habit, ...prev])
     setNewName('')
     setShowInput(false)
-  }
+  }, [newName])
 
   const today = new Date().toISOString().slice(0, 10)
 
@@ -179,8 +180,9 @@ function HabitsPageInner() {
             <div className="animate-stagger space-y-2">
               {habits.map((habit) => {
                 const done = todayMap[habit.id] ?? false
+                const isEditing = editingId === habit.id
                 return (
-                  <HabitRow key={habit.id} habit={habit} done={done} streak={streaks[habit.id] ?? 0} bestStreak={bestStreaks[habit.id] ?? 0} weekCount={perHabitWeek[habit.id] ?? 0} monthCount={perHabitMonth[habit.id] ?? 0} totalCompletions={perHabitTotals[habit.id] ?? 0} today={today} onToggle={handleToggle} onDelete={handleDelete} onEdit={handleEdit} isEditing={editingId === habit.id} editValue={editValue} onEditValueChange={setEditValue} onEditConfirm={handleEditConfirm} onEditCancel={handleEditCancel} />
+                  <HabitRow key={habit.id} habit={habit} done={done} streak={streaks[habit.id] ?? 0} bestStreak={bestStreaks[habit.id] ?? 0} weekCount={perHabitWeek[habit.id] ?? 0} monthCount={perHabitMonth[habit.id] ?? 0} totalCompletions={perHabitTotals[habit.id] ?? 0} today={today} onToggle={handleToggle} onDelete={handleDelete} onEdit={handleEdit} isEditing={isEditing} editValue={isEditing ? editValue : undefined} onEditValueChange={isEditing ? setEditValue : undefined} onEditConfirm={handleEditConfirm} onEditCancel={handleEditCancel} />
                 )
               })}
             </div>

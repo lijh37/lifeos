@@ -3,26 +3,28 @@ import { getClient } from './client'
 import { genId } from '../utils'
 import { UNTAGGED } from '../types'
 
-export async function syncNoteTags(noteId: string, tags: string[]): Promise<void> {
+export async function syncNoteTags(noteId: string, tags: string[], tx?: Awaited<ReturnType<ReturnType<typeof getClient>['transaction']>>): Promise<void> {
   const db = getClient()
-  const tx = await db.transaction()
+  // Allow running inside an outer transaction (e.g. batch operations). If no
+  // transaction is provided, open a dedicated one for this single note.
+  const ownTx = tx ?? await db.transaction()
   try {
     const trimmed = [...new Set(tags.map(t => t.trim()).filter(Boolean))]
 
     // 清除旧关联
-    await tx.execute({ sql: 'DELETE FROM note_tags WHERE note_id = ?', args: [noteId] })
-    if (trimmed.length === 0) { await tx.commit(); return }
+    await ownTx.execute({ sql: 'DELETE FROM note_tags WHERE note_id = ?', args: [noteId] })
+    if (trimmed.length === 0) { if (!tx) await ownTx.commit(); return }
 
     // 批量创建不存在的标签（INSERT OR IGNORE 跳过已存在）
     const now = new Date().toISOString()
     const tagPlaceholders = trimmed.map(() => '(?, ?, ?)').join(', ')
-    await tx.execute({
+    await ownTx.execute({
       sql: `INSERT OR IGNORE INTO tags (id, name, created_at) VALUES ${tagPlaceholders}`,
       args: trimmed.flatMap(name => [genId(), name, now]) as InValue[],
     })
 
     // 一次性查询所有标签 ID
-    const tagResult = await tx.execute({
+    const tagResult = await ownTx.execute({
       sql: `SELECT id, name FROM tags WHERE name IN (${trimmed.map(() => '?').join(',')})`,
       args: trimmed as unknown as InValue[],
     })
@@ -39,14 +41,14 @@ export async function syncNoteTags(noteId: string, tags: string[]): Promise<void
     }
     if (ntPairs.length > 0) {
       const ntPlaceholders = ntPairs.map(() => '(?, ?)').join(', ')
-      await tx.execute({
+      await ownTx.execute({
         sql: `INSERT OR IGNORE INTO note_tags (note_id, tag_id) VALUES ${ntPlaceholders}`,
         args: ntPairs.flat() as InValue[],
       })
     }
-    await tx.commit()
+    if (!tx) await ownTx.commit()
   } catch (e) {
-    await tx.rollback()
+    if (!tx) await ownTx.rollback()
     throw e
   }
 }

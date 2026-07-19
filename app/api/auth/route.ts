@@ -35,8 +35,7 @@ export async function POST(req: Request) {
   }
 
   // Constant-time compare of the submitted password.
-  const ok = password.length === expected.length &&
-    timingSafeEqual(password, expected)
+  const ok = timingSafeEqual(password, expected)
   if (!ok) {
     const now = Date.now()
     const existing = rateBuckets.get(clientIp)

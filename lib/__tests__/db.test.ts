@@ -91,7 +91,7 @@ describe('Database - Notes', () => {
     await createNote(makeNote({ type: 'note' }))
     await createNote(makeNote({ type: 'note' }))
 
-    const notes = await getNotes('note')
+    const notes = await getNotes()
     expect(notes.length).toBeGreaterThanOrEqual(2)
     expect(notes[0].type).toBe('note')
   })

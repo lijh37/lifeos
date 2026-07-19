@@ -8,6 +8,7 @@ import { genId } from '../utils'
  * @param from 起始日期（默认今天）
  */
 export function computeCurrentStreak(datesSet: Set<string>, from: Date = new Date()): number {
+  if (datesSet.size === 0) return 0
   let streak = 0
   const cursor = new Date(from)
   for (let j = 0; j < 365; j++) {
@@ -160,7 +161,7 @@ export async function getTodayCompletions(): Promise<Record<string, boolean>> {
 /**
  * 获取本周周一日期（YYYY-MM-DD）。
  */
-function getWeekStart(): string {
+export function getWeekStart(): string {
   const now = new Date()
   const dayOfWeek = now.getDay()
   const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
@@ -172,7 +173,7 @@ function getWeekStart(): string {
 /**
  * 获取本月第一天日期（YYYY-MM-DD）。
  */
-function getMonthStart(): string {
+export function getMonthStart(): string {
   const monthStart = new Date()
   monthStart.setDate(1)
   return monthStart.toISOString().slice(0, 10)
