@@ -93,6 +93,14 @@ cd /root/lifeos
 可另开终端 `tail -f /tmp/lifeos-build.log` 看实时进度。若构建进程异常退出或超时，脚本会提示查看该日志。
 脚本末尾会 `docker compose logs -f next` 跟踪启动日志，`Ctrl+C` 退出即可（容器已在后台运行）。
 
+> **磁盘保护（重要）**：`deploy.sh` 在每次 `docker build` **之前**会先执行 `docker image prune -f`，
+> 清掉未被引用的悬空镜像（`<none>`）。因为构建用 `--no-cache`，每次都会生成全新镜像层，
+> 若不清理旧镜像会持续堆积、最终把磁盘吃满（曾因此 40G 磁盘被占 28G）。该命令只删悬空镜像，
+> 不影响运行中的 `lifeos-next` 容器与 `lifeos-data` 卷，数据安全。
+> 此外 `docker-compose.yml` 已为 `next` 服务配置 `logging`（单文件 50M、最多 3 个），
+> 防止容器运行日志无限增长。**注意**：`logging` 配置仅对新建容器生效，改 compose 后需
+> `docker compose up -d` 重建 `next` 容器才会应用。
+
 ---
 
 ## 3. 常见问题排查
@@ -191,3 +199,17 @@ docker compose restart       # 重启
 docker compose down          # 停止（数据保留在 volume）
 npm run migrate              # 手动执行数据库迁移（容器内或本地）
 ```
+
+### 7.1 重置环境（清空所有数据，重来）
+
+若需丢弃全部数据（SQLite + 附件）从零开始，停容器并删 `lifeos-data` 卷，再清掉所有镜像彻底腾空间：
+
+```bash
+docker compose down -v          # 停容器并删除 lifeos-data 卷（数据全清）
+docker system prune -a -f       # 删所有未使用镜像/容器/网络/构建缓存
+docker system df                # 确认已释放
+df -h /                        # 确认磁盘恢复
+```
+
+之后重新 `./deploy.sh` 即可拉起一个全新的空 LifeOS（容器启动会自动建空表）。
+> `prune -a` 会删掉所有未被容器引用的镜像；若服务器上还有其他项目镜像也会被清掉。

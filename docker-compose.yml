@@ -33,6 +33,12 @@ services:
       - lifeos-data:/app/data
     expose:
       - "3000"
+    # 限制容器日志大小，防止 json-file 驱动无限增长把磁盘吃满
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
     # 启动前确保 db/ 目录存在（volume 挂载会遮蔽镜像内建的目录），再执行迁移（建表）
     command: sh -c "mkdir -p /app/data/db && npm run migrate && npm run start"
 

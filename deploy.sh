@@ -19,8 +19,11 @@ git pull --ff-only
 
 echo "==> [2/4] 后台重建镜像（日志: $BUILD_LOG，SSH 断开也不中断）"
 # 后台启动构建；构建脚本末尾写 BUILD_DONE 标记
+# 构建前先清掉悬空镜像（<none>），避免每次 --no-cache 构建叠加旧层把磁盘吃满
+# 仅删除未被任何容器引用的悬空镜像，不影响运行中的 lifeos-next 容器与 lifeos-data 卷
 nohup bash -c "
   set -e
+  docker image prune -f
   docker build --no-cache -t '$IMAGE' -f Dockerfile . > '$BUILD_LOG' 2>&1
   touch '$BUILD_DONE'
 " >/dev/null 2>&1 &
