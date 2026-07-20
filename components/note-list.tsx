@@ -427,7 +427,7 @@ export function NoteList() {
                 {selectedIds.size > 0 ? `已选 ${selectedIds.size} 项` : `${displayNotes.length} 项`}
               </span>
             </div>
-            {displayNotes.length > 50 && mounted ? (
+            {displayNotes.length > 500 && mounted ? (
               <VirtualNoteList
                 notes={displayNotes}
                 onEdit={handleEdit}

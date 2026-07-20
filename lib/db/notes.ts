@@ -101,92 +101,20 @@ export async function deleteNote(id: string): Promise<void> {
 }
 
 /**
- * 获取笔记列表，可按类型过滤，支持分页。置顶优先，再按创建时间降序。
- * @param type - 可选，笔记类型筛选
+ * 获取笔记列表，置顶优先，再按创建时间降序。
  * @param limit - 返回条数上限（默认 200）
- * @param offset - 分页偏移量（默认 0）
  * @returns 笔记对象数组
  */
-export async function getNotes(limit = 200, offset = 0): Promise<Note[]> {
+export async function getNotes(limit = 200): Promise<Note[]> {
   const db = getClient()
   let sql = 'SELECT * FROM notes'
   const args: InValue[] = []
-  sql += ' ORDER BY pinned DESC, created_at DESC LIMIT ? OFFSET ?'
-  args.push(limit, offset)
+  sql += ' ORDER BY pinned DESC, created_at DESC LIMIT ?'
+  args.push(limit)
   const result = await db.execute({ sql, args })
   const ids = result.rows.map(r => r.id as string)
   const tagMap = await fetchTagsForNotes(ids)
   return result.rows.map(row => rowToNote(row, tagMap.get(row.id as string) || []))
-}
-
-/**
- * 基于游标分页获取笔记列表，支持按类型过滤。用于无限滚动场景。
- * @param type - 可选，笔记类型筛选
- * @param limit - 每页条数（默认 50，实际多取一条判断下一页）
- * @param cursor - 上一页最后一条的 created_at 时间戳
- * @returns 包含笔记数组和下一页游标的对象
- */
-export async function getNotesCursor(limit = 50, cursor?: string, tag?: string, summary = false): Promise<{ notes: Note[]; nextCursor: string | null }> {
-  const db = getClient()
-
-  // Use table-qualified columns so we can add JOINs for tag filtering
-  // Summary mode only fetches first 80 chars of content (for list preview)
-  const selectColumns = summary
-    ? "notes.id, notes.title, notes.type, notes.pinned, notes.done, notes.created_at, notes.updated_at, notes.due_date, substr(notes.content, 1, 80) AS content"
-    : 'notes.*'
-  let sql = `SELECT ${selectColumns} FROM notes`
-  const args: InValue[] = []
-
-  if (tag === UNTAGGED) {
-    sql += ' LEFT JOIN note_tags ON notes.id = note_tags.note_id'
-  } else if (tag) {
-    sql += ' INNER JOIN note_tags ON notes.id = note_tags.note_id INNER JOIN tags ON note_tags.tag_id = tags.id'
-  }
-
-  const conditions: string[] = []
-  if (tag === UNTAGGED) {
-    conditions.push('note_tags.note_id IS NULL')
-  } else if (tag) {
-    conditions.push('tags.name = ?')
-    args.push(tag.trim())
-  }
-  if (cursor) {
-    let parsed: { p?: number; c?: string }
-    try {
-      parsed = JSON.parse(cursor)
-    } catch {
-      // Malformed cursor — treat as no cursor rather than throwing a 500.
-      return { notes: [], nextCursor: null }
-    }
-    const pinned = parsed.p ?? 0
-    const createdAt = parsed.c ?? ''
-    conditions.push('(notes.pinned < ? OR (notes.pinned = ? AND notes.created_at < ?))')
-    args.push(pinned, pinned, createdAt)
-  }
-
-  if (conditions.length > 0) {
-    sql += ' WHERE ' + conditions.join(' AND ')
-  }
-
-  sql += ' ORDER BY notes.pinned DESC, notes.created_at DESC LIMIT ?'
-  // Fetch one extra to determine if there's a next page
-  args.push(limit + 1)
-
-  const result = await db.execute({ sql, args })
-  const rawRows = [...result.rows]
-
-  let nextCursor: string | null = null
-  if (rawRows.length > limit) {
-    rawRows.pop()
-    const last = rawRows[rawRows.length - 1]
-    nextCursor = JSON.stringify({ p: (Number(last.pinned ?? 0)), c: last.created_at as string })
-  }
-
-  const ids = rawRows.map(r => r.id as string)
-  const tagMap = await fetchTagsForNotes(ids)
-  const notes = rawRows.map(row => rowToNote(row, tagMap.get(row.id as string) || []))
-
-  return { notes, nextCursor }
 }
 
 /**

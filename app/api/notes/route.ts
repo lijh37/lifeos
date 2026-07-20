@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createNote, getNotesCursor, deleteNote, searchNotes, getNotesByDateRange } from '@/lib/db'
+import { createNote, deleteNote, searchNotes, getNotesByDateRange, getNotes } from '@/lib/db'
 import { isAuthorized } from '@/lib/auth-guard'
 import type { Note } from '@/lib/types'
 
@@ -11,7 +11,6 @@ export async function GET(req: NextRequest) {
   const endDate = searchParams.get('endDate')
   const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '200'), 1), 500)
   const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0)
-  const summary = searchParams.get('summary') === 'true'
   const tag = searchParams.get('tag')
 
   // No HTTP caching: the list is private (auth-gated) and must reflect
@@ -29,13 +28,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ notes }, noCache)
   }
 
-  const cursor = searchParams.get('cursor')
+  const notes = await getNotes(limit)
 
-  const result = await getNotesCursor(limit, cursor || undefined, tag || undefined, summary)
-  const notes = result.notes
-  const nextCursor = result.nextCursor
-
-  return NextResponse.json({ notes, nextCursor }, noCache)
+  return NextResponse.json({ notes }, noCache)
 }
 
 const NOTE_TYPES = ['note', 'todo', 'event'] as const
