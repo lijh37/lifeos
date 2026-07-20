@@ -14,16 +14,19 @@ export async function GET(req: NextRequest) {
   const summary = searchParams.get('summary') === 'true'
   const tag = searchParams.get('tag')
 
-  const cacheHeaders = { headers: { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=60' } }
+  // No HTTP caching: the list is private (auth-gated) and must reflect
+  // mutations (tag rename/delete, pin, batch ops) immediately. A stale
+  // cached response caused transient duplicate/missing tags after a rename.
+  const noCache = { headers: { 'Cache-Control': 'private, no-store' } }
 
   if (q) {
     const notes = await searchNotes(q, tag || undefined)
-    return NextResponse.json({ notes }, cacheHeaders)
+    return NextResponse.json({ notes }, noCache)
   }
 
   if (startDate && endDate) {
     const notes = await getNotesByDateRange(startDate, endDate, limit, offset)
-    return NextResponse.json({ notes }, cacheHeaders)
+    return NextResponse.json({ notes }, noCache)
   }
 
   const cursor = searchParams.get('cursor')
@@ -32,7 +35,7 @@ export async function GET(req: NextRequest) {
   const notes = result.notes
   const nextCursor = result.nextCursor
 
-  return NextResponse.json({ notes, nextCursor }, cacheHeaders)
+  return NextResponse.json({ notes, nextCursor }, noCache)
 }
 
 const NOTE_TYPES = ['note', 'todo', 'event'] as const

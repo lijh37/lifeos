@@ -76,6 +76,19 @@ export function NoteList() {
     }
   }, [setInitialLoading, setNotes])
 
+  // Re-fetch notes from the server after a tag mutation (rename/delete) so the
+  // list reflects the change authoritatively instead of relying solely on the
+  // optimistic Zustand patch, which can desync from the server.
+  const refreshNotes = useCallback(() => {
+    const params = new URLSearchParams()
+    params.set('limit', '500')
+    params.set('summary', 'true')
+    fetch(`/api/notes?${params}`)
+      .then(res => res.json())
+      .then(data => { if (Array.isArray(data.notes)) setNotes(data.notes) })
+      .catch(() => {})
+  }, [setNotes])
+
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -103,6 +116,13 @@ export function NoteList() {
       .then(data => setAvailableTags(data.tags || []))
       .catch(() => {})
   }, [])
+
+  // After a tag rename/delete, refresh both the tag filter bar and the note
+  // list from the server so they stay consistent.
+  const handleTagsChanged = useCallback(() => {
+    refreshAvailableTags()
+    refreshNotes()
+  }, [refreshAvailableTags, refreshNotes])
 
   useEffect(() => {
     refreshAvailableTags()
@@ -450,7 +470,7 @@ export function NoteList() {
         open={tagManagerOpen}
         onOpenChange={setTagManagerOpen}
         onTagSelect={handleTagSelect}
-        onTagsChanged={refreshAvailableTags}
+        onTagsChanged={handleTagsChanged}
       />
     </div>
   )
