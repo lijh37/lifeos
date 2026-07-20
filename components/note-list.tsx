@@ -83,10 +83,11 @@ export function NoteList() {
     const params = new URLSearchParams()
     params.set('limit', '500')
     params.set('summary', 'true')
-    fetch(`/api/notes?${params}`)
-      .then(res => res.json())
+    params.set('_t', Date.now().toString())
+    fetch(`/api/notes?${params}`, { cache: 'no-store' })
+      .then(res => { if (!res.ok) throw new Error(res.statusText); return res.json() })
       .then(data => { if (Array.isArray(data.notes)) setNotes(data.notes) })
-      .catch(() => {})
+      .catch(e => console.error('refreshNotes failed:', e))
   }, [setNotes])
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -111,10 +112,10 @@ export function NoteList() {
 
   // Fetch available tags for the filter bar (defined early because used by handleDelete)
   const refreshAvailableTags = useCallback(() => {
-    fetch('/api/tags')
-      .then(res => res.json())
+    fetch(`/api/tags?_t=${Date.now()}`, { cache: 'no-store' })
+      .then(res => { if (!res.ok) throw new Error(res.statusText); return res.json() })
       .then(data => setAvailableTags(data.tags || []))
-      .catch(() => {})
+      .catch(e => console.error('refreshAvailableTags failed:', e))
   }, [])
 
   // After a tag rename/delete, refresh both the tag filter bar and the note
