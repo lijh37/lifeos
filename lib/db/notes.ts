@@ -1,7 +1,6 @@
 import type { InValue } from '@libsql/client'
 import type { Note } from '../types'
 import { getClient } from './client'
-import { checkFts5 } from './fts5'
 import { syncNoteTags } from './tags'
 import { UNTAGGED } from '../types'
 
@@ -229,8 +228,8 @@ export async function getNote(id: string): Promise<Note | null> {
 }
 
 /**
- * 按关键词搜索笔记，优先使用 FTS5 全文索引，失败时回退到 LIKE 模糊匹配。
- * 支持标题和内容搜索，返回最多 50 条结果。
+ * 按关键词搜索笔记，使用 LIKE 模糊匹配标题与内容。
+ * 支持子串/数字搜索（如内容 "123" 可被 "2" 命中），返回最多 50 条结果。
  * @param query - 搜索关键词
  * @returns 匹配的笔记数组
  */
@@ -238,55 +237,6 @@ export async function searchNotes(query: string, tag?: string): Promise<Note[]> 
   const db = getClient()
   const term = `%${query}%`
 
-  // Try FTS5 first, fall back to LIKE
-  if (await checkFts5()) {
-    try {
-      // Build a safe FTS5 MATCH query: each whitespace-separated term is
-      // wrapped in double quotes so pure numbers / timestamps are treated as
-      // search tokens instead of column names. Internal double quotes are
-      // escaped by doubling (FTS5 string literal syntax).
-      const ftsQuery = query
-        .split(/\s+/)
-        .map((t) => t.trim())
-        .filter(Boolean)
-        .map((t) => `"${t.replace(/"/g, '""')}"`)
-        .join(' AND ')
-      if (!ftsQuery) return []
-
-      let sql: string
-      const sqlArgs: InValue[] = [ftsQuery]
-
-      if (tag === UNTAGGED) {
-        sql = `SELECT n.* FROM notes n
-               INNER JOIN notes_fts fts ON n.rowid = fts.rowid
-               LEFT JOIN note_tags nt ON n.id = nt.note_id
-               WHERE notes_fts MATCH ? AND nt.note_id IS NULL
-               ORDER BY rank LIMIT 50`
-      } else if (tag) {
-        sql = `SELECT n.* FROM notes n
-               INNER JOIN notes_fts fts ON n.rowid = fts.rowid
-               INNER JOIN note_tags nt ON n.id = nt.note_id
-               INNER JOIN tags t ON nt.tag_id = t.id
-               WHERE notes_fts MATCH ? AND t.name = ?
-               ORDER BY rank LIMIT 50`
-        sqlArgs.push(tag)
-      } else {
-        sql = `SELECT n.* FROM notes n
-               INNER JOIN notes_fts fts ON n.rowid = fts.rowid
-               WHERE notes_fts MATCH ?
-               ORDER BY rank LIMIT 50`
-      }
-
-      const result = await db.execute({ sql, args: sqlArgs })
-      if (result.rows.length > 0) {
-        const ids = result.rows.map(r => r.id as string)
-        const tagMap = await fetchTagsForNotes(ids)
-        return result.rows.map(row => rowToNote(row, tagMap.get(row.id as string) || []))
-      }
-    } catch (e) { console.warn('[fts5] 全文搜索查询失败，回退到 LIKE:', e) }
-  }
-
-  // Fallback: LIKE search
   let sql = `SELECT * FROM notes WHERE (content LIKE ? OR title LIKE ?)`
   const sqlArgs: InValue[] = [term, term]
 

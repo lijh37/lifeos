@@ -75,8 +75,7 @@ lib/                    # 核心逻辑
   ├── db/               # 数据库模块（通过 index.ts 重导出）
   │   ├── client.ts     # getClient() 单例连接管理（无 DDL，纯连接）
   │   ├── migrate.ts    # 迁移执行器（可编程 API，按版本执行 migrations/*.sql）
-  │   ├── fts5.ts       # 运行时 FTS5 可用性探测（checkFts5，缓存结果）
-  │   ├── notes.ts      # 笔记 CRUD + FTS5 搜索 + 游标/偏移分页 + 日期范围查询；updateNote 返回更新后的 Note；getNotes 系列不再按 type 过滤（Note.type 恒为 'note'）
+  │   ├── notes.ts      # 笔记 CRUD + LIKE 搜索 + 游标/偏移分页 + 日期范围查询；updateNote 返回更新后的 Note；getNotes 系列不再按 type 过滤（Note.type 恒为 'note'）
   │   ├── habits.ts     # 习惯 CRUD + 打卡 + streaks + 最佳记录 + 周/月统计 + getHabitsDashboard() 合并查询；computeCurrentStreak/computeBestStreak 为纯函数，dashboard 与 habits 路由共用（消除双份实现）
   │   ├── budgets.ts    # 预算 CRUD（upsert）
   │   ├── tags.ts       # 标签同步(syncNoteTags，可选 tx 参数支持外部事务) + getAllTags(含计数) + renameTag(合并) + deleteTag
@@ -84,8 +83,7 @@ lib/                    # 核心逻辑
   │   └── attachments.ts # 注意：另有 lib/attachments.ts 存放 ALLOWED_MIME_TYPES 白名单 + buildAcceptAttribute()，供服务端路由与客户端附件组件共用（避免 accept 与白名单漂移）
   │   └── index.ts      # 重导出（import from '@/lib/db'）
 migrations/             # 数据库迁移（纯 SQL，按编号版本化）
-  ├── 001_create_tables.sql
-  └── 002_add_fulltext_search.sql
+  └── 001_create_tables.sql
 scripts/                # 工具脚本
   └── migrate.ts        # 迁移 CLI（npm run migrate）
 lib/                    # 核心逻辑
@@ -119,8 +117,8 @@ public/
 
 ### 数据库
 
-使用 `@libsql/client` 直接操作，7 个表（支持置顶 `pinned` 字段）+ 1 个 FTS5 虚拟表：
-- `notes` — 笔记（含 FTS5 全文索引，3 个触发器同步）
+使用 `@libsql/client` 直接操作，7 个表（支持置顶 `pinned` 字段）：
+- `notes` — 笔记（搜索走 LIKE 模糊匹配标题与内容）
 - `budgets` — 月度预算（`month` 字段 UNIQUE）
 - `habits` + `habit_completions` — 习惯打卡（含 UNIQUE 索引防重复）
 - `attachments` — 笔记附件（外键 CASCADE 删除）
@@ -136,7 +134,6 @@ DDL 不放在应用代码中。迁移通过 `migrations/*.sql` 文件管理：
 - 测试中调用 `migrate(getClient())` 在 `beforeAll` 中显式建表
 - 每次迁移在一个事务中完成，失败自动回滚
 - `_migrations` 表追踪已执行的迁移及其校验和，防止篡改
-- FTS5 可用性由运行时 `checkFts5()` 探测，迁移失败时优雅降级到 LIKE 搜索
 
 ### UI 动效约定
 

@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
 
     let imported = 0
 
-    // Import notes (raw INSERT to avoid FTS5 trigger issues inside tx)
+    // Import notes (raw INSERT inside tx)
     for (const rawNote of data.notes) {
       const n = rawNote as Record<string, unknown>
       await tx.execute({
