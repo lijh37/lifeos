@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getNotes } from '@/lib/db'
-import { isAuthorized } from '@/lib/auth-guard'
 import type { Note } from '@/lib/types'
 
 function toBeijingTime(iso: string): string {
@@ -58,9 +57,6 @@ function notesToMarkdown(notes: Note[]): string {
 }
 
 export async function GET(req: NextRequest) {
-  if (!(await isAuthorized(req))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
   const notes = await getNotes(Number.MAX_SAFE_INTEGER)
 
   const content = notesToMarkdown(notes)

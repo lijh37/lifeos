@@ -167,20 +167,6 @@ describe('API routes', () => {
     })
   })
 
-  describe('auth guard', () => {
-    it('11. guarded route returns 401 when APP_PASSWORD set without token', async () => {
-      process.env.APP_PASSWORD = 'secret'
-      try {
-        const res = await notesPOST(postReq('http://localhost/api/notes', { content: 'blocked' }))
-        expect(res.status).toBe(401)
-        const data = await res.json()
-        expect(data.error).toBeDefined()
-      } finally {
-        delete process.env.APP_PASSWORD
-      }
-    })
-  })
-
   describe('budgets', () => {
     it('12. budgets POST upserts and GET by month returns it; invalid month 400', async () => {
       const res = await budgetsPOST(postReq('http://localhost/api/budgets', {

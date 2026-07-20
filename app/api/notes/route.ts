@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createNote, deleteNote, searchNotes, getNotesByDateRange, getNotes } from '@/lib/db'
-import { isAuthorized } from '@/lib/auth-guard'
 import type { Note } from '@/lib/types'
 
 export async function GET(req: NextRequest) {
@@ -36,9 +35,6 @@ export async function GET(req: NextRequest) {
 const NOTE_TYPES = ['note', 'todo', 'event'] as const
 
 export async function POST(req: NextRequest) {
-  if (!(await isAuthorized(req))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
   const body = await req.json()
 
   // Validate inputs — reject anything that isn't the expected shape.
@@ -76,9 +72,6 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!(await isAuthorized(req))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })

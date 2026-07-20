@@ -21,7 +21,6 @@ import { UNTAGGED } from '@/lib/types'
 import { useAppStore } from '@/store'
 import { toast } from 'sonner'
 import { NoteCard } from '@/components/note-card'
-import { VirtualNoteList } from '@/components/virtual-note-list'
 
 const TagManagerSheet = dynamic(() => import('@/components/tag-manager-sheet').then(mod => ({ default: mod.TagManagerSheet })), {
   loading: () => null,
@@ -44,10 +43,6 @@ export function NoteList() {
   const setInitialLoading = useAppStore((s) => s.setInitialLoading)
   const removeNote = useAppStore((s) => s.removeNote)
   const updateNote = useAppStore((s) => s.updateNote)
-  const [mounted, setMounted] = useState(false)
-  // Wait for mount so VirtualNoteList gets a valid scrollRef
-  useEffect(() => { setMounted(true) }, [])
-
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Note[] | null>(null)
   const [searchLoading, setSearchLoading] = useState(false)
@@ -89,8 +84,6 @@ export function NoteList() {
       .then(data => { if (Array.isArray(data.notes)) setNotes(data.notes) })
       .catch(e => console.error('refreshNotes failed:', e))
   }, [setNotes])
-
-  const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     // If we have cached notes from a previous session, show them immediately
@@ -401,7 +394,7 @@ export function NoteList() {
         </button>
       </div>
 
-      <div ref={scrollRef} className="flex-1 p-4 pb-20">
+      <div className="flex-1 p-4 pb-20">
         {initialLoading && notes.length === 0 ? (
           <SkeletonNoteList count={5} />
         ) : displayNotes.length === 0 ? (
@@ -427,32 +420,18 @@ export function NoteList() {
                 {selectedIds.size > 0 ? `已选 ${selectedIds.size} 项` : `${displayNotes.length} 项`}
               </span>
             </div>
-            {displayNotes.length > 500 && mounted ? (
-              <VirtualNoteList
-                notes={displayNotes}
+            <div className="space-y-1.5">
+              {displayNotes.map((note) => <NoteCard
+                key={note.id}
+                note={note}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onTogglePin={handleTogglePin}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
                 onSelectTag={handleTagSelect}
-                scrollRef={scrollRef}
-              />
-            ) : (
-              <div className="space-y-1.5">
-                {displayNotes.map((note, index) => <NoteCard
-                  key={note.id}
-                  note={note}
-                  enablePrefetch={index < 20}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onTogglePin={handleTogglePin}
-                  selectedIds={selectedIds}
-                  onToggleSelect={toggleSelect}
-                  onSelectTag={handleTagSelect}
-                />)}
-              </div>
-            )}
+              />)}
+            </div>
 
           </>
         )}

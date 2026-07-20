@@ -153,7 +153,7 @@ function HabitsPageInner() {
         </div>
 
         {showInput && (
-          <div className="mt-2 flex gap-2 animate-slide-up">
+          <div className="mt-2 flex gap-2">
             <input
               autoFocus
               value={newName}
@@ -177,7 +177,7 @@ function HabitsPageInner() {
           </div>
         ) : (
           <div className="space-y-4 p-4">
-            <div className="animate-stagger space-y-2">
+            <div className="space-y-2">
               {habits.map((habit) => {
                 const done = todayMap[habit.id] ?? false
                 const isEditing = editingId === habit.id

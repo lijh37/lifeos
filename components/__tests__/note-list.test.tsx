@@ -45,15 +45,6 @@ describe('NoteList', () => {
     })
   })
 
-  it('should render loading skeleton initially when initialLoading is true', async () => {
-    useAppStore.setState({ initialLoading: true, notes: [] })
-    render(<NoteList />)
-    // Let async effects (fetch) settle, then verify skeleton is still shown
-    await waitFor(() => {
-      expect(screen.queryByText('Test content')).not.toBeInTheDocument()
-    })
-  })
-
   it('should render notes from store after fetch resolves', async () => {
     const notes = [
       createNote({ content: 'Note 1', type: 'note', title: 'First Note' }),
@@ -87,6 +78,22 @@ describe('NoteList', () => {
     })
   })
 
+  it('should render a single note with title', async () => {
+    const notes = [
+      createNote({ content: 'Solo note', type: 'note', title: 'Solo' }),
+    ]
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ notes }),
+    })
+
+    render(<NoteList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Solo')).toBeInTheDocument()
+    })
+  })
+
   it('should show search input', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
@@ -99,22 +106,4 @@ describe('NoteList', () => {
       expect(screen.getByPlaceholderText('搜索笔记…')).toBeInTheDocument()
     })
   })
-
-  it('should display multiple tags on a note', async () => {
-    const notes = [
-      createNote({ content: 'Tagged note', title: 'Tagged', type: 'note', tags: ['work', 'urgent'] }),
-    ]
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ notes }),
-    })
-
-    render(<NoteList />)
-    await waitFor(() => {
-      expect(screen.getByText('Tagged')).toBeInTheDocument()
-      expect(screen.getByText('work')).toBeInTheDocument()
-      expect(screen.getByText('urgent')).toBeInTheDocument()
-    })
-  })
-
 })

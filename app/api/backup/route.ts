@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getNotes, getBudgets, getHabits } from '@/lib/db'
 import { getClient } from '@/lib/db/client'
-import { isAuthorized } from '@/lib/auth-guard'
 
 interface BackupFile {
   version: string
@@ -55,9 +54,6 @@ function validateBackup(data: BackupFile): string | null {
 }
 
 export async function GET(req: NextRequest) {
-  if (!(await isAuthorized(req))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
   const [notes, budgets, habits] = await Promise.all([
     getNotes(Number.MAX_SAFE_INTEGER),
     getBudgets(),
@@ -95,9 +91,6 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!(await isAuthorized(req))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
   let data: BackupFile
   try {
     data = await req.json()

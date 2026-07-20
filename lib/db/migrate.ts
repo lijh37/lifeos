@@ -1,7 +1,6 @@
 import type { Client } from '@libsql/client'
 import fs from 'fs'
 import path from 'path'
-import crypto from 'crypto'
 
 /**
  * 将 SQL 文本拆分为单条语句。
@@ -51,13 +50,6 @@ function splitStatements(sql: string): string[] {
 }
 
 /**
- * 计算 SQL 内容的简短校验和，用于检测迁移文件是否被篡改。
- */
-function checksum(content: string): string {
-  return crypto.createHash('sha256').update(content, 'utf-8').digest('hex').slice(0, 12)
-}
-
-/**
  * 对指定数据库执行所有待处理的迁移：
  * 1. 创建 `_migrations` 追踪表（如果不存在）
  * 2. 扫描 `migrations/` 目录的 `.sql` 文件（按文件名排序）
@@ -74,16 +66,15 @@ export async function migrate(db: Client): Promise<void> {
     CREATE TABLE IF NOT EXISTS _migrations (
       version INTEGER PRIMARY KEY,
       name TEXT NOT NULL,
-      checksum TEXT NOT NULL,
       applied_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `)
 
   // 读取已应用的迁移
-  const applied = await db.execute('SELECT version, checksum FROM _migrations ORDER BY version')
-  const appliedMap = new Map<number, string>()
+  const applied = await db.execute('SELECT version FROM _migrations ORDER BY version')
+  const appliedSet = new Set<number>()
   for (const row of applied.rows) {
-    appliedMap.set(Number(row.version), String(row.checksum))
+    appliedSet.add(Number(row.version))
   }
 
   // 扫描迁移文件
@@ -109,19 +100,9 @@ export async function migrate(db: Client): Promise<void> {
       continue
     }
 
-    const sql = fs.readFileSync(path.join(dir, file), 'utf-8')
-    const cksum = checksum(sql)
+    if (appliedSet.has(version)) continue
 
-    if (appliedMap.has(version)) {
-      // 已应用的迁移：校验和需一致
-      if (appliedMap.get(version) !== cksum) {
-        throw new Error(
-          `[migrate] 迁移 ${file} (v${version}) 已被修改！` +
-          `原校验和: ${appliedMap.get(version)}, 当前: ${cksum}`
-        )
-      }
-      continue
-    }
+    const sql = fs.readFileSync(path.join(dir, file), 'utf-8')
 
     // 执行迁移
     const statements = splitStatements(sql)
@@ -139,8 +120,8 @@ export async function migrate(db: Client): Promise<void> {
       try {
         for (const stmt of statements) await tx.execute(stmt)
         await tx.execute({
-          sql: 'INSERT INTO _migrations (version, name, checksum) VALUES (?, ?, ?)',
-          args: [version, file, cksum],
+          sql: 'INSERT INTO _migrations (version, name) VALUES (?, ?)',
+          args: [version, file],
         })
         await tx.commit()
         console.log(`[migrate]   ✓ ${file}`)
@@ -153,8 +134,8 @@ export async function migrate(db: Client): Promise<void> {
       try {
         for (const stmt of statements) await db.execute(stmt)
         await db.execute({
-          sql: 'INSERT INTO _migrations (version, name, checksum) VALUES (?, ?, ?)',
-          args: [version, file, cksum],
+          sql: 'INSERT INTO _migrations (version, name) VALUES (?, ?)',
+          args: [version, file],
         })
         console.log(`[migrate]   ✓ ${file}`)
       } catch (err) {

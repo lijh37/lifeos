@@ -4,7 +4,6 @@ import {
   getHabitsDashboard, toggleCompletion,
 } from '@/lib/db'
 import type { Habit } from '@/lib/types'
-import { isAuthorized } from '@/lib/auth-guard'
 
 export async function GET() {
   const dashboard = await getHabitsDashboard()
@@ -12,9 +11,6 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  if (!(await isAuthorized(req))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
   const body = await req.json()
   if (body._action === 'toggle') {
     // Toggle completion state via shared DB helper
@@ -56,9 +52,6 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!(await isAuthorized(req))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
   const body = await req.json()
   const { id, name, description } = body
   if (!id || !name?.trim()) {
@@ -69,9 +62,6 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!(await isAuthorized(req))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })

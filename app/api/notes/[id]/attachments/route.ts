@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAttachment, getAttachmentsByNoteId, deleteAttachment, getAttachment } from '@/lib/db'
 import { getStorageDriver } from '@/lib/storage'
-import { isAuthorized } from '@/lib/auth-guard'
 import { formatFileSize } from '@/lib/utils'
 import { ALLOWED_MIME_TYPES } from '@/lib/attachments'
 
@@ -42,9 +41,6 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await isAuthorized(req))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
   const { id: noteId } = await params
 
   let formData: FormData
@@ -113,9 +109,6 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await isAuthorized(req))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
   const { id: noteId } = await params
   const { searchParams } = new URL(req.url)
   const attachmentId = searchParams.get('attachmentId')

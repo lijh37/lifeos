@@ -45,7 +45,7 @@ export const HabitRow = memo(function HabitRow({
   onEditCancel,
 }: HabitRowProps) {
   return (
-    <Card className="card-hover">
+    <Card>
       <CardContent className="flex items-center gap-3 p-3">
         <button onClick={() => onToggle(habit.id, today)} className="shrink-0">
           {done ? (

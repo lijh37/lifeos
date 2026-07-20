@@ -1,7 +1,6 @@
 'use client'
 
 import { memo } from 'react'
-import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { CheckSquare, Square, Pin, PinOff } from 'lucide-react'
@@ -11,7 +10,7 @@ import { cn } from '@/lib/utils'
 import { formatNoteDate } from '@/components/format-note-date'
 
 const NoteCard = memo(function NoteCard({
-  note, onEdit, onDelete, onTogglePin, selectedIds, onToggleSelect, onSelectTag, enablePrefetch = true,
+  note, onEdit, onDelete, onTogglePin, selectedIds, onToggleSelect, onSelectTag,
 }: {
   note: Note
   onEdit: (note: Note) => void
@@ -20,19 +19,13 @@ const NoteCard = memo(function NoteCard({
   selectedIds?: Set<string>
   onToggleSelect?: (id: string) => void
   onSelectTag?: (tag: string) => void
-  enablePrefetch?: boolean
 }) {
   const isSelected = selectedIds?.has(note.id) ?? false
-  const router = useRouter()
 
   return (
     <Card
-      onPointerEnter={() => {
-        if (enablePrefetch) router.prefetch(`/notes/${note.id}`)
-      }}
       size="sm"
       className={cn(
-        'card-hover',
         note.done && 'opacity-50',
         isSelected && 'ring-2 ring-primary/50',
       )}

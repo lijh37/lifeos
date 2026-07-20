@@ -1,22 +1,6 @@
 import { NextResponse } from 'next/server'
 import { deriveToken } from '@/lib/auth-token'
 
-// In-memory fixed-window rate limiter keyed by client IP.
-// NOTE: state is per-process only; it won't be shared across serverless
-// instances. Acceptable for a single-instance personal app.
-const MAX_ATTEMPTS = 10
-const WINDOW_MS = 5 * 60 * 1000
-const rateBuckets = new Map<string, { count: number; resetAt: number }>()
-
-function getClientIp(req: Request): string {
-  const forwarded = req.headers.get('x-forwarded-for')
-  if (forwarded) {
-    // x-forwarded-for may be a comma-separated list; take the first hop.
-    return forwarded.split(',')[0]!.trim()
-  }
-  return req.headers.get('x-real-ip') || 'unknown'
-}
-
 export async function POST(req: Request) {
   const { password } = await req.json()
   const expected = process.env.APP_PASSWORD
@@ -25,30 +9,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true })
   }
 
-  const clientIp = getClientIp(req)
-  const bucket = rateBuckets.get(clientIp)
-  if (bucket && Date.now() < bucket.resetAt && bucket.count >= MAX_ATTEMPTS) {
-    return NextResponse.json(
-      { error: '尝试次数过多，请稍后再试' },
-      { status: 429, headers: { 'Retry-After': '300' } }
-    )
-  }
-
   // Constant-time compare of the submitted password.
-  const ok = timingSafeEqual(password, expected)
-  if (!ok) {
-    const now = Date.now()
-    const existing = rateBuckets.get(clientIp)
-    if (!existing || now >= existing.resetAt) {
-      rateBuckets.set(clientIp, { count: 1, resetAt: now + WINDOW_MS })
-    } else {
-      existing.count++
-    }
+  if (!timingSafeEqual(password, expected)) {
     return NextResponse.json({ ok: false }, { status: 401 })
   }
-
-  // Successful login clears any penalty for this IP.
-  rateBuckets.delete(clientIp)
 
   const token = await deriveToken()
   const res = NextResponse.json({ ok: true })

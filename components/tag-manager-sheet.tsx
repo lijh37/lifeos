@@ -141,7 +141,7 @@ export function TagManagerSheet({ open, onOpenChange, onTagSelect, onTagsChanged
           ) : (
             <div className="space-y-1 p-4">
               {tags.map(tag => (
-                <Card key={tag.name} className="card-hover">
+                <Card key={tag.name}>
                   <CardContent className="flex items-center gap-3 p-3">
                     {editing === tag.name ? (
                       <div className="flex flex-1 items-center gap-2">
