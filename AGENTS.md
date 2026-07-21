@@ -30,7 +30,7 @@ app/                  # Next.js App Router 页面和 API
   │   ├── route.ts    # 列表（搜索+游标分页+标签筛选+摘要模式）
   │   ├── [id]/       # 单条笔记操作
   │   │   ├── route.ts
-  │   │   └── attachments/   # 附件上传/列表/删除（存储驱动抽象，10MB 限制，MIME 白名单见 lib/attachments.ts；SVG 已禁用以防存储型 XSS）
+  │   │   └── attachments/   # 附件上传/列表/删除（存储驱动抽象，10MB 文件大小限制）
   │   │       └── route.ts
   │   └── batch/      # 批量操作（事务性删除/加标签；删除走 FK CASCADE，加标签复用 syncNoteTags(tx)）
   │       └── route.ts
@@ -67,8 +67,7 @@ components/             # React 组件
   ├── format-note-date.ts # 日期格式化工具（中文相对时间："刚刚、X分钟前、昨天...")
   ├── error-boundary.tsx # React Error Boundary（含重试按钮）
   ├── pwa-handler.tsx   # PWA 处理（memo，注册 Service Worker + 离线黄色横幅；安装引导已移除）
-  ├── page-animation.tsx # 页面过渡动效（useSelectedLayoutSegment key 驱动 fadeIn）
-  └── skeleton-card.tsx # 骨架屏（SkeletonNoteList / SkeletonHabits）
+  └── page-animation.tsx # 页面过渡动效（useSelectedLayoutSegment key 驱动 fadeIn）
 lib/                    # 核心逻辑
   ├── db/               # 数据库模块（通过 index.ts 重导出）
   │   ├── client.ts     # getClient() 单例连接管理（无 DDL，纯连接）
@@ -78,12 +77,11 @@ lib/                    # 核心逻辑
   │   ├── budgets.ts    # 预算 CRUD（upsert）
   │   ├── tags.ts       # 标签同步(syncNoteTags，可选 tx 参数支持外部事务) + getAllTags(含计数) + renameTag(合并) + deleteTag
   │   ├── attachments.ts # 附件 CRUD（createAttachment / getAttachmentsByNoteId / deleteAttachment）
-  │   └── attachments.ts # 注意：另有 lib/attachments.ts 存放 ALLOWED_MIME_TYPES 白名单 + buildAcceptAttribute()，供服务端路由与客户端附件组件共用（避免 accept 与白名单漂移）
   │   └── index.ts      # 重导出（import from '@/lib/db'）
 migrations/             # 数据库迁移（纯 SQL，按编号版本化）
   └── 001_create_tables.sql
 scripts/                # 工具脚本
-  └── migrate.ts        # 迁移 CLI（npm run migrate）
+  └── migrate.ts        # 迁移 CLI（npm run migrate / --dry-run / --reset）
 lib/                    # 核心逻辑
   ├── types.ts          # TypeScript 类型（Note/Budget/Habit/Attachment）
   ├── markdown.tsx      # MarkdownRenderer（react-markdown + Tailwind 样式）
@@ -129,6 +127,7 @@ DDL 不放在应用代码中。迁移通过 `migrations/*.sql` 文件管理：
 
 - `npm run migrate` — 执行待处理迁移（连接由环境变量 `TURSO_DATABASE_URL` 或 `DATABASE_URL` 决定）
 - `npm run migrate:dry` — 仅列出待执行迁移
+- `npm run migrate -- --reset` — 清空所有表后重新迁移（开发时改 schema 后一键重置）
 - 测试中调用 `migrate(getClient())` 在 `beforeAll` 中显式建表
 - 每次迁移在一个事务中完成，失败自动回滚
 - `_migrations` 表追踪已执行的迁移
@@ -136,7 +135,7 @@ DDL 不放在应用代码中。迁移通过 `migrations/*.sql` 文件管理：
 ### UI 动效约定
 
 - 页面过渡：`PageAnimation` 组件包裹 `animate-fade-in` 实现淡入
-- 骨架屏：使用 `SkeletonNoteList` / `SkeletonHabits` 替代手动 Loader2
+- 加载中状态：各页面直接内联 `skeleton-pulse` class div，无需独立骨架屏组件
 - 全局 CSS 动画定义于 `app/globals.css`（fadeIn / skeleton-pulse）
 
 ### UI 组件库

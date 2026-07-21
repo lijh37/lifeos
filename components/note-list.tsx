@@ -15,7 +15,6 @@ import {
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { Input } from '@/components/ui/input'
-import { SkeletonNoteList } from '@/components/skeleton-card'
 import type { Note } from '@/lib/types'
 import { UNTAGGED } from '@/lib/types'
 import { useAppStore } from '@/store'
@@ -280,20 +279,15 @@ export function NoteList() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'tag', ids, tag }),
       })
-      ids.forEach(id => {
-        const note = notes.find(n => n.id === id)
-        if (note && !note.tags.includes(tag)) {
-          updateNote(id, { tags: [...note.tags, tag] })
-        }
-      })
       clearSelection()
       refreshAvailableTags()
+      fetchNotes()
       toast.success(`已添加标签「${tag}」`)
     } catch (e) {
       console.error('Batch tag failed:', e)
       toast.error('批量打标签失败，请重试')
     }
-  }, [notes, updateNote, clearSelection, selectedIds, refreshAvailableTags])
+  }, [clearSelection, selectedIds, refreshAvailableTags, fetchNotes])
 
   const handleTogglePin = useCallback(async (note: Note) => {
     const newPinned = !note.pinned
@@ -396,7 +390,17 @@ export function NoteList() {
 
       <div className="flex-1 p-4 pb-20">
         {initialLoading && notes.length === 0 ? (
-          <SkeletonNoteList count={5} />
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 rounded-lg border p-3">
+                <div className="h-9 w-9 shrink-0 rounded-full skeleton-pulse" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="h-4 w-2/3 rounded skeleton-pulse" />
+                  <div className="h-3 w-1/3 rounded skeleton-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : displayNotes.length === 0 ? (
           <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
             {searchLoading ? (

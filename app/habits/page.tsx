@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { Plus, Trophy } from 'lucide-react'
-import { SkeletonHabits } from '@/components/skeleton-card'
+
 import { HabitRow } from '@/components/habit-row'
 import type { Habit } from '@/lib/types'
 import {
@@ -169,7 +169,17 @@ function HabitsPageInner() {
 
       <ScrollArea className="flex-1">
         {loading ? (
-          <SkeletonHabits count={4} />
+          <div className="space-y-2 p-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 rounded-lg border p-3">
+                <div className="h-6 w-6 shrink-0 rounded-full skeleton-pulse" />
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="h-4 w-1/2 rounded skeleton-pulse" />
+                  <div className="h-3 w-1/4 rounded skeleton-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : habits.length === 0 ? (
           <div className="flex h-48 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
             <Trophy className="h-10 w-10 text-muted-foreground/50" />

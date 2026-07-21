@@ -2,17 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAttachment, getAttachmentsByNoteId, deleteAttachment, getAttachment } from '@/lib/db'
 import { getStorageDriver } from '@/lib/storage'
 import { formatFileSize } from '@/lib/utils'
-import { ALLOWED_MIME_TYPES } from '@/lib/attachments'
 
 export const runtime = 'nodejs'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
-
-function isAllowedMime(mime: string): boolean {
-  // 仅允许白名单中显式列出的类型，不再信任 image/* 前缀，
-  // 防止客户端伪造 file.type 上传 image/svg+xml 等可执行子类型（存储型 XSS）。
-  return ALLOWED_MIME_TYPES.has(mime)
-}
 
 /**
  * 判断 FormDataEntryValue 是否为文件（而非文本字段）。
@@ -74,25 +67,16 @@ export async function POST(
     )
   }
 
-  // MIME 类型检查
-  const mimeType = file.type || 'application/octet-stream'
-  if (!isAllowedMime(mimeType)) {
-    return NextResponse.json(
-      { error: `不支持的文件类型（${mimeType}）` },
-      { status: 415 }
-    )
-  }
-
   // 上传到存储后端（Vercel Blob 或本地磁盘，由 STORAGE_DRIVER 决定）
   try {
-    const { url } = await getStorageDriver().save(file, mimeType)
+    const { url } = await getStorageDriver().save(file, file.type || 'application/octet-stream')
 
     // 创建数据库记录（使用存储后端返回的 URL）
     const attachment = await createAttachment({
       noteId,
       filename: file.name,
       url,
-      mimeType,
+      mimeType: file.type || 'application/octet-stream',
       fileSize: file.size,
     })
 

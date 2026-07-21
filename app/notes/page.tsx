@@ -1,7 +1,6 @@
 import { Suspense } from 'react'
 import { NoteList } from '@/components/note-list'
 import { ErrorBoundary } from '@/components/error-boundary'
-import { SkeletonNoteList } from '@/components/skeleton-card'
 
 function NotesPageSkeleton() {
   return (
@@ -18,8 +17,16 @@ function NotesPageSkeleton() {
         </div>
       </div>
       {/* List skeleton */}
-      <div className="flex-1 p-4">
-        <SkeletonNoteList count={6} />
+      <div className="flex-1 space-y-2 p-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 rounded-lg border p-3">
+            <div className="h-9 w-9 shrink-0 rounded-full skeleton-pulse" />
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <div className="h-4 w-2/3 rounded skeleton-pulse" />
+              <div className="h-3 w-1/3 rounded skeleton-pulse" />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )

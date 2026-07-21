@@ -4,6 +4,7 @@
  * 用法：
  *   npx tsx scripts/migrate.ts              # 执行所有待处理迁移
  *   npx tsx scripts/migrate.ts --dry-run    # 仅列出待执行迁移，不实际运行
+ *   npx tsx scripts/migrate.ts --reset      # 清空所有表再重新迁移（开发用）
  *
  * 环境变量：（与运行时 getClient() 规则一致）
  *   TURSO_DATABASE_URL (+ TURSO_AUTH_TOKEN) — 生产环境 Turso 远程库
@@ -33,6 +34,19 @@ loadEnvFile('.env.local')
 loadEnvFile('.env')
 
 const DRY_RUN = process.argv.includes('--dry-run')
+const RESET = process.argv.includes('--reset')
+
+// FK 安全的删表顺序：子表（有外键指向父表的）先删
+const DROP_TABLES = [
+  'DROP TABLE IF EXISTS note_tags;',
+  'DROP TABLE IF EXISTS habit_completions;',
+  'DROP TABLE IF EXISTS attachments;',
+  'DROP TABLE IF EXISTS tags;',
+  'DROP TABLE IF EXISTS habits;',
+  'DROP TABLE IF EXISTS budgets;',
+  'DROP TABLE IF EXISTS notes;',
+  'DROP TABLE IF EXISTS _migrations;',
+]
 
 async function main() {
   const tursoUrl = process.env.TURSO_DATABASE_URL
@@ -46,7 +60,7 @@ async function main() {
 
   const authToken = process.env.TURSO_AUTH_TOKEN
 
-  // 本地 SQLite 文件：先确保父目录存在（libsql 不会自动创建父目录，否则报 SQLITE_CANTOPEN(14)）
+  // 本地 SQLite 文件：先确保父目录存在
   if (!tursoUrl && url.startsWith('file:')) {
     const filePath = url.slice('file:'.length).replace(/^\.\//, '')
     const dir = filePath.includes('/') ? filePath.slice(0, filePath.lastIndexOf('/')) : ''
@@ -94,6 +108,28 @@ async function main() {
         for (const f of pending) console.log(`   ${f}`)
       }
       return
+    }
+
+    if (RESET) {
+      console.log('⚠️  清空所有表，所有数据将丢失...')
+      const isRemote = !!process.env.TURSO_DATABASE_URL
+
+      if (isRemote) {
+        const tx = await db.transaction()
+        try {
+          for (const stmt of DROP_TABLES) await tx.execute(stmt)
+          await tx.commit()
+        } catch (err) {
+          await tx.rollback().catch(() => {})
+          throw err
+        }
+      } else {
+        // SQLite：PRAGMA foreign_keys 可能导致 DROP 顺序出问题，临时禁用
+        await db.execute('PRAGMA foreign_keys = OFF')
+        for (const stmt of DROP_TABLES) await db.execute(stmt)
+        await db.execute('PRAGMA foreign_keys = ON')
+      }
+      console.log('🗑️  已清空所有表')
     }
 
     await migrate(db)

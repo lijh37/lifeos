@@ -2,50 +2,23 @@ import type { Client } from '@libsql/client'
 import fs from 'fs'
 import path from 'path'
 
-/**
- * 将 SQL 文本拆分为单条语句。
- * 处理 BEGIN…END 块（触发器），避免在块内部分割。
- */
+/** 将 SQL 文本按分号拆分为单条语句。 */
 function splitStatements(sql: string): string[] {
   const stmts: string[] = []
   let buf = ''
-  let inBlock = false
 
   for (const line of sql.split('\n')) {
     const trimmed = line.trim()
-
-    // 跳过空行和注释
-    if (trimmed === '' || trimmed.startsWith('--')) {
-      // 但在块内时保留空行（保持语法完整）
-      if (inBlock) buf += line + '\n'
-      continue
-    }
-
+    if (trimmed === '' || trimmed.startsWith('--')) continue
     buf += line + '\n'
-
-    // 检测 BEGIN（看作块开始）
-    if (!inBlock && /BEGIN\s*$/i.test(trimmed)) {
-      inBlock = true
-    }
-
-    // 检测块结束（END 后跟可选分号）
-    if (inBlock && /^END\s*;?\s*$/i.test(trimmed)) {
-      inBlock = false
-    }
-
-    // 非块内且以分号结束 → 一条完整语句
-    if (!inBlock && trimmed.endsWith(';')) {
+    if (trimmed.endsWith(';')) {
       stmts.push(buf.trim())
       buf = ''
     }
   }
 
-  // 文件末尾无分号的尾部内容（可能不完整，但留作容错）
   const remaining = buf.trim()
-  if (remaining) {
-    stmts.push(remaining)
-  }
-
+  if (remaining) stmts.push(remaining)
   return stmts
 }
 

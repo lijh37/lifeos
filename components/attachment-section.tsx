@@ -13,16 +13,12 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn, formatFileSize } from '@/lib/utils'
-import { buildAcceptAttribute } from '@/lib/attachments'
 import type { Attachment } from '@/lib/types'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB，与服务端一致
 const UPLOAD_TIMEOUT = 60000 // 60s 超时
-
-// 由服务端白名单派生，保证文件选择器与服务端接受的类型永远一致。
-const ACCEPT_ATTRIBUTE = buildAcceptAttribute()
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -246,7 +242,6 @@ export function AttachmentSection({ noteId }: AttachmentSectionProps) {
             multiple
             className="hidden"
             onChange={handleFileChange}
-            accept={ACCEPT_ATTRIBUTE}
           />
 
           {/* Attachment list */}
