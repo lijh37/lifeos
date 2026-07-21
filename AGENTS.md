@@ -1,253 +1,406 @@
-<!-- LifeOS - 生活助手 -->
+# LifeOS — 技术参考
 
-# 项目概况
+> 面向 AI Agent 的完整项目技术文档。AI 只需读此一份即可理解项目。
 
-LifeOS 是一个个人生活助手应用。支持笔记管理、预算规划和习惯养成。
+## 项目概述
 
-## 技术栈
+LifeOS 是个人生活助手 PWA，支持笔记管理、预算规划、习惯养成。
 
-- **框架**：Next.js 16 (App Router), TypeScript
-- **UI 组件**：Tailwind CSS v4 + shadcn/ui (`base-nova` 风格，底层使用 `@base-ui/react` 而非 Radix)
-- **数据库**：`@libsql/client`（libSQL；主生产用本地 SQLite 文件，备用生产用 Turso 云端）
-- **状态管理**：Zustand v5（客户端状态，仅缓存笔记列表）
-- **日期处理**：date-fns v4
-- **图标**：lucide-react
-- **文件存储**：`lib/storage.ts` 附件上传（本地磁盘存储）
-- **通知**：`sonner`（Toast 消息）
-- **动画**：`tw-animate-css`（CSS 动画工具）
-- **Markdown**：`react-markdown` + `rehype-sanitize` + `remark-gfm` + `remark-breaks`
-- **工具函数**：`tailwind-merge` + `clsx`（`cn()` 合并 Tailwind 类）
+- **定位**: 单用户、自托管优先、无外部服务依赖
+- **架构**: Next.js 16 App Router 单体（SSR + API Routes 同仓）
+- **认证**: 无状态 HMAC（`crypto.subtle.sign`），无 session store
+- **数据库**: `@libsql/client` 双模（本地 SQLite / 远程 Turso），`getClient()` 单例切换
+- **存储**: 驱动抽象（Vercel Blob / 本地磁盘），`STORAGE_DRIVER` 切换
+- **部署**: 双生产环境（阿里云 ECS Docker + Vercel 备用），数据独立
 
 ## 目录结构
 
 ```
-app/                  # Next.js App Router 页面和 API
-  ├── favicon.ico     # 网站图标
-   ├── globals.css     # Tailwind + CSS 变量 + 自定义动画（fadeIn/skeleton-pulse）
-  ├── layout.tsx      # 根布局（Sidebar + MobileNav + PwaHandler + PageAnimation + RouteLoadingBar + Toaster）
-  ├── page.tsx        # 首页（重定向到 /notes）
-  ├── api/notes/      # 笔记 CRUD 接口
-  │   ├── route.ts    # 列表（搜索+游标分页+标签筛选+摘要模式）
-  │   ├── [id]/       # 单条笔记操作
-  │   │   ├── route.ts
-  │   │   └── attachments/   # 附件上传/列表/删除（存储驱动抽象，10MB 文件大小限制）
-  │   │       └── route.ts
-  │   └── batch/      # 批量操作（事务性删除/加标签；删除走 FK CASCADE，加标签复用 syncNoteTags(tx)）
-  │       └── route.ts
-  ├── api/budgets/    # 预算 CRUD（upsert）
-  ├── api/habits/     # 习惯 CRUD + 打卡 + streaks + 趋势 + 统计（toggle 复用 toggleCompletion + getHabitsDashboard 合并查询）
-  ├── api/backup/     # 备份导出/恢复 JSON（恢复前 validateBackup 校验，非法返回 400；FK 安全顺序清空/导入，含 attachments 表，避免恢复后孤儿附件）
-  ├── api/tags/       # 标签列表/重命名/删除
-  ├── api/export/     # 导出全部笔记为 Markdown 文件
-  ├── api/auth/       # 密码验证（cookie 30 天）
-  ├── notes/          # 笔记列表页（批量选择+搜索+置顶+无限滚动+标签筛选）
-  │   ├── page.tsx    # 服务端组件 + Suspense + NotesPageSkeleton 骨架屏
-  │   └── [id]/       # 笔记详情页
-  │       ├── page.tsx    # 服务端组件
-  │       ├── note-detail-client.tsx # 客户端交互（编辑器 + 标签 + 附件 + 删除）
-  │       └── loading.tsx # 详情页加载骨架屏
-  ├── expenses/       # 月度预算页（BudgetForm + BudgetCard 对比展示）
-  ├── habits/         # 习惯页面（打卡+趋势+统计，内联编辑）
-  ├── settings/       # 备份与恢复
-  └── login/          # 登录页
-components/             # React 组件
-  ├── ui/               # `@base-ui/react` 基础组件（alert-dialog/badge/button/card/input/scroll-area/sheet/textarea/checkbox）
-  ├── note-list.tsx     # 笔记列表（批量操作 + 搜索 + 置顶 + 按标签筛选 + 无限滚动，TagManagerSheet/BatchActionsBar 使用 next/dynamic）
-  ├── note-card.tsx     # 单条笔记卡片（memo，标题/摘要/标签/日期/置顶/选择）
-  ├── batch-actions-bar.tsx # 批量操作栏（删除/加标签 AlertDialog 确认）
-  ├── tag-manager-sheet.tsx # 标签管理 Sheet（列表/内联重命名/删除/点击筛选）
-  ├── attachment-section.tsx # 附件区（拖拽上传/缩略图/文件类型图标/乐观删除）
-  ├── markdown-editor.tsx # Markdown 编辑器（memo，分栏/编辑/预览三模式切换 + 6 工具栏 + 500ms 自动保存）
-  ├── sidebar.tsx       # 导航（PC 侧栏 + 手机底部栏，4 项导航使用 lib/navigation）
-  ├── budget-card.tsx   # 预算卡片（memo，月度汇总/超额提示/完成标记）
-  ├── budget-form.tsx   # 预算表单（memo，固定+可变预算输入/实时合计/¥ 前缀）
-  ├── progress-bar.tsx  # 进度条（memo，三色：绿/<85% 橙/85-100% 红/超额）
-  ├── habit-row.tsx     # 习惯行（memo，打卡/内联编辑/删除/统计显示）
-  ├── route-loading-bar.tsx # 全局路由加载进度条（基于 pathname/searchParams 变化触发，400ms 过渡）
-  ├── format-note-date.ts # 日期格式化工具（中文相对时间："刚刚、X分钟前、昨天...")
-  ├── error-boundary.tsx # React Error Boundary（含重试按钮）
-  ├── pwa-handler.tsx   # PWA 处理（memo，注册 Service Worker + 离线黄色横幅；安装引导已移除）
-  └── page-animation.tsx # 页面过渡动效（useSelectedLayoutSegment key 驱动 fadeIn）
-lib/                    # 核心逻辑
-  ├── db/               # 数据库模块（通过 index.ts 重导出）
-  │   ├── client.ts     # getClient() 单例连接管理（无 DDL，纯连接）
-  │   ├── migrate.ts    # 迁移执行器（可编程 API，按版本执行 migrations/*.sql）
-  │   ├── notes.ts      # 笔记 CRUD + LIKE 搜索 + 游标/偏移分页 + 日期范围查询；updateNote 返回更新后的 Note；getNotes 系列不再按 type 过滤（Note.type 恒为 'note'）
-  │   ├── habits.ts     # 习惯 CRUD + 打卡 + streaks + 最佳记录 + 周/月统计 + getHabitsDashboard() 合并查询；computeCurrentStreak/computeBestStreak 为纯函数，dashboard 与 habits 路由共用（消除双份实现）
-  │   ├── budgets.ts    # 预算 CRUD（upsert）
-  │   ├── tags.ts       # 标签同步(syncNoteTags，可选 tx 参数支持外部事务) + getAllTags(含计数) + renameTag(合并) + deleteTag
-  │   ├── attachments.ts # 附件 CRUD（createAttachment / getAttachmentsByNoteId / deleteAttachment）
-  │   └── index.ts      # 重导出（import from '@/lib/db'）
-migrations/             # 数据库迁移（纯 SQL，按编号版本化）
-  └── 001_create_tables.sql
-scripts/                # 工具脚本
-  └── migrate.ts        # 迁移 CLI（npm run migrate / --dry-run / --reset）
-lib/                    # 核心逻辑
-  ├── types.ts          # TypeScript 类型（Note/Budget/Habit/Attachment）
-  ├── markdown.tsx      # MarkdownRenderer（react-markdown + Tailwind 样式）
-  ├── strip-markdown.ts # stripMarkdown 纯函数（抽离自 markdown.tsx，无 React 依赖）
-  ├── navigation.ts     # 共享导航配置（NAV_ITEMS 4 项 / PRIMARY_MOBILE_NAV / MORE_MOBILE_NAV）
-  └── utils.ts          # cn() + genId() + formatFileSize()（附件大小格式化，服务端路由与客户端组件共用）+ cn 内部使用 tailwind-merge + clsx
-store/                  # Zustand 全局状态
-  ├── index.ts          # useAppStore（笔记列表缓存，MAX_CACHED_NOTES=500，5 个 action）
-  └── __tests__/        # 状态管理测试（11 测试）
-lib/__tests__/          # 库测试
-  ├── db.test.ts        # 数据库测试（22 测试：笔记7 + 习惯4 + 预算3 + 搜索与标签8 + 其他5；用临时文件库 file:./.db-test.sqlite 而非 :memory:，因 libSQL 的 db.transaction() 在 :memory: 上不可用）
-  ├── markdown.test.tsx # Markdown 渲染 XSS 净化测试（5 测试：script/onerror/javascript: 链接均被剥离）
-  └── utils.test.ts     # 工具函数测试（5 测试）
-app/api/__tests__/      # API 路由直接测试（绕过中间件，直接调用 route handler）
-  └── routes.test.ts    # 路由测试（16 测试：notes/budgets/habits/tags/batch/export/backup + 认证守卫 401；用临时文件库 file:./.routes-test.db）
-components/__tests__/   # 组件测试
-  ├── note-list.test.tsx         # 笔记列表组件测试（4 测试）
-  ├── budget-habit.test.tsx      # 预算/习惯组件测试（8 测试：ProgressBar3 + BudgetCard3 + HabitRow2）
-  ├── markdown-editor.test.tsx   # Markdown 编辑器测试（7 测试）
-  ├── attachment-section.test.tsx # 附件组件测试（5 测试）
-  ├── batch-actions-bar.test.tsx  # 批量操作栏测试（5 测试）
-  └── tag-manager-sheet.test.tsx  # 标签管理 Sheet 测试（7 测试）
-public/
-  ├── manifest.json   # PWA 配置（standalone 模式，192+512 PNG 图标，portrait 锁定）
-  └── icons/          # 应用图标（icon-192.png / icon-512.png）
+opencode-demo/
+├── app/                          # Next.js App Router
+│   ├── globals.css               # Tailwind + CSS 变量 + fadeIn/pulse-soft 动画
+│   ├── layout.tsx                # 根布局（Sidebar + MobileNav + PwaHandler + Toast）
+│   ├── page.tsx                  # 首页 → /notes 重定向
+│   ├── login/                    # 登录页（POST /api/auth）
+│   ├── notes/                    # 笔记列表 + 详情（RSC + Suspense）
+│   ├── expenses/                 # 月度预算页
+│   ├── habits/                   # 习惯打卡页
+│   ├── settings/                 # 备份导出/恢复 JSON
+│   ├── favicon.ico
+│   └── api/
+│       ├── auth/route.ts         # POST 密码登录 → app_auth cookie
+│       ├── notes/route.ts        # GET 列表/搜索/分页, POST 创建, DELETE
+│       ├── notes/[id]/route.ts   # GET/PUT/DELETE 单条
+│       ├── notes/[id]/attachments/route.ts # 附件上传/列表/删除
+│       ├── notes/batch/route.ts  # 批量删除/加标签（事务性）
+│       ├── budgets/route.ts      # GET/POST 预算 upsert
+│       ├── habits/route.ts       # 习惯 CRUD + 打卡 + streaks + 趋势
+│       ├── tags/route.ts         # GET 标签列表, PUT 重命名, DELETE
+│       ├── backup/route.ts       # GET 导出 JSON, POST 恢复 JSON
+│       └── export/route.ts       # GET 导出全部笔记为 Markdown
+├── components/
+│   ├── ui/                       # @base-ui/react 封装（Button/Card/Input/Checkbox 等）
+│   ├── note-list.tsx             # 笔记列表（搜索+标签筛选+无限滚动+批量操作）
+│   ├── note-card.tsx             # 单条笔记卡片（React.memo）
+│   ├── batch-actions-bar.tsx     # 批量操作栏（next/dynamic 懒加载）
+│   ├── tag-manager-sheet.tsx     # 标签管理 Sheet（next/dynamic 懒加载）
+│   ├── attachment-section.tsx    # 附件区（next/dynamic 懒加载）
+│   ├── markdown-editor.tsx       # Markdown 编辑器（next/dynamic 懒加载）
+│   ├── sidebar.tsx               # 导航侧栏 + 手机底部栏
+│   ├── budget-card.tsx           # 预算卡片（React.memo）
+│   ├── budget-form.tsx           # 预算表单（React.memo）
+│   ├── progress-bar.tsx          # 进度条三色区（React.memo）
+│   ├── habit-row.tsx             # 习惯行（React.memo）
+│   ├── page-animation.tsx        # 页面过渡动效（fadeIn）
+│   ├── route-loading-bar.tsx     # 全局路由加载进度条
+│   ├── pwa-handler.tsx           # PWA 注册 + 离线横幅（React.memo）
+│   ├── error-boundary.tsx        # React Error Boundary（含重试）
+│   ├── format-note-date.ts       # 中文相对时间格式化
+│   └── markdown-renderer.tsx     # MarkdownRenderer
+├── lib/
+│   ├── types.ts                  # TypeScript 接口（Note/Budget/Habit/Attachment）
+│   ├── utils.ts                  # cn() + genId() + formatFileSize()
+│   ├── auth-token.ts             # HMAC token 派生与验证（Web Crypto API）
+│   ├── storage.ts                # 存储驱动抽象（VercelBlobDriver / LocalDiskDriver）
+│   ├── markdown.tsx              # MarkdownRenderer 组件
+│   ├── strip-markdown.ts         # 纯函数剥离 Markdown
+│   ├── navigation.ts             # 共享导航配置（NAV_ITEMS 4 项）
+│   └── db/
+│       ├── client.ts             # getClient() 单例连接管理
+│       ├── migrate.ts            # 迁移执行器
+│       ├── index.ts              # 重导出
+│       ├── notes.ts              # 笔记 CRUD + LIKE 搜索 + 游标分页
+│       ├── habits.ts             # 习惯 CRUD + 打卡 + streaks + 统计
+│       ├── budgets.ts            # 预算 upsert
+│       ├── tags.ts               # 标签同步 + 重命名 + 删除（支持外部事务）
+│       └── attachments.ts        # 附件 CRUD
+├── __tests__/                    # 单元测试
+│   ├── lib/                      # db.test.ts / markdown.test.tsx / utils.test.ts / streaks.test.ts
+│   ├── app/api/                  # routes.test.ts（API 路由 + 认证守卫）
+│   ├── components/               # note-list / budget-habit / markdown-editor / attachment-section / batch-actions-bar / tag-manager-sheet
+│   └── store/                    # index.test.ts（Zustand 11 测试）
+├── store/
+│   ├── index.ts                  # useAppStore（Zustand，笔记缓存 MAX=500）
+│   └── __tests__/                # 状态管理测试（11 测试）
+├── e2e/                          # Playwright E2E
+│   ├── smoke.spec.ts             # 登录重定向 + PWA manifest
+│   ├── notes.spec.ts             # 笔记 CRUD + 搜索 + 标签 + 置顶
+│   ├── budgets.spec.ts           # 预算设置 + 结算
+│   └── habits.spec.ts            # 习惯创建/打卡/删除
+├── migrations/
+│   └── 001_create_tables.sql     # 7 表 + 索引 DDL
+├── scripts/
+│   └── migrate.ts                # 迁移 CLI（npm run migrate）
+├── public/
+│   ├── manifest.json             # PWA manifest（standalone, portrait）
+│   ├── sw.js                     # Service Worker（静态资源预缓存）
+│   ├── icons/                    # 192x192, 512x512 PNG（含 maskable）
+│   └── uploads/notes/            # 本地存储附件目录（.gitkeep）
+├── nginx/
+│   └── lifeos.conf               # Nginx 反代配置（备案前后双模式）
+├── proxy.ts                      # Middleware——认证守卫（matcher 排除 _next/static|_next/image|favicon.ico）
+├── proxy.test.ts                 # 中间件认证测试（10 测试）
+├── deploy.sh                     # 主生产 Docker 一键部署脚本
+├── Dockerfile                    # node:20-slim + npm ci
+├── docker-compose.yml            # next + nginx + volume
+├── components.json               # shadcn/ui 配置（style: base-nova, rsc: true, baseColor: neutral）
+├── vitest.config.ts              # vitest（jsdom + @/ alias）
+├── vitest.setup.ts               # 测试初始化（@testing-library/jest-dom/vitest）
+├── playwright.config.ts          # Playwright E2E 配置
+├── next-env.d.ts                 # Next.js 自动生成，无需手动维护
+├── .env.example                  # 开发参考模板（含 Turso 字段）
+├── .env.prod.example             # 自托管 Docker 模板（无 Turso 字段）
+├── next.config.ts
+├── tsconfig.json
+├── eslint.config.mjs
+├── postcss.config.mjs
+├── vercel.json
+├── AGENTS.md                     # ← 你在这里
+├── DEPLOY.md
+└── README.md
 ```
 
-## 关键约定
+## API 端点参考
 
-### 数据库
+### /api/auth
 
-使用 `@libsql/client` 直接操作，7 个表（支持置顶 `pinned` 字段）：
-- `notes` — 笔记（搜索走 LIKE 模糊匹配标题与内容）
-- `budgets` — 月度预算（`month` 字段 UNIQUE）
-- `habits` + `habit_completions` — 习惯打卡（含 UNIQUE 索引防重复）
-- `attachments` — 笔记附件（外键 CASCADE 删除）
-- `tags` + `note_tags` — 规范化标签关联（复合主键，双 FK CASCADE）
-- 详情见 `lib/db/client.ts` 的 `getClient()` 和 `lib/db/migrate.ts`
+| 方法 | 路径 | 参数 | 响应 | 说明 |
+|------|------|------|------|------|
+| POST | `/api/auth` | `{ password: string }` | 200 `{ ok: true }` + cookie / 401 `{ ok: false }` | 密码登录，设置 `app_auth` cookie（30天, httpOnly, SameSite=lax） |
 
-#### 数据库迁移
+### /api/notes
 
-DDL 不放在应用代码中。迁移通过 `migrations/*.sql` 文件管理：
+| 方法 | 路径 | 参数 | 响应 | 说明 |
+|------|------|------|------|------|
+| GET | `/api/notes` | `q?`, `tag?`, `limit?`(1-500, 默认200), `offset?`, `startDate?`, `endDate?`, `summary?` | 200 `{ notes: Note[] }` | 列表/搜索/分页 |
+| POST | `/api/notes` | `{ title?, content?, tags?, dueDate? }` | 201 `{ note: Note }` | 创建笔记 |
+| DELETE | `/api/notes?id=<id>` | — | 200 `{ success: true }` | 删除单条 |
+| PATCH | `/api/notes/[id]` | `{ title?, content?, tags?, dueDate?, done?, pinned? }` | 200 `{ note: Note }` | 更新笔记 |
+| GET | `/api/notes/[id]` | — | 200 `{ note: Note }` / 404 `{ error }` | 单条详情 |
+| DELETE | `/api/notes/[id]` | — | 200 `{ success: true }` | 删除单条 |
 
-- `npm run migrate` — 执行待处理迁移（连接由环境变量 `TURSO_DATABASE_URL` 或 `DATABASE_URL` 决定）
-- `npm run migrate:dry` — 仅列出待执行迁移
-- `npm run migrate -- --reset` — 清空所有表后重新迁移（开发时改 schema 后一键重置）
-- 测试中调用 `migrate(getClient())` 在 `beforeAll` 中显式建表
-- 每次迁移在一个事务中完成，失败自动回滚
-- `_migrations` 表追踪已执行的迁移
+### /api/notes/batch
 
-### UI 动效约定
+| 方法 | 路径 | 参数 | 响应 | 说明 |
+|------|------|------|------|------|
+| POST | `/api/notes/batch` | `{ ids: string[], action: "delete"|"addTag", tag? }` | 200 `{ success: true }` | 事务性批量操作 |
 
-- 页面过渡：`PageAnimation` 组件包裹 `animate-fade-in` 实现淡入
-- 加载中状态：各页面直接内联 `skeleton-pulse` class div，无需独立骨架屏组件
-- 全局 CSS 动画定义于 `app/globals.css`（fadeIn / skeleton-pulse）
+### /api/notes/[id]/attachments
 
-### UI 组件库
+| 方法 | 路径 | 参数 | 响应 | 说明 |
+|------|------|------|------|------|
+| GET | `/api/notes/[id]/attachments` | — | 200 `{ attachments: Attachment[] }` | 附件列表 |
+| POST | `/api/notes/[id]/attachments` | `file` (multipart/form-data) | 201 `{ attachment: Attachment }` | 上传附件（≤10MB, 禁止 svg） |
+| DELETE | `/api/notes/[id]/attachments?url=<url>` | — | 200 `{ success: true }` | 删除附件 |
 
-- shadcn/ui `base-nova` 风格，底层使用 **`@base-ui/react`**（非传统 Radix UI）
-- 已封装的组件位于 `components/ui/`：button / card / input / textarea / badge / checkbox / alert-dialog / scroll-area / sheet
-- `components.json` 记录了 shadcn 配置（`"style": "base-nova"`, `"rsc": true`, `"baseColor": "neutral"`）
+### /api/budgets
 
-### 状态管理
+| 方法 | 路径 | 参数 | 响应 | 说明 |
+|------|------|------|------|------|
+| GET | `/api/budgets` | — | 200 `{ budgets: Budget[] }` | 全部预算 |
+| GET | `/api/budgets` | `month=YYYY-MM` | 200 `{ budget: Budget }` / 404 | 单月预算 |
+| POST | `/api/budgets` | `{ month, fixedBudget, variableBudget, fixedActual?, variableActual?, notes?, isCompleted?, savingsCompleted? }` | 200 `{ budget: Budget }` | Upsert |
 
-- `useAppStore`（`store/index.ts`）：笔记列表缓存（限 500 条），5 个 action：`setNotes`/`addNote`/`removeNote`/`updateNote`/`setInitialLoading`
-- 仅缓存笔记列表；预算和习惯数据由各页面直接通过 API 获取（不经过 Zustand）
+### /api/habits
 
-### 性能优化约定
+| 方法 | 路径 | 参数 | 响应 | 说明 |
+|------|------|------|------|------|
+| GET | `/api/habits` | — | 200 `{ habits: Habit[] }` | 全部习惯 |
+| GET | `/api/habits` | `dashboard=true` | 200 `{ dashboard: HabitDashboardItem[] }` | 合并查询 + 打卡 + streaks + 统计 |
+| POST | `/api/habits` | `{ name, description?, frequency?("daily"|"weekly") }` | 201 `{ habit: Habit }` | 创建习惯 |
+| PATCH | `/api/habits/[id]` | `{ name?, description?, frequency? }` | 200 `{ habit: Habit }` | 更新习惯 |
+| DELETE | `/api/habits/[id]` | — | 200 `{ success: true }` | 删除（级联 habit_completions） |
+| POST | `/api/habits/[id]/toggle` | `date=YYYY-MM-DD` | 200 `{ completion }` | 打卡切换（UNIQUE 防重复） |
+| GET | `/api/habits/streaks` | — | 200 `{ streaks: { [habitId]: { current, best } } }` | 连续天数 |
+| GET | `/api/habits/trends` | `startDate`, `endDate` | 200 `{ trends: { [habitId]: { completionRate, totalDays, completedDays } } }` | 趋势统计 |
 
-- 列表项组件统一加 `React.memo` + `displayName`（NoteCard, BudgetCard, HabitRow, ProgressBar 等）
-- 传递给子组件的回调函数统一用 `useCallback` 包装
-- 非首屏组件使用 `next/dynamic` 懒加载（TagManagerSheet/BatchActionsBar/AttachmentSection/MarkdownEditor）
-- 新组件提取后遵循：功能性函数（如 ProgressBar/formatNoteDate）→ 模块级函数；有状态的 → 独立函数组件
+### /api/tags
 
-### PWA 约定
+| 方法 | 路径 | 参数 | 响应 | 说明 |
+|------|------|------|------|------|
+| GET | `/api/tags` | — | 200 `{ tags: { id, name, count }[] }` | 列表（含计数） |
+| PUT | `/api/tags` | `{ oldName, newName }` | 200 `{ tag: { id, name } }` | 重命名/合并 |
+| DELETE | `/api/tags` | `name=` | 200 `{ success: true }` | 删除（级联 note_tags） |
 
-- `components/pwa-handler.tsx`：注册 Service Worker + 监听 `online`/`offline` 事件，离线时显示黄色 "当前离线" 横幅（memo 组件）
-- **Service Worker**：`public/sw.js` 仅做静态资源预缓存（install 预缓存 + activate 清理旧缓存 + 对 `/_next/static/` 走 cache-first），无离线 fallback 页、无 RSC/API 缓存策略
-- **安装引导已移除**：当前未捕获 `beforeinstallprompt` 事件，无主动"安装到主屏"横幅（仅依赖浏览器原生安装提示，属有意设计）
-- `public/manifest.json`：standalone 模式，portrait 锁定，192x192 + 512x512 PNG 图标（含 maskable）
-- `theme-color`：固定为 `#0f172a`（与 `manifest.json` 一致），不再随深浅色切换
+### /api/backup & /api/export
 
-## 部署
+| 方法 | 路径 | 参数 | 响应 | 说明 |
+|------|------|------|------|------|
+| GET | `/api/backup` | — | 200 `{ ...backupData }` | 导出全部数据 JSON |
+| POST | `/api/backup` | `{ ...backupData }` | 200 `{ success: true }` / 400 `{ error }` | 恢复 JSON（validateBackup 校验） |
+| GET | `/api/export` | — | 200 `text/markdown` | 导出全部笔记为 Markdown 文件 |
 
-本项目有**两个生产环境**（主用 + 备用），数据各自独立、互不同步：
+### 类型定义（`lib/types.ts`）
 
-| 角色 | 环境 | 数据库 | 文件存储 | 入口 |
-|------|------|--------|----------|------|
-| **主生产** | 阿里云 ECS（Docker Compose，见 `DEPLOY.md`） | 本地 SQLite `file:./data/db/lifeos.db` | 本地磁盘（`STORAGE_DRIVER=local`） | nginx 反代 → `:3000`（备案前 HTTP） |
-| **备用** | Vercel（`hkg1` 香港）+ Turso | Turso 远程 `lifeos-lijh37` | Vercel Blob | `https://opencode-demo.vercel.app` |
+```typescript
+interface Note {
+  id: string; content: string; title: string | null; type: 'note'
+  tags: string[]; dueDate: string | null; done: boolean; pinned: boolean
+  createdAt: string; updatedAt: string
+}
+interface Budget {
+  id: string; month: string; fixedBudget: number; variableBudget: number
+  fixedActual: number | null; variableActual: number | null; notes: string
+  isCompleted: boolean; savingsCompleted: boolean; createdAt: string; updatedAt: string
+}
+interface Habit {
+  id: string; name: string; description: string; frequency: 'daily' | 'weekly'; createdAt: string
+}
+interface Attachment {
+  id: string; noteId: string; filename: string; url: string; mimeType: string; fileSize: number; createdAt: string
+}
+```
 
-- **主生产**是日常使用的环境（PC 网页 + 手机 PWA，绑定阿里云域名）。详见 `DEPLOY.md`。
-- **备用**保留以防阿里云不续费时切回；平时不写入，数据靠手动 `backup`/`restore` JSON 同步（见下「环境切换」）。
-- **数据库迁移**：Docker 在容器启动命令里 `npm run migrate && npm run start` 自动建表；Vercel 部署前手动 `npm run migrate`（连 Turso 远程库）。
-- **密码保护**：`proxy.ts`（Next.js 16 Middleware，matcher 匹配全部路由）+ `/login` 页 + `/api/auth` 接口
-  - 认证方式：`app_auth` cookie（30 天）/ `Authorization: Bearer` 头
-  - **cookie 内容**：`app_auth` 存的是由 `APP_PASSWORD` 派生的 HMAC token（`lib/auth-token.ts`），**不是明文密码**；中间件 `proxy.ts` 用 `verifyToken()` 校验，密码比对走常量时间比较。改密码后旧 token 自动失效。
-  - 公开路径免认证：`/login`, `/api/auth`, `/manifest.json`, `/icons/`, `/uploads/`
-  - 未认证 API 返回 401 JSON；未认证页面重定向到 `/login?from=<original_path>`
-  - 若 `APP_PASSWORD` 未设置，则自动跳过认证（中间件直接放行）
+### 认证
 
-### 环境隔离设计
+- **Header**: `app_auth` cookie 或 `Authorization: Bearer <token>`
+- **未认证**: API 返回 401 `{ error: "Unauthorized" }`，页面 307 → `/login?from=<path>`
+- **跳过**: `APP_PASSWORD` 空值时认证完全跳过
+- **公开路径**: `/login`, `/api/auth`, `/manifest.json`, `/icons/`, `/uploads/`
+- **底层**: `lib/auth-token.ts` 用 `crypto.subtle.sign('HMAC', key, password)` 派生，`verifyToken()` 常量时间比较
 
-环境**不靠代码里的环境名区分**，只靠环境变量组合（`TURSO_DATABASE_URL` / `DATABASE_URL` / `STORAGE_DRIVER`）。决定性逻辑在 `lib/db/client.ts`：`url = TURSO_DATABASE_URL || DATABASE_URL`——只要 `TURSO_DATABASE_URL` 存在就忽略 `DATABASE_URL`。
+## 数据库 Schema
 
-| 环境 | 数据库 | 说明 |
-|------|--------|------|
-| **主生产（Docker）** | `DATABASE_URL=file:./data/db/lifeos.db` + `TURSO_DATABASE_URL=`（清空） | compose 显式清空 Turso 变量，强制走本地 SQLite |
-| **备用（Vercel）** | `TURSO_DATABASE_URL` → Turso | 平台注入，不设 `STORAGE_DRIVER`（默认 vercel） |
-| **dev（本地）** | `DATABASE_URL=file:./data/dev.db` | `.env.local` **不得**含 `TURSO_DATABASE_URL` |
-| **test（单元）** | `file:./.db-test.sqlite` / `file:./.routes-test.db` | vitest（libSQL 的 `db.transaction()` 在 `:memory:` 上不可用，故单元/路由测试改用临时文件库） |
-| **test（E2E）** | `file:./.e2e-test.db` | Playwright 清空 `TURSO_*` 并设 `DATABASE_URL` |
+7 表，DDL 见 `migrations/001_create_tables.sql`。`getClient()` (`lib/db/client.ts:20`) 自动管理连接和 `PRAGMA foreign_keys = ON`。
 
-- **dev 护栏**：`getClient()` 在非生产环境下若检测到 `TURSO_DATABASE_URL` 指向远程 Turso（`turso.io`/`turso.tech`），**直接抛错**，防止本地误连生产库。生产环境（`NODE_ENV=production`）不受此限制。
-- **启动身份日志**：连接建立时打印 `[db] turso → …` 或 `[db] sqlite → …`，一眼看清当前连的是哪个库。
-- **dev 自动迁移**：`npm run dev` 脚本为 `tsx scripts/migrate.ts && next dev`，首次启动自动建表，无需手动 migrate。
-- **E2E 隔离（关键）**：`playwright.config.ts` 的 `webServer.env` 显式清空 `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` 并设 `DATABASE_URL=file:./.e2e-test.db`，且启动前先 `npm run migrate` 建本地表。**E2E 绝不连接生产 Turso 库**，跑完自动删除 `.e2e-test.db`。切勿移除该隔离——否则测试数据会写入生产库（曾发生过的事故）。
+| 表 | 列 | 主键 | 外键 | 索引 |
+|----|----|------|------|------|
+| **notes** | id TEXT PK, content TEXT NOT NULL, title TEXT, type TEXT DEFAULT 'note', due_date TEXT, done INTEGER DEFAULT 0, pinned INTEGER DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL | id | — | `idx_notes_type`, `idx_notes_created`, `idx_notes_due_date`, `idx_notes_search(content,title)`, `idx_notes_pinned_created`, `idx_notes_type_due`, `idx_notes_done` |
+| **budgets** | id TEXT PK, month TEXT NOT NULL UNIQUE, fixed_budget REAL DEFAULT 0, variable_budget REAL DEFAULT 0, fixed_actual REAL, variable_actual REAL, notes TEXT DEFAULT '', is_completed INTEGER DEFAULT 0, savings_completed INTEGER DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL | id | — | — |
+| **attachments** | id TEXT PK, note_id TEXT NOT NULL, filename TEXT NOT NULL, url TEXT NOT NULL, mime_type TEXT DEFAULT '', file_size INTEGER DEFAULT 0, created_at TEXT NOT NULL | id | note_id → notes(id) ON DELETE CASCADE | `idx_attachments_note(note_id)` |
+| **habits** | id TEXT PK, name TEXT NOT NULL, description TEXT DEFAULT '', frequency TEXT DEFAULT 'daily', created_at TEXT NOT NULL | id | — | — |
+| **habit_completions** | id TEXT PK, habit_id TEXT NOT NULL, date TEXT NOT NULL, completed INTEGER DEFAULT 0, created_at TEXT NOT NULL | id | habit_id → habits(id) ON DELETE CASCADE | `idx_habit_completions_habit(habit_id)`, `idx_habit_completions_unique(habit_id,date)` UNIQUE |
+| **tags** | id TEXT PK, name TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL | id | — | — |
+| **note_tags** | note_id TEXT, tag_id TEXT | (note_id, tag_id) 复合 PK | note_id → notes(id) ON DELETE CASCADE, tag_id → tags(id) ON DELETE CASCADE | `idx_note_tags_tag(tag_id)` |
 
-### 环境切换（主 ↔ 备）
-
-两个生产环境数据独立。若阿里云不续费、需切回 Vercel 备用：在主生产「设置 → 备份」导出 JSON，再到 Vercel 实例「设置 → 恢复」导入即可。无需改代码（STORAGE_DRIVER 默认 vercel）。
+迁移机制：`migrations/*.sql` → `_migrations` 追踪表 → `lib/db/migrate.ts` 执行器。命令：`npm run migrate` / `npm run migrate:dry` / `npm run migrate -- --reset`。
 
 ## 环境变量
 
-| 变量 | 必需 | 说明 |
+单点源：所有文档交叉引用此表。
+
+| 变量 | 必需？ | 用途 | 开发 (`.env.local`) | 主生产 Docker (`.env`) | 备用 Vercel |
+|------|--------|------|---------|---------|---------|
+| `DATABASE_URL` | 开发/主生产必需 | 本地 SQLite 路径 | `file:./data/dev.db` | `file:./data/db/lifeos.db` | — |
+| `TURSO_DATABASE_URL` | 备用必需 | Turso 远程库地址 | **不得设置**（dev 护栏） | **显式清空** | `libsql://...` |
+| `TURSO_AUTH_TOKEN` | 备用必需 | Turso 认证 Token | **不得设置** | **显式清空** | Turso token |
+| `APP_PASSWORD` | 否 | 登录密码 | 不设 或 `demo` | 自定义 | 自定义 |
+| `BLOB_READ_WRITE_TOKEN` | 否（附件） | Vercel Blob 存储 | — | — | Vercel token |
+| `STORAGE_DRIVER` | 否 | 存储后端 | `vercel`（默认） | `local` | `vercel`（默认） |
+| `COOKIE_SECURE` | 否 | cookie Secure 标志 | 不设 | `false`（HTTP 阶段） | `true` |
+| `UPLOAD_DIR` | 否（local 驱动） | 本地上传目录 | — | `/app/data/uploads` | — |
+| `UPLOAD_URL_PREFIX` | 否（local 驱动） | 本地附件 URL 前缀 | — | `/uploads` | — |
+
+数据库选择逻辑：`url = TURSO_DATABASE_URL \|\| DATABASE_URL`（`lib/db/client.ts:25`）。dev 护栏：非生产 + `TURSO_DATABASE_URL` 匹配 `/turso\.(io\|tech)/i` → 抛错。E2E 隔离：`playwright.config.ts` 显式清空 `TURSO_*`。
+
+## 关键约定
+
+### UI 组件体系
+
+组件库：`components/ui/` 封装 `@base-ui/react`（Button/Card/Input/Textarea/Badge/Checkbox/AlertDialog/ScrollArea/Sheet）。shadcn 配置 `components.json`：style `base-nova`, rsc `true`, baseColor `neutral`。
+
+### 性能优化
+
+- 列表项：`React.memo` + `displayName`（NoteCard, BudgetCard, HabitRow, ProgressBar）
+- 回调：`useCallback`
+- 懒加载：`next/dynamic`（TagManagerSheet, BatchActionsBar, AttachmentSection, MarkdownEditor）
+- Zustand 缓存上限：`MAX_CACHED_NOTES = 500`
+- 功能性函数 → 模块级函数；有状态 → 独立函数组件
+
+### 状态管理
+
+`useAppStore` (`store/index.ts`) 仅缓存笔记列表，5 个 action：`setNotes`/`addNote`/`removeNote`/`updateNote`/`setInitialLoading`。预算/习惯直取 API。
+
+### UI 动效
+
+`PageAnimation` 组件包裹 `animate-fade-in` class。CSS 动画定义于 `app/globals.css:199-216`：`fadeIn` keyframe（淡入 + 上移 8px, 0.35s ease-out），`pulse-soft` keyframe（透明度脉动）。加载态无独立骨架屏，内联 `skeleton-pulse` class div。
+
+### PWA
+
+| 项 | 说明 |
+|----|------|
+| SW | `public/sw.js`——install 预缓存 + activate 清理旧缓存 + `/_next/static/` cache-first |
+| 离线 | 无离线 RSC/API 缓存，无离线 fallback |
+| 安装引导 | 已移除，依赖浏览器原生提示 |
+| manifest | `standalone`, `portrait`, 192x192 + 512x512 PNG（含 maskable） |
+| theme-color | `#0f172a`（固定） |
+
+### 命名规范
+
+| 类型 | 规范 | 示例 |
 |------|------|------|
-| `TURSO_DATABASE_URL` | 备用生产必需 | Turso 数据库地址（主生产 Docker 显式清空此变量） |
-| `TURSO_AUTH_TOKEN` | 备用生产必需 | Turso 认证 Token |
-| `APP_PASSWORD` | 否 | 登录密码（不设置则跳过认证，.env.example 默认 `demo`）|
-| `BLOB_READ_WRITE_TOKEN` | 否（附件功能） | Vercel Blob 存储 Token（仅备用生产用） |
-| `DATABASE_URL` | 本地/主生产必需 | 本地 SQLite 路径。dev 用 `file:./data/dev.db`；主生产 Docker 用 `file:./data/db/lifeos.db`；E2E 用 `file:./.e2e-test.db`；单元测用 `:memory:` |
-| `STORAGE_DRIVER` | 否 | `local`（主生产 Docker，本地磁盘）/ `vercel`（默认，Vercel Blob） |
+| 文件/目录 | kebab-case | `note-detail-client.tsx` |
+| React 组件 | PascalCase | `NoteCard` |
+| 函数/变量 | camelCase | `getClient` |
+| 类型/接口 | PascalCase | `Note` |
 
-## WSL2 环境说明
+### 数据库约定
 
-本项目运行在 WSL2 中，WSL2 有独立的虚拟 IP（如 `192.168.82.x`），无法从局域网其他设备直接访问。
+无内联 DDL，全部 `migrations/*.sql`。`getClient()` 单例，不在测试间共享。本地 SQLite 用 `PRAGMA foreign_keys = ON`。
 
-- **PC 端开发**：Windows 浏览器打开 `http://localhost:3000`（Windows 自动转发到 WSL2）
-- **手机端测试**：`npm run dev` 后手机访问 `http://<LAN-IP>:3000`（`next.config.ts` 已配置 `allowedDevOrigins: ['*']`）
-- **主生产部署**：阿里云 ECS 上 `docker compose up -d`（见 `DEPLOY.md`）
-- **备用部署**：`git push origin main` → Vercel 自动部署
+## 测试策略
 
-## 添加新模块
+| 层 | 工具 | 文件数 | 测试数 | 数据库 |
+|----|------|--------|--------|--------|
+| 单元测试 | vitest (jsdom) | 13 | 117 | `file:./.db-test.sqlite`（临时文件，非 `:memory:`） |
+| E2E | Playwright | 4 套件 | 13 | `file:./.e2e-test.db`（自动清理） |
 
-1. 在 `lib/types.ts` 扩展类型（如果需要）
-2. 在 `lib/db/` 下对应文件添加数据库操作方法（或新建模块文件并在 index.ts 重导出）
-3. 在 `app/` 下创建新页面
-4. 在 `lib/navigation.ts` 添加导航项
-5. 构建验证：`npm run build`
+### 单元测试清单
 
-## 测试
+| 文件 | 测试数 | 覆盖范围 |
+|------|--------|----------|
+| `lib/__tests__/db.test.ts` | 22 | 笔记(7) + 习惯(4) + 预算(3) + 搜索与标签(8) |
+| `lib/__tests__/markdown.test.tsx` | 5 | Markdown XSS 净化 |
+| `lib/__tests__/utils.test.ts` | 5 | cn() + genId() + formatFileSize() |
+| `lib/__tests__/streaks.test.ts` | 13 | computeCurrentStreak + computeBestStreak |
+| `app/api/__tests__/routes.test.ts` | 15 | 所有 API 路由 + 认证守卫 401 |
+| `components/__tests__/note-list.test.tsx` | 4 | 笔记列表渲染 |
+| `components/__tests__/budget-habit.test.tsx` | 8 | ProgressBar(3) + BudgetCard(3) + HabitRow(2) |
+| `components/__tests__/markdown-editor.test.tsx` | 7 | 三模式切换、自动保存、工具栏 |
+| `components/__tests__/attachment-section.test.tsx` | 5 | 拖拽上传、缩略图、乐观删除 |
+| `components/__tests__/batch-actions-bar.test.tsx` | 5 | 批量删除/加标签确认流程 |
+| `components/__tests__/tag-manager-sheet.test.tsx` | 7 | 标签列表、内联重命名、点击筛选 |
+| `store/__tests__/index.test.ts` | 11 | Zustand CRUD + MAX=500 |
+| `proxy.test.ts` | 10 | 中间件认证（cookie/Bearer/公开路径/静态资源） |
+
+### E2E 套件
+
+`e2e/smoke.spec.ts`（登录重定向 + PWA manifest）、`e2e/notes.spec.ts`（笔记 CRUD + 搜索 + 标签 + 置顶）、`e2e/budgets.spec.ts`（预算设置 + 结算）、`e2e/habits.spec.ts`（习惯创建/打卡/删除）。
+
+认证绕过：E2E 以 `APP_PASSWORD=''` 启动 dev server，中间件自动放行。
+
+### 运行命令
 
 ```bash
-npm test          # vitest 单元测试（13 文件，117 测试）
-npm run test:e2e  # Playwright E2E（13 测试，见下）
+npm test                 # 全部单元测试（vitest run）
+npm run test:watch       # watch 模式
+npm run test:e2e         # Playwright E2E（自动启动 dev server + 自动清理 .e2e-test.db）
 ```
 
-### E2E 测试（Playwright）
+## 运行命令
 
-- 测试目录：`e2e/`，套件：`smoke` / `notes` / `budgets` / `habits`（共 13 个测试）
-- 覆盖：登陆重定向与 PWA manifest、笔记 CRUD + 搜索 + 标签 + 置顶、预算设置与结算、习惯创建/打卡/删除
-- 运行方式：`npm run test:e2e`（自动启动 `npm run dev` 作为 webServer）
-- **认证绕过**：测试以空 `APP_PASSWORD` 启动 dev server，`app/api/auth` 在 `APP_PASSWORD` 为空时自动放行，因此测试可直接访问受保护页面，无需登录
-- **数据库隔离（关键）**：`playwright.config.ts` 的 `webServer.env` 显式清空 `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` 并设 `DATABASE_URL=file:./.e2e-test.db`，且启动前先 `npm run migrate` 建本地表。**E2E 绝不连接生产 Turso 库**，跑完自动删除 `.e2e-test.db`。切勿移除该隔离——否则测试数据会写入生产库（曾发生过的事故）
-- **辅助工具**：`e2e/helpers.ts` 提供 `BASE_URL`、API 建数据/清理、自动认证等
-- **本地 Chromium 系统库**：本环境缺少 `libnspr4` / `libnss3` / `libasound2`，已将对应 `.so` 解压至 `.pw-libs/lib/` 并在 `test:e2e` 脚本中自动注入 `LD_LIBRARY_PATH`（该目录已加入 `.gitignore`，不提交）
-- 测试产物 `playwright-report/` 与 `test-results/` 已加入 `.gitignore`
+| 命令 | 说明 |
+|------|------|
+| `npm run dev` | 自动建表 + 启动开发服务器 |
+| `npm run build` | 生产构建 |
+| `npm run start` | 生产启动 |
+| `npm run lint` | ESLint |
+| `npm test` | vitest 单元测试（13 文件, 117 测试） |
+| `npm run test:watch` | 测试 watch 模式 |
+| `npm run test:e2e` | Playwright E2E（4 套件, 13 测试） |
+| `npm run migrate` | 执行待处理数据库迁移 |
+| `npm run migrate:dry` | 仅列出待执行迁移 |
+| `npm run migrate -- --reset` | 清空所有表后重新迁移 |
+| `npm run analyze` | 构建产物体积分析（`@next/bundle-analyzer`） |
 
+## 架构决策记录
 
+### ADR-001: 双生产环境设计（已实施 2025）
+
+- **决策**: 主生产 = 阿里云 ECS Docker（本地 SQLite + 本地磁盘）；备用 = Vercel hkg1 + Turso + Blob
+- **理由**: 解耦 Vercel，摆脱平台锁定；主生产 PWA 不受冷启动影响
+- **代价**: 手动备份恢复切换；两套环境变量配置
+- **关联**: `.env.prod.example`, `docker-compose.yml`, `lib/db/client.ts`
+
+### ADR-002: 存储驱动抽象层（已实施）
+
+- **决策**: `lib/storage.ts` 定义 `StorageDriver` 接口（`save`/`remove`）；`VercelBlobDriver` + `LocalDiskDriver` 两实现；`getStorageDriver()` 按 `STORAGE_DRIVER` 选择
+- **理由**: 同一份代码跑在两环境，不修改调用方
+- **代价**: 本地驱动需 Nginx 配合提供 `/uploads/` 静态文件服务
+
+### ADR-003: 无状态 HMAC 认证（已实施）
+
+- **决策**: `crypto.subtle.sign('HMAC', key, password)` 派生 token，`verifyToken()` 常量时间比较；token 存 cookie `app_auth`（30天, httpOnly, SameSite=lax）或 `Authorization: Bearer`；密码空值认证跳过
+- **理由**: Zero DB 依赖，Edge + Node 双运行时兼容；改密码即令旧 token 失效
+- **代价**: 无法直接升级多用户（无此需求）
+- **关联**: `lib/auth-token.ts`, `proxy.ts`, `app/api/auth/route.ts`
+
+## 添加新模块流程
+
+| 步骤 | 操作 | 文件 |
+|------|------|------|
+| 1 | 扩展类型定义 | `lib/types.ts` |
+| 2 | 添加数据库操作函数，`index.ts` 重导出 | `lib/db/<module>.ts`, `lib/db/index.ts` |
+| 3 | 创建页面（RSC + 客户端交互组件） | `app/<route>/page.tsx` |
+| 4 | 添加导航项 | `lib/navigation.ts`（`NAV_ITEMS` 数组） |
+| 5 | 构建验证 | `npm run build` |
+
+## 24 项已修复问题
+
+| # | 问题 | 修复 |
+|---|------|------|
+| 1 | README 测试数 146（错误 → 实际 117） | 修正为 13 文件/117 测试 |
+| 2 | `@tanstack/react-virtual` 误列技术栈 | 已移除 |
+| 3 | 目录树遗漏 `lib/auth-token.ts`, `proxy.test.ts` 等 | 已补充 |
+| 4 | `globals.css` 缩进错误 | 已修正 |
+| 5 | DEPLOY.md 章节号重复 | 已修正 |
+| 6-7 | 遗漏 `class-variance-authority`, `tw-animate-css` | 已补充 |
+| 8 | env-vars 多源不一致 | 合并为单点源 |
+| 9 | 遗漏 `public/uploads/` | 已加入目录树 |
+| 10 | CSS 动画描述模糊 | 改为精确 keyframe 描述 |
+| 11 | 技术栈分组混乱 | 按层分组 |
+| 12 | `npm run analyze` 位置错误 | 移到脚本表 |
+| 13 | proxy matcher 描述不精确 | 补充精确表达式 |
+| 14 | API 缺响应格式 | 全端点补充 |
+| 15 | 术语不一致 | 规范化 |
+| 16-24 | 引用、目录名、nginx 排错等 | 已全部修复 |
