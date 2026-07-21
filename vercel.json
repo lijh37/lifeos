@@ -1,7 +1,7 @@
 {
   "framework": "nextjs",
   "installCommand": "npm install",
-  "buildCommand": "npm run build",
+  "buildCommand": "npx tsx scripts/migrate.ts && npm run build",
   "outputDirectory": ".next",
   "regions": ["hkg1"],
   "github": {
