@@ -98,6 +98,10 @@ opencode-demo/
 │   └── uploads/notes/            # 本地存储附件目录（.gitkeep）
 ├── nginx/
 │   └── lifeos.conf               # Nginx 反代配置（备案前后双模式）
+├── tasks/                          # 任务管理
+│   ├── todo/                       # 待办任务
+│   ├── doing/                      # 进行中（同时只能有一个）
+│   └── done/                       # 已完成
 ├── proxy.ts                      # Middleware——认证守卫（matcher 排除 _next/static|_next/image|favicon.ico）
 ├── proxy.test.ts                 # 中间件认证测试（10 测试）
 ├── deploy.sh                     # 主生产 Docker 一键部署脚本
@@ -116,6 +120,7 @@ opencode-demo/
 ├── postcss.config.mjs
 ├── vercel.json
 ├── AGENTS.md                     # ← 你在这里
+├── DESIGN.md                     # 设计文档（需求 + 方案 + 决策）
 ├── DEPLOY.md
 └── README.md
 ```
@@ -353,27 +358,53 @@ npm run test:e2e         # Playwright E2E（自动启动 dev server + 自动清�
 | `npm run migrate -- --reset` | 清空所有表后重新迁移 |
 | `npm run analyze` | 构建产物体积分析（`@next/bundle-analyzer`） |
 
-## 架构决策记录
+## AI 协作流程
 
-### ADR-001: 双生产环境设计（已实施 2025）
+### 角色与工具
 
-- **决策**: 主生产 = 阿里云 ECS Docker（本地 SQLite + 本地磁盘）；备用 = Vercel hkg1 + Turso + Blob
-- **理由**: 解耦 Vercel，摆脱平台锁定；主生产 PWA 不受冷启动影响
-- **代价**: 手动备份恢复切换；两套环境变量配置
-- **关联**: `.env.prod.example`, `docker-compose.yml`, `lib/db/client.ts`
+本项目使用 OMO 自动分配子代理。常用代理类型：
 
-### ADR-002: 存储驱动抽象层（已实施）
+| 代理 | 职责 | 何时触发 |
+|------|------|---------|
+| explore | 代码搜索、理解、调研 | 需要了解现有代码时 |
+| fixer | 代码实现、修改 | 执行具体编码任务时 |
+| designer | UI/UX 设计、样式 | 涉及界面和交互时 |
+| oracle | 架构决策、代码审查、方案分析 | 需要高层分析或 review 时 |
 
-- **决策**: `lib/storage.ts` 定义 `StorageDriver` 接口（`save`/`remove`）；`VercelBlobDriver` + `LocalDiskDriver` 两实现；`getStorageDriver()` 按 `STORAGE_DRIVER` 选择
-- **理由**: 同一份代码跑在两环境，不修改调用方
-- **代价**: 本地驱动需 Nginx 配合提供 `/uploads/` 静态文件服务
+### 任务管理
 
-### ADR-003: 无状态 HMAC 认证（已实施）
+任务文件存放在 `tasks/` 目录，按状态分文件夹：
 
-- **决策**: `crypto.subtle.sign('HMAC', key, password)` 派生 token，`verifyToken()` 常量时间比较；token 存 cookie `app_auth`（30天, httpOnly, SameSite=lax）或 `Authorization: Bearer`；密码空值认证跳过
-- **理由**: Zero DB 依赖，Edge + Node 双运行时兼容；改密码即令旧 token 失效
-- **代价**: 无法直接升级多用户（无此需求）
-- **关联**: `lib/auth-token.ts`, `proxy.ts`, `app/api/auth/route.ts`
+```
+tasks/
+├── todo/           # 待办任务
+├── doing/          # 进行中（同时只能有一个任务）
+└── done/           # 已完成（保留作为开发历史）
+```
+
+任务文件是自包含的——任何代理接手时，读取任务文件即可理解上下文，无需依赖对话历史。
+
+### 工作流程
+
+1. 读 `DESIGN.md` 了解当前需求和设计
+2. 读 `tasks/doing/` 了解当前任务（如有）
+3. 执行工作，实时更新任务文件的「笔记」区域
+4. 完成后更新 `DESIGN.md`（如设计有变更）
+5. 移动任务文件到 `done/`
+
+### 文档读写规则
+
+| 场景 | 读 | 写 |
+|------|----|----|
+| 接手新任务 | `DESIGN.md` + 对应任务文件 | 任务文件状态改为 `doing` |
+| 实现过程中 | 任务文件 | 任务文件的笔记区域 |
+| 设计有变更 | `DESIGN.md` | `DESIGN.md` 对应章节 |
+| 任务完成 | — | 任务文件移到 `done/` |
+| 发现新需求 | `DESIGN.md` | 追加到 `DESIGN.md` 需求区 |
+
+### 简单任务
+
+Bug 修复等简单任务不需要走完整流程，直接由 fixer 代理修复即可。是否需要写文档取决于复杂度。
 
 ## 添加新模块流程
 
@@ -385,22 +416,4 @@ npm run test:e2e         # Playwright E2E（自动启动 dev server + 自动清�
 | 4 | 添加导航项 | `lib/navigation.ts`（`NAV_ITEMS` 数组） |
 | 5 | 构建验证 | `npm run build` |
 
-## 24 项已修复问题
 
-| # | 问题 | 修复 |
-|---|------|------|
-| 1 | README 测试数 146（错误 → 实际 117） | 修正为 13 文件/117 测试 |
-| 2 | `@tanstack/react-virtual` 误列技术栈 | 已移除 |
-| 3 | 目录树遗漏 `lib/auth-token.ts`, `proxy.test.ts` 等 | 已补充 |
-| 4 | `globals.css` 缩进错误 | 已修正 |
-| 5 | DEPLOY.md 章节号重复 | 已修正 |
-| 6-7 | 遗漏 `class-variance-authority`, `tw-animate-css` | 已补充 |
-| 8 | env-vars 多源不一致 | 合并为单点源 |
-| 9 | 遗漏 `public/uploads/` | 已加入目录树 |
-| 10 | CSS 动画描述模糊 | 改为精确 keyframe 描述 |
-| 11 | 技术栈分组混乱 | 按层分组 |
-| 12 | `npm run analyze` 位置错误 | 移到脚本表 |
-| 13 | proxy matcher 描述不精确 | 补充精确表达式 |
-| 14 | API 缺响应格式 | 全端点补充 |
-| 15 | 术语不一致 | 规范化 |
-| 16-24 | 引用、目录名、nginx 排错等 | 已全部修复 |
