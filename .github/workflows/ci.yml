@@ -29,6 +29,9 @@ jobs:
         run: npm run lint
         continue-on-error: true  # Don't block CI on lint warnings initially
 
+      - name: Docs contract check
+        run: npm run docs:check  # 文档契约断言：API/环境变量/README 版本漂移拦截
+
       - name: Unit tests
         run: npm test
 
