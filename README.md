@@ -33,4 +33,4 @@ npm run dev                       # 首次自动建表，http://localhost:3000
 
 ## 项目状态
 
-**版本**: 0.2.1 | **Node**: >= 20 | **License**: 私有
+**版本**: 0.2.1 | **Node**: 20.x（勿用 22+：npm "Exit handler never called" bug，见 DEPLOY.md FAQ） | **License**: 私有

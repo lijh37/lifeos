@@ -1,6 +1,6 @@
 # LifeOS — 部署指南
 
-> 双生产环境部署与运维。自包含，不依赖 README 或 AGENTS.md。
+> 双生产环境部署与运维。自包含（部署步骤独立可执行；环境变量完整说明以 AGENTS.md 为单点源）。
 
 ## 双环境概览
 
@@ -63,6 +63,8 @@ cd /root/lifeos && ./deploy.sh
 `deploy.sh` 执行 `git pull` → `docker image prune -f` → 后台 `docker build --no-cache` → `docker compose up -d`。构建日志：`/tmp/lifeos-build.log`。
 
 ### 环境变量（`.env`）
+
+> 完整变量说明与取值对照见 AGENTS.md「环境变量」表（单点源）；此处仅列部署相关取值。
 
 | 变量 | 值 | 说明 |
 |------|----|------|
@@ -160,6 +162,8 @@ git push origin main    # Vercel 自动部署
 ```
 
 环境变量在 Vercel Dashboard 配置：
+
+> 完整变量说明与取值对照见 AGENTS.md「环境变量」表（单点源）；此处仅列部署相关取值。
 
 | 变量 | 说明 |
 |------|------|

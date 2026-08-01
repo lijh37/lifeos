@@ -11,6 +11,11 @@
  *   断言组 3：环境变量双向一致性
  *             - 代码引用 ⊆ 文档表 ∪ 白名单 ∪ 平台内置（缺文档表记录 → 报错）
  *             - 文档表有但代码无引用 → 仅 info 提示
+ *   断言组 4：README 技术栈版本 vs package.json
+ *             - README 出现的三段版本号 ⊆ package.json 依赖版本（升级依赖须同步 README）
+ *   断言组 5：AGENTS.md 环境变量表 vs .env 示例文件
+ *             - 文档表变量 ⊆ .env.example / .env.prod.example（新增变量须同步示例文件）
+ *             - 示例文件有但表无 → 仅 info 提示
  *
  * 任一断言失败 → 退出码 1。无第三方依赖（node:fs / node:child_process / node:path）。
  *
@@ -161,6 +166,71 @@ if (codeOnly.length === 0) {
 
 for (const v of docOnly) {
   info(`文档表有记录但代码无直接引用（合理差异，不报错）：${v}`)
+}
+
+// ─── 断言组 4：README 技术栈版本 vs package.json ─────────────────────────────
+console.log('\n[断言组 4] README 技术栈版本 vs package.json')
+
+const pkg = JSON.parse(readFile('package.json')) as {
+  version?: string
+  dependencies?: Record<string, string>
+  devDependencies?: Record<string, string>
+}
+
+// V_pkg：dependencies + devDependencies 中的三段版本号（"^16.2.9" → "16.2.9"，
+// "^5" / "^4" 等纯 major 版本无三段版本，不提取）。
+// 另纳入根 version 字段：README「版本: 0.2.1」与 package.json 的 version 对应，
+// 同属版本漂移守护范围（项目版本升级同样需要同步 README）。
+const pkgVersionStrings = [
+  ...Object.values(pkg.dependencies ?? {}),
+  ...Object.values(pkg.devDependencies ?? {}),
+  pkg.version ?? '',
+]
+const V_PKG = new Set<string>()
+for (const v of pkgVersionStrings) {
+  for (const m of v.matchAll(/\d+\.\d+\.\d+/g)) {
+    V_PKG.add(m[0])
+  }
+}
+
+// V_readme：README 全文所有三段版本号（"Node >= 20" 不含三段版本，不会误匹配）
+const readme = readFile('README.md')
+const V_README = [...new Set([...readme.matchAll(/\b\d+\.\d+\.\d+\b/g)].map(m => m[0]))]
+
+const readmeOnly = V_README.filter(v => !V_PKG.has(v))
+if (readmeOnly.length === 0) {
+  ok(`README 出现的三段版本号 [${V_README.join(', ')}] ⊆ package.json 依赖版本`)
+} else {
+  fail(
+    `README 出现但 package.json 依赖中不存在：${readmeOnly.join(', ')}` +
+    '（依赖升级后需同步 README 技术栈章节；若为项目版本或其他非依赖版本号，请人工确认）'
+  )
+}
+
+// ─── 断言组 5：AGENTS.md 环境变量表 vs .env 示例文件 ────────────────────────
+console.log('\n[断言组 5] AGENTS.md 环境变量表 vs .env 示例文件')
+
+// V_docs 复用断言组 3 的 docEnv 提取结果（AGENTS.md 环境变量表 `| \`NAME\` |` 行）
+// V_env：合并两份示例文件全文提取。正则锚定到赋值形式 `NAME=`（注释掉的赋值也算，
+// 如 `# ANALYZE=1`），避免把注释里的普通大写单词（OS/SQL/HTTP 等）误当成变量名。
+const V_ENV = new Set<string>()
+for (const m of `${readFile('.env.example')}\n${readFile('.env.prod.example')}`.matchAll(/[A-Z][A-Z0-9_]+(?==)/g)) {
+  V_ENV.add(m[0])
+}
+
+const envMissing = [...docEnv].filter(v => !V_ENV.has(v)).sort()
+if (envMissing.length === 0) {
+  ok('AGENTS.md 环境变量表的每个变量在 .env 示例文件（.env.example / .env.prod.example）中出现')
+} else {
+  fail(
+    `AGENTS.md 环境变量表有记录但 .env 示例文件缺失：${envMissing.join(', ')}` +
+    '（新增环境变量需同步 .env.example / .env.prod.example）'
+  )
+}
+
+const envOnly = [...V_ENV].filter(v => !docEnv.has(v)).sort()
+for (const v of envOnly) {
+  info(`示例文件有但环境变量表无记录（合理冗余/注释指引，不报错）：${v}`)
 }
 
 // ─── 汇总与退出码 ───────────────────────────────────────────────────────────
