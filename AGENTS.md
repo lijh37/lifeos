@@ -15,6 +15,8 @@ LifeOS 是个人生活助手 PWA，支持笔记管理、预算规划、习惯养
 
 ## 目录结构
 
+> 目录树为索引，可能滞后于代码；以实际文件为准。
+
 ```
 opencode-demo/
 ├── app/                          # Next.js App Router
@@ -55,8 +57,7 @@ opencode-demo/
 │   ├── route-loading-bar.tsx     # 全局路由加载进度条
 │   ├── pwa-handler.tsx           # PWA 注册 + 离线横幅（React.memo）
 │   ├── error-boundary.tsx        # React Error Boundary（含重试）
-│   ├── format-note-date.ts       # 中文相对时间格式化
-│   └── markdown-renderer.tsx     # MarkdownRenderer
+│   └── format-note-date.ts       # 中文相对时间格式化
 ├── lib/
 │   ├── types.ts                  # TypeScript 接口（Note/Budget/Habit/Attachment）
 │   ├── utils.ts                  # cn() + genId() + formatFileSize()
@@ -305,10 +306,12 @@ interface Attachment {
 
 ## 测试策略
 
+> 计数为近似值，随迭代变化；以 `npm test` / `npm run test:e2e` 实际输出为准。
+
 | 层 | 工具 | 文件数 | 测试数 | 数据库 |
 |----|------|--------|--------|--------|
-| 单元测试 | vitest (jsdom) | 13 | 117 | `file:./.db-test.sqlite`（临时文件，非 `:memory:`） |
-| E2E | Playwright | 4 套件 | 13 | `file:./.e2e-test.db`（自动清理） |
+| 单元测试 | vitest (jsdom) | ~13 | ~117 | `file:./.db-test.sqlite`（临时文件，非 `:memory:`） |
+| E2E | Playwright | 4 套件 | ~13 | `file:./.e2e-test.db`（自动清理） |
 
 ### 单元测试清单
 
@@ -350,7 +353,7 @@ npm run test:e2e         # Playwright E2E（自动启动 dev server + 自动清�
 | `npm run build` | 生产构建 |
 | `npm run start` | 生产启动 |
 | `npm run lint` | ESLint |
-| `npm test` | vitest 单元测试（13 文件, 117 测试） |
+| `npm test` | vitest 单元测试（约 120 个，见 `__tests__/`） |
 | `npm run test:watch` | 测试 watch 模式 |
 | `npm run test:e2e` | Playwright E2E（4 套件, 13 测试） |
 | `npm run migrate` | 执行待处理数据库迁移 |
@@ -384,12 +387,27 @@ tasks/
 
 任务文件是自包含的——任何代理接手时，读取任务文件即可理解上下文，无需依赖对话历史。
 
+任务文件模板（`tasks/{status}/xx-xxx.md`）：
+
+```markdown
+# 任务标题
+
+## 目标
+<!-- 要达成的可验证结果 -->
+
+## 文档影响
+<!-- AGENTS.md / DESIGN.md / 无 —— 涉及变更的文档，完成时必须同步，未同步 = 任务未完成 -->
+
+## 笔记
+<!-- 实现过程中的实时记录 -->
+```
+
 ### 工作流程
 
 1. 读 `DESIGN.md` 了解当前需求和设计
 2. 读 `tasks/doing/` 了解当前任务（如有）
 3. 执行工作，实时更新任务文件的「笔记」区域
-4. 完成后更新 `DESIGN.md`（如设计有变更）
+4. 同步「文档影响」字段标注的文档；设计有变更时更新 `DESIGN.md`
 5. 移动任务文件到 `done/`
 
 ### 文档读写规则
@@ -401,6 +419,9 @@ tasks/
 | 设计有变更 | `DESIGN.md` | `DESIGN.md` 对应章节 |
 | 任务完成 | — | 任务文件移到 `done/` |
 | 发现新需求 | `DESIGN.md` | 追加到 `DESIGN.md` 需求区 |
+| 变更涉及 AGENTS.md 记录的事实（目录结构/测试数/API 契约/环境变量） | 变更内容 | 完成时同步更新 AGENTS.md |
+
+> **文档维护纪律**：任何变更涉及 AGENTS.md 中记录的事实，完成时必须同步更新 AGENTS.md——文档漂移由 AI 在任务完成时顺手消除，不依赖人工记忆。AGENTS.md 中的精确计数（如测试数）为近似值，以 `npm test` 等实际输出为准。
 
 ### 简单任务
 
