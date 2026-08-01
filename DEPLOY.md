@@ -7,7 +7,7 @@
 | 角色 | 环境 | 数据库 | 存储 | 入口 |
 |------|------|--------|------|------|
 | **主生产** | 阿里云 ECS Docker | 本地 SQLite (`lifeos.db`) | 本地磁盘 | `http://<IP>:3000` |
-| **备用** | Vercel (hkg1) | Turso 远程 | Vercel Blob | `https://lifeos.vercel.app` |
+| **备用** | Vercel (hkg1) | Turso 远程 | Vercel Blob | `https://lifeos-daimo.vercel.app` |
 
 数据完全独立，通过「设置 → 备份/恢复」JSON 手动同步。
 

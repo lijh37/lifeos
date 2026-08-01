@@ -25,6 +25,10 @@ lifeos/
 │   ├── page.tsx                  # 首页 → /notes 重定向
 │   ├── login/                    # 登录页（POST /api/auth）
 │   ├── notes/                    # 笔记列表 + 详情（RSC + Suspense）
+│   │   └── [id]/
+│   │       ├── page.tsx
+│   │       ├── loading.tsx
+│   │       └── note-detail-client.tsx
 │   ├── expenses/                 # 月度预算页
 │   ├── habits/                   # 习惯打卡页
 │   ├── settings/                 # 备份导出/恢复 JSON
@@ -36,8 +40,8 @@ lifeos/
 │       ├── notes/[id]/attachments/route.ts # 附件上传/列表/删除
 │       ├── notes/batch/route.ts  # 批量删除/加标签（事务性）
 │       ├── budgets/route.ts      # GET/POST 预算 upsert
-│       ├── habits/route.ts       # 习惯 CRUD + 打卡 + streaks + 趋势
-│       ├── tags/route.ts         # GET 标签列表, PUT 重命名, DELETE
+│       ├── habits/route.ts       # 习惯 CRUD + 打卡 + streaks + 统计
+│       ├── tags/route.ts         # GET 标签列表, PATCH 重命名, DELETE
 │       ├── backup/route.ts       # GET 导出 JSON, POST 恢复 JSON
 │       └── export/route.ts       # GET 导出全部笔记为 Markdown
 ├── components/
@@ -70,16 +74,12 @@ lifeos/
 │       ├── client.ts             # getClient() 单例连接管理
 │       ├── migrate.ts            # 迁移执行器
 │       ├── index.ts              # 重导出
-│       ├── notes.ts              # 笔记 CRUD + LIKE 搜索 + 游标分页
+│       ├── notes.ts              # 笔记 CRUD + LIKE 搜索 + offset 分页
 │       ├── habits.ts             # 习惯 CRUD + 打卡 + streaks + 统计
 │       ├── budgets.ts            # 预算 upsert
 │       ├── tags.ts               # 标签同步 + 重命名 + 删除（支持外部事务）
 │       └── attachments.ts        # 附件 CRUD
-├── __tests__/                    # 单元测试
-│   ├── lib/                      # db.test.ts / markdown.test.tsx / utils.test.ts / streaks.test.ts
-│   ├── app/api/                  # routes.test.ts（API 路由 + 认证守卫）
-│   ├── components/               # note-list / budget-habit / markdown-editor / attachment-section / batch-actions-bar / tag-manager-sheet
-│   └── store/                    # index.test.ts（Zustand 11 测试）
+├── 单元测试                        # 各模块内嵌 __tests__/ 目录（lib/、app/api/、components/、store/），根目录仅 proxy.test.ts
 ├── store/
 │   ├── index.ts                  # useAppStore（Zustand，笔记缓存 MAX=500）
 │   └── __tests__/                # 状态管理测试（11 测试）
@@ -87,7 +87,8 @@ lifeos/
 │   ├── smoke.spec.ts             # 登录重定向 + PWA manifest
 │   ├── notes.spec.ts             # 笔记 CRUD + 搜索 + 标签 + 置顶
 │   ├── budgets.spec.ts           # 预算设置 + 结算
-│   └── habits.spec.ts            # 习惯创建/打卡/删除
+│   ├── habits.spec.ts            # 习惯创建/打卡/删除
+│   └── helpers.ts                # E2E 辅助（createNoteViaApi/deleteNoteViaApi）
 ├── migrations/
 │   └── 001_create_tables.sql     # 7 表 + 索引 DDL
 ├── scripts/
@@ -100,6 +101,7 @@ lifeos/
 ├── nginx/
 │   └── lifeos.conf               # Nginx 反代配置（备案前后双模式）
 ├── tasks/                          # 任务管理
+│   ├── TEMPLATE.md                 # 任务文件模板
 │   ├── todo/                       # 待办任务
 │   ├── doing/                      # 进行中（同时只能有一个）
 │   └── done/                       # 已完成
@@ -138,8 +140,8 @@ lifeos/
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| GET | `/api/notes` | `q?`, `tag?`, `limit?`(1-500, 默认200), `offset?`, `startDate?`, `endDate?`, `summary?` | 200 `{ notes: Note[] }` | 列表/搜索/分页 |
-| POST | `/api/notes` | `{ title?, content?, tags?, dueDate? }` | 201 `{ note: Note }` | 创建笔记 |
+| GET | `/api/notes` | `q?`, `tag?`, `type?`, `limit?`(1-500, 默认200), `offset?`, `startDate?`, `endDate?` | 200 `{ notes: Note[] }` | 列表/搜索/分页。`offset` 仅 `startDate+endDate` 路径生效；搜索（`q`）固定返回最多 50 条 |
+| POST | `/api/notes` | `{ title?, content?, type?, tags?, dueDate? }` | 201 `{ note: Note }` | 创建笔记（type 仅允许 'note'） |
 | DELETE | `/api/notes?id=<id>` | — | 200 `{ success: true }` | 删除单条 |
 | PATCH | `/api/notes/[id]` | `{ title?, content?, tags?, dueDate?, done?, pinned? }` | 200 `{ note: Note }` | 更新笔记 |
 | GET | `/api/notes/[id]` | — | 200 `{ note: Note }` / 404 `{ error }` | 单条详情 |
@@ -149,43 +151,40 @@ lifeos/
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| POST | `/api/notes/batch` | `{ ids: string[], action: "delete"|"addTag", tag? }` | 200 `{ success: true }` | 事务性批量操作 |
+| POST | `/api/notes/batch` | `{ ids: string[], action: "delete"|"tag", tag? }` | 200 `{ success: true }` | 事务性批量操作 |
 
 ### /api/notes/[id]/attachments
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
 | GET | `/api/notes/[id]/attachments` | — | 200 `{ attachments: Attachment[] }` | 附件列表 |
-| POST | `/api/notes/[id]/attachments` | `file` (multipart/form-data) | 201 `{ attachment: Attachment }` | 上传附件（≤10MB, 禁止 svg） |
-| DELETE | `/api/notes/[id]/attachments?url=<url>` | — | 200 `{ success: true }` | 删除附件 |
+| POST | `/api/notes/[id]/attachments` | `file` (multipart/form-data) | 201 `{ attachment: Attachment }` | 上传附件（≤10MB） |
+| DELETE | `/api/notes/[id]/attachments?attachmentId=<id>` | — | 200 `{ success: true }` | 删除附件（校验附件归属，不属该笔记返回 404） |
 
 ### /api/budgets
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
 | GET | `/api/budgets` | — | 200 `{ budgets: Budget[] }` | 全部预算 |
-| GET | `/api/budgets` | `month=YYYY-MM` | 200 `{ budget: Budget }` / 404 | 单月预算 |
+| GET | `/api/budgets` | `month=YYYY-MM` | 200 `{ budget: Budget | null }` | 单月预算（未设置时返回 null） |
 | POST | `/api/budgets` | `{ month, fixedBudget, variableBudget, fixedActual?, variableActual?, notes?, isCompleted?, savingsCompleted? }` | 200 `{ budget: Budget }` | Upsert |
 
 ### /api/habits
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| GET | `/api/habits` | — | 200 `{ habits: Habit[] }` | 全部习惯 |
-| GET | `/api/habits` | `dashboard=true` | 200 `{ dashboard: HabitDashboardItem[] }` | 合并查询 + 打卡 + streaks + 统计 |
-| POST | `/api/habits` | `{ name, description?, frequency?("daily"|"weekly") }` | 201 `{ habit: Habit }` | 创建习惯 |
-| PATCH | `/api/habits/[id]` | `{ name?, description?, frequency? }` | 200 `{ habit: Habit }` | 更新习惯 |
-| DELETE | `/api/habits/[id]` | — | 200 `{ success: true }` | 删除（级联 habit_completions） |
-| POST | `/api/habits/[id]/toggle` | `date=YYYY-MM-DD` | 200 `{ completion }` | 打卡切换（UNIQUE 防重复） |
-| GET | `/api/habits/streaks` | — | 200 `{ streaks: { [habitId]: { current, best } } }` | 连续天数 |
-| GET | `/api/habits/trends` | `startDate`, `endDate` | 200 `{ trends: { [habitId]: { completionRate, totalDays, completedDays } } }` | 趋势统计 |
+| GET | `/api/habits` | — | 200 `{ habits, todayCompletions, streaks, bestStreaks, perHabitRates, perHabitTotals, perHabitWeek, perHabitMonth }` | 习惯列表 + 打卡 + streaks + 统计（单次返回全部 dashboard 数据，无参数分支） |
+| POST | `/api/habits` | `{ name, description?, frequency?("daily"|"weekly") }` | 200 `{ habit: Habit }` | 创建习惯 |
+| POST | `/api/habits` | `{ _action: "toggle", habitId, date }` | 200 `{ completed, streak, bestStreak, weekCount, monthCount, totalCompletions }` | 打卡切换（UNIQUE 防重复） |
+| PATCH | `/api/habits` | `{ id, name, description }` | 200 `{ success: true }` | 更新习惯（不支持 frequency 更新） |
+| DELETE | `/api/habits?id=<id>` | — | 200 `{ success: true }` | 删除（代码手动级联删除 habit_completions） |
 
 ### /api/tags
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| GET | `/api/tags` | — | 200 `{ tags: { id, name, count }[] }` | 列表（含计数） |
-| PUT | `/api/tags` | `{ oldName, newName }` | 200 `{ tag: { id, name } }` | 重命名/合并 |
+| GET | `/api/tags` | — | 200 `{ tags: { name, count }[] }` | 列表（含计数） |
+| PATCH | `/api/tags` | `{ oldName, newName }` | 200 `{ success: true }` | 重命名/合并 |
 | DELETE | `/api/tags` | `name=` | 200 `{ success: true }` | 删除（级联 note_tags） |
 
 ### /api/backup & /api/export
@@ -235,7 +234,7 @@ interface Attachment {
 | **budgets** | id TEXT PK, month TEXT NOT NULL UNIQUE, fixed_budget REAL DEFAULT 0, variable_budget REAL DEFAULT 0, fixed_actual REAL, variable_actual REAL, notes TEXT DEFAULT '', is_completed INTEGER DEFAULT 0, savings_completed INTEGER DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL | id | — | — |
 | **attachments** | id TEXT PK, note_id TEXT NOT NULL, filename TEXT NOT NULL, url TEXT NOT NULL, mime_type TEXT DEFAULT '', file_size INTEGER DEFAULT 0, created_at TEXT NOT NULL | id | note_id → notes(id) ON DELETE CASCADE | `idx_attachments_note(note_id)` |
 | **habits** | id TEXT PK, name TEXT NOT NULL, description TEXT DEFAULT '', frequency TEXT DEFAULT 'daily', created_at TEXT NOT NULL | id | — | — |
-| **habit_completions** | id TEXT PK, habit_id TEXT NOT NULL, date TEXT NOT NULL, completed INTEGER DEFAULT 0, created_at TEXT NOT NULL | id | habit_id → habits(id) ON DELETE CASCADE | `idx_habit_completions_habit(habit_id)`, `idx_habit_completions_unique(habit_id,date)` UNIQUE |
+| **habit_completions** | id TEXT PK, habit_id TEXT NOT NULL, date TEXT NOT NULL, completed INTEGER DEFAULT 0, created_at TEXT NOT NULL | id | —（无 FK，级联由 lib/db/habits.ts deleteHabit 手动实现） | `idx_habit_completions_habit(habit_id)`, `idx_habit_completions_unique(habit_id,date)` UNIQUE |
 | **tags** | id TEXT PK, name TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL | id | — | — |
 | **note_tags** | note_id TEXT, tag_id TEXT | (note_id, tag_id) 复合 PK | note_id → notes(id) ON DELETE CASCADE, tag_id → tags(id) ON DELETE CASCADE | `idx_note_tags_tag(tag_id)` |
 
@@ -251,11 +250,13 @@ interface Attachment {
 | `TURSO_DATABASE_URL` | 备用必需 | Turso 远程库地址 | **不得设置**（dev 护栏） | **显式清空** | `libsql://...` |
 | `TURSO_AUTH_TOKEN` | 备用必需 | Turso 认证 Token | **不得设置** | **显式清空** | Turso token |
 | `APP_PASSWORD` | 否 | 登录密码 | 不设 或 `demo` | 自定义 | 自定义 |
-| `BLOB_READ_WRITE_TOKEN` | 否（附件） | Vercel Blob 存储 | — | — | Vercel token |
+| `BLOB_READ_WRITE_TOKEN` | 否（附件） | Vercel Blob 存储（由 @vercel/blob 库隐式读取，代码无直接 process.env 引用） | — | — | Vercel token |
 | `STORAGE_DRIVER` | 否 | 存储后端 | `vercel`（默认） | `local` | `vercel`（默认） |
 | `COOKIE_SECURE` | 否 | cookie Secure 标志 | 不设 | `false`（HTTP 阶段） | `true` |
 | `UPLOAD_DIR` | 否（local 驱动） | 本地上传目录 | — | `/app/data/uploads` | — |
 | `UPLOAD_URL_PREFIX` | 否（local 驱动） | 本地附件 URL 前缀 | — | `/uploads` | — |
+| `ANALYZE` | 否 | bundle-analyzer 构建开关 | 不设 | 不设 | 不设 |
+| `BASE_URL` | 否（E2E） | Playwright 目标地址 | 不设 | 不设 | 不设 |
 
 数据库选择逻辑：`url = TURSO_DATABASE_URL \|\| DATABASE_URL`（`lib/db/client.ts:25`）。dev 护栏：非生产 + `TURSO_DATABASE_URL` 匹配 `/turso\.(io\|tech)/i` → 抛错。E2E 隔离：`playwright.config.ts` 显式清空 `TURSO_*`。
 
@@ -321,9 +322,9 @@ interface Attachment {
 | `lib/__tests__/markdown.test.tsx` | 5 | Markdown XSS 净化 |
 | `lib/__tests__/utils.test.ts` | 5 | cn() + genId() + formatFileSize() |
 | `lib/__tests__/streaks.test.ts` | 13 | computeCurrentStreak + computeBestStreak |
-| `app/api/__tests__/routes.test.ts` | 15 | 所有 API 路由 + 认证守卫 401 |
+| `app/api/__tests__/routes.test.ts` | 15 | API 路由校验（认证守卫测试见 proxy.test.ts） |
 | `components/__tests__/note-list.test.tsx` | 4 | 笔记列表渲染 |
-| `components/__tests__/budget-habit.test.tsx` | 8 | ProgressBar(3) + BudgetCard(3) + HabitRow(2) |
+| `components/__tests__/budget-habit.test.tsx` | 8 | ProgressBar(3) + BudgetCard(2) + HabitRow(3) |
 | `components/__tests__/markdown-editor.test.tsx` | 7 | 三模式切换、自动保存、工具栏 |
 | `components/__tests__/attachment-section.test.tsx` | 5 | 拖拽上传、缩略图、乐观删除 |
 | `components/__tests__/batch-actions-bar.test.tsx` | 5 | 批量删除/加标签确认流程 |

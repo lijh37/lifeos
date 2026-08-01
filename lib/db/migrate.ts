@@ -28,7 +28,7 @@ function splitStatements(sql: string): string[] {
  * 2. 扫描 `migrations/` 目录的 `.sql` 文件（按文件名排序）
  * 3. 对比已应用的迁移，执行新增的迁移
  * 4. 每次迁移在一个事务中完成
- * 5. 校验和防止已应用的迁移被意外修改
+ * 5. 按 version 追踪已应用迁移（appliedSet.has(version)），防止重复执行
  *
  * 兼容 SQLite（:memory: / 文件）和 Turso（libSQL 云端）。
  * 在测试中可直接调用：`await migrate(getClient())`

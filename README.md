@@ -29,7 +29,7 @@ npm run dev                       # 首次自动建表，http://localhost:3000
 
 ## 技术栈
 
-**Next.js 16.2.9 (App Router)** + **TypeScript ^5** + **Tailwind v4** + **shadcn/ui base-nova** (`@base-ui/react ^1.6.0` + `class-variance-authority`) + **`@libsql/client` ^0.17.4** (SQLite/Turso) + **Zustand ^5.0.14** + **date-fns ^4.4.0** + **lucide-react ^1.21.0** + **react-markdown** + **sonner ^2.0.7** + **tw-animate-css ^1.4.0**
+**Next.js 16.2.9 (App Router)** + **TypeScript ^5** + **Tailwind v4** + **shadcn/ui base-nova** (`@base-ui/react ^1.6.0` + `class-variance-authority`) + **`@libsql/client` ^0.17.4** (SQLite/Turso) + **Zustand ^5.0.14** + **date-fns ^4.4.0** + **lucide-react ^1.21.0** + **react-markdown ^10.1.0** + **rehype-sanitize** + **remark-gfm** + **remark-breaks** + **sonner ^2.0.7** + **`@vercel/blob` ^2.6.1** + **tw-animate-css ^1.4.0**
 
 ## 项目状态
 

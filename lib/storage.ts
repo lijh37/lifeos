@@ -68,8 +68,7 @@ class LocalDiskDriver implements StorageDriver {
     const buffer = Buffer.from(await file.arrayBuffer())
     await fs.writeFile(path.join(this.uploadDir, filename), buffer)
     // 注意：/uploads/* 由 Nginx / Next 静态服务以文件扩展名推断的 content-type 提供。
-    // 由于上传层（app/api/notes/[id]/attachments/route.ts）已禁止 image/svg+xml
-    // 等可执行子类型，此处不会写入可被浏览器内联执行的 SVG 文件。
+    // 上传层目前未限制 MIME 类型，svg 也可上传。
     return { url: `${this.urlPrefix}/${filename}` }
   }
 
