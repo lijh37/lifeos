@@ -15,118 +15,168 @@ LifeOS 是个人生活助手 PWA，支持笔记管理、预算规划、习惯养
 
 ## 目录结构
 
-> 目录树为索引，可能滞后于代码；以实际文件为准。
+<!-- docgen:tree -->
+> 本目录树由 npm run docs:gen 自动生成，基于 git 跟踪文件；可能滞后于未提交的新文件。
 
 ```
 lifeos/
-├── app/                          # Next.js App Router
-│   ├── globals.css               # Tailwind + CSS 变量 + fadeIn/pulse-soft 动画
-│   ├── layout.tsx                # 根布局（Sidebar + MobileNav + PwaHandler + Toast）
-│   ├── page.tsx                  # 首页 → /notes 重定向
-│   ├── login/                    # 登录页（POST /api/auth）
-│   ├── notes/                    # 笔记列表 + 详情（RSC + Suspense）
-│   │   └── [id]/
-│   │       ├── page.tsx
-│   │       ├── loading.tsx
-│   │       └── note-detail-client.tsx
-│   ├── expenses/                 # 月度预算页
-│   ├── habits/                   # 习惯打卡页
-│   ├── settings/                 # 备份导出/恢复 JSON
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+├── app/
+│   ├── api/
+│   │   ├── __tests__/
+│   │   │   └── routes.test.ts
+│   │   ├── auth/
+│   │   │   └── route.ts
+│   │   ├── backup/
+│   │   │   └── route.ts
+│   │   ├── budgets/
+│   │   │   └── route.ts
+│   │   ├── export/
+│   │   │   └── route.ts
+│   │   ├── habits/
+│   │   │   └── route.ts
+│   │   ├── notes/
+│   │   │   ├── [id]/
+│   │   │   │   ├── attachments/
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── route.ts
+│   │   │   ├── batch/
+│   │   │   │   └── route.ts
+│   │   │   └── route.ts
+│   │   └── tags/
+│   │       └── route.ts
+│   ├── expenses/
+│   │   └── page.tsx
+│   ├── habits/
+│   │   └── page.tsx
+│   ├── login/
+│   │   └── page.tsx
+│   ├── notes/
+│   │   ├── [id]/
+│   │   │   ├── loading.tsx
+│   │   │   ├── note-detail-client.tsx
+│   │   │   └── page.tsx
+│   │   └── page.tsx
+│   ├── settings/
+│   │   └── page.tsx
 │   ├── favicon.ico
-│   └── api/
-│       ├── auth/route.ts         # POST 密码登录 → app_auth cookie
-│       ├── notes/route.ts        # GET 列表/搜索/分页, POST 创建, DELETE
-│       ├── notes/[id]/route.ts   # GET/PUT/DELETE 单条
-│       ├── notes/[id]/attachments/route.ts # 附件上传/列表/删除
-│       ├── notes/batch/route.ts  # 批量删除/加标签（事务性）
-│       ├── budgets/route.ts      # GET/POST 预算 upsert
-│       ├── habits/route.ts       # 习惯 CRUD + 打卡 + streaks + 统计
-│       ├── tags/route.ts         # GET 标签列表, PATCH 重命名, DELETE
-│       ├── backup/route.ts       # GET 导出 JSON, POST 恢复 JSON
-│       └── export/route.ts       # GET 导出全部笔记为 Markdown
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
 ├── components/
-│   ├── ui/                       # @base-ui/react 封装（Button/Card/Input/Checkbox 等）
-│   ├── note-list.tsx             # 笔记列表（搜索+标签筛选+无限滚动+批量操作）
-│   ├── note-card.tsx             # 单条笔记卡片（React.memo）
-│   ├── batch-actions-bar.tsx     # 批量操作栏（next/dynamic 懒加载）
-│   ├── tag-manager-sheet.tsx     # 标签管理 Sheet（next/dynamic 懒加载）
-│   ├── attachment-section.tsx    # 附件区（next/dynamic 懒加载）
-│   ├── markdown-editor.tsx       # Markdown 编辑器（next/dynamic 懒加载）
-│   ├── sidebar.tsx               # 导航侧栏 + 手机底部栏
-│   ├── budget-card.tsx           # 预算卡片（React.memo）
-│   ├── budget-form.tsx           # 预算表单（React.memo）
-│   ├── progress-bar.tsx          # 进度条三色区（React.memo）
-│   ├── habit-row.tsx             # 习惯行（React.memo）
-│   ├── page-animation.tsx        # 页面过渡动效（fadeIn）
-│   ├── route-loading-bar.tsx     # 全局路由加载进度条
-│   ├── pwa-handler.tsx           # PWA 注册 + 离线横幅（React.memo）
-│   ├── error-boundary.tsx        # React Error Boundary（含重试）
-│   └── format-note-date.ts       # 中文相对时间格式化
+│   ├── __tests__/
+│   │   ├── attachment-section.test.tsx
+│   │   ├── batch-actions-bar.test.tsx
+│   │   ├── budget-habit.test.tsx
+│   │   ├── markdown-editor.test.tsx
+│   │   ├── note-list.test.tsx
+│   │   └── tag-manager-sheet.test.tsx
+│   ├── ui/
+│   │   ├── alert-dialog.tsx
+│   │   ├── badge.tsx
+│   │   ├── button.tsx
+│   │   ├── card.tsx
+│   │   ├── checkbox.tsx
+│   │   ├── input.tsx
+│   │   ├── scroll-area.tsx
+│   │   ├── sheet.tsx
+│   │   └── textarea.tsx
+│   ├── attachment-section.tsx
+│   ├── batch-actions-bar.tsx
+│   ├── budget-card.tsx
+│   ├── budget-form.tsx
+│   ├── error-boundary.tsx
+│   ├── format-note-date.ts
+│   ├── habit-row.tsx
+│   ├── markdown-editor.tsx
+│   ├── note-card.tsx
+│   ├── note-list.tsx
+│   ├── page-animation.tsx
+│   ├── progress-bar.tsx
+│   ├── pwa-handler.tsx
+│   ├── route-loading-bar.tsx
+│   ├── sidebar.tsx
+│   └── tag-manager-sheet.tsx
+├── e2e/
+│   ├── budgets.spec.ts
+│   ├── habits.spec.ts
+│   ├── helpers.ts
+│   ├── notes.spec.ts
+│   └── smoke.spec.ts
 ├── lib/
-│   ├── types.ts                  # TypeScript 接口（Note/Budget/Habit/Attachment）
-│   ├── utils.ts                  # cn() + genId() + formatFileSize()
-│   ├── auth-token.ts             # HMAC token 派生与验证（Web Crypto API）
-│   ├── storage.ts                # 存储驱动抽象（VercelBlobDriver / LocalDiskDriver）
-│   ├── markdown.tsx              # MarkdownRenderer 组件
-│   ├── strip-markdown.ts         # 纯函数剥离 Markdown
-│   ├── navigation.ts             # 共享导航配置（NAV_ITEMS 4 项）
-│   └── db/
-│       ├── client.ts             # getClient() 单例连接管理
-│       ├── migrate.ts            # 迁移执行器
-│       ├── index.ts              # 重导出
-│       ├── notes.ts              # 笔记 CRUD + LIKE 搜索 + offset 分页
-│       ├── habits.ts             # 习惯 CRUD + 打卡 + streaks + 统计
-│       ├── budgets.ts            # 预算 upsert
-│       ├── tags.ts               # 标签同步 + 重命名 + 删除（支持外部事务）
-│       └── attachments.ts        # 附件 CRUD
-├── 单元测试                        # 各模块内嵌 __tests__/ 目录（lib/、app/api/、components/、store/），根目录仅 proxy.test.ts
-├── store/
-│   ├── index.ts                  # useAppStore（Zustand，笔记缓存 MAX=500）
-│   └── __tests__/                # 状态管理测试（11 测试）
-├── e2e/                          # Playwright E2E
-│   ├── smoke.spec.ts             # 登录重定向 + PWA manifest
-│   ├── notes.spec.ts             # 笔记 CRUD + 搜索 + 标签 + 置顶
-│   ├── budgets.spec.ts           # 预算设置 + 结算
-│   ├── habits.spec.ts            # 习惯创建/打卡/删除
-│   └── helpers.ts                # E2E 辅助（createNoteViaApi/deleteNoteViaApi）
+│   ├── __tests__/
+│   │   ├── db.test.ts
+│   │   ├── markdown.test.tsx
+│   │   ├── streaks.test.ts
+│   │   └── utils.test.ts
+│   ├── db/
+│   │   ├── attachments.ts
+│   │   ├── budgets.ts
+│   │   ├── client.ts
+│   │   ├── habits.ts
+│   │   ├── index.ts
+│   │   ├── migrate.ts
+│   │   ├── notes.ts
+│   │   └── tags.ts
+│   ├── auth-token.ts
+│   ├── markdown.tsx
+│   ├── navigation.ts
+│   ├── storage.ts
+│   ├── strip-markdown.ts
+│   ├── types.ts
+│   └── utils.ts
 ├── migrations/
-│   └── 001_create_tables.sql     # 7 表 + 索引 DDL
-├── scripts/
-│   └── migrate.ts                # 迁移 CLI（npm run migrate）
-├── public/
-│   ├── manifest.json             # PWA manifest（standalone, portrait）
-│   ├── sw.js                     # Service Worker（静态资源预缓存）
-│   ├── icons/                    # 192x192, 512x512 PNG（含 maskable）
-│   └── uploads/notes/            # 本地存储附件目录（.gitkeep）
+│   └── 001_create_tables.sql
 ├── nginx/
-│   └── lifeos.conf               # Nginx 反代配置（备案前后双模式）
-├── tasks/                          # 任务管理
-│   ├── TEMPLATE.md                 # 任务文件模板
-│   ├── todo/                       # 待办任务
-│   ├── doing/                      # 进行中（同时只能有一个）
-│   └── done/                       # 已完成
-├── proxy.ts                      # Middleware——认证守卫（matcher 排除 _next/static|_next/image|favicon.ico）
-├── proxy.test.ts                 # 中间件认证测试（10 测试）
-├── deploy.sh                     # 主生产 Docker 一键部署脚本
-├── Dockerfile                    # node:20-slim + npm ci
-├── docker-compose.yml            # next + nginx + volume
-├── components.json               # shadcn/ui 配置（style: base-nova, rsc: true, baseColor: neutral）
-├── vitest.config.ts              # vitest（jsdom + @/ alias）
-├── vitest.setup.ts               # 测试初始化（@testing-library/jest-dom/vitest）
-├── playwright.config.ts          # Playwright E2E 配置
-├── next-env.d.ts                 # Next.js 自动生成，无需手动维护
-├── .env.example                  # 开发参考模板（含 Turso 字段）
-├── .env.prod.example             # 自托管 Docker 模板（无 Turso 字段）
-├── next.config.ts
-├── tsconfig.json
-├── eslint.config.mjs
-├── postcss.config.mjs
-├── vercel.json
-├── AGENTS.md                     # ← 你在这里
-├── DESIGN.md                     # 设计文档（需求 + 方案 + 决策）
+│   └── lifeos.conf
+├── public/
+│   ├── icons/
+│   │   ├── icon-192.png
+│   │   └── icon-512.png
+│   ├── manifest.json
+│   └── sw.js
+├── scripts/
+│   └── migrate.ts
+├── store/
+│   ├── __tests__/
+│   │   └── index.test.ts
+│   └── index.ts
+├── tasks/
+│   ├── doing/
+│   │   └── .gitkeep
+│   ├── done/
+│   │   └── .gitkeep
+│   ├── todo/
+│   │   └── .gitkeep
+│   └── TEMPLATE.md
+├── .dockerignore
+├── .env.example
+├── .env.prod.example
+├── .gitignore
+├── AGENTS.md
 ├── DEPLOY.md
-└── README.md
+├── DESIGN.md
+├── Dockerfile
+├── README.md
+├── components.json
+├── deploy.sh
+├── docker-compose.yml
+├── eslint.config.mjs
+├── next.config.ts
+├── package-lock.json
+├── package.json
+├── playwright.config.ts
+├── postcss.config.mjs
+├── proxy.test.ts
+├── proxy.ts
+├── tsconfig.json
+├── vercel.json
+├── vitest.config.ts
+└── vitest.setup.ts
 ```
+<!-- /docgen:tree -->
 
 ## API 端点参考
 
@@ -316,21 +366,25 @@ interface Attachment {
 
 ### 单元测试清单
 
-| 文件 | 测试数 | 覆盖范围 |
-|------|--------|----------|
-| `lib/__tests__/db.test.ts` | 22 | 笔记(7) + 习惯(4) + 预算(3) + 搜索与标签(8) |
-| `lib/__tests__/markdown.test.tsx` | 5 | Markdown XSS 净化 |
-| `lib/__tests__/utils.test.ts` | 5 | cn() + genId() + formatFileSize() |
-| `lib/__tests__/streaks.test.ts` | 13 | computeCurrentStreak + computeBestStreak |
-| `app/api/__tests__/routes.test.ts` | 15 | API 路由校验（认证守卫测试见 proxy.test.ts） |
-| `components/__tests__/note-list.test.tsx` | 4 | 笔记列表渲染 |
-| `components/__tests__/budget-habit.test.tsx` | 8 | ProgressBar(3) + BudgetCard(2) + HabitRow(3) |
-| `components/__tests__/markdown-editor.test.tsx` | 7 | 三模式切换、自动保存、工具栏 |
-| `components/__tests__/attachment-section.test.tsx` | 5 | 拖拽上传、缩略图、乐观删除 |
-| `components/__tests__/batch-actions-bar.test.tsx` | 5 | 批量删除/加标签确认流程 |
-| `components/__tests__/tag-manager-sheet.test.tsx` | 7 | 标签列表、内联重命名、点击筛选 |
-| `store/__tests__/index.test.ts` | 11 | Zustand CRUD + MAX=500 |
-| `proxy.test.ts` | 10 | 中间件认证（cookie/Bearer/公开路径/静态资源） |
+<!-- docgen:tests -->
+> 本清单由 npm run docs:gen 自动生成，计数为静态扫描近似值；精确数字以 npm test 实际输出为准。
+
+| 文件                                               | 测试数（约） | 覆盖范围                                 |
+| -------------------------------------------------- | ------------ | ---------------------------------------- |
+| `app/api/__tests__/routes.test.ts`                 | 15           | API 路由                                 |
+| `components/__tests__/attachment-section.test.tsx` | 5            | AttachmentSection                        |
+| `components/__tests__/batch-actions-bar.test.tsx`  | 5            | BatchActionsBar                          |
+| `components/__tests__/budget-habit.test.tsx`       | 8            | ProgressBar + BudgetCard + HabitRow      |
+| `components/__tests__/markdown-editor.test.tsx`    | 7            | MarkdownEditor                           |
+| `components/__tests__/note-list.test.tsx`          | 4            | NoteList                                 |
+| `components/__tests__/tag-manager-sheet.test.tsx`  | 7            | TagManagerSheet                          |
+| `lib/__tests__/db.test.ts`                         | 22           | 笔记 + 习惯 + 预算 + 搜索与标签          |
+| `lib/__tests__/markdown.test.tsx`                  | 5            | MarkdownRenderer XSS 净化                |
+| `lib/__tests__/streaks.test.ts`                    | 13           | computeCurrentStreak + computeBestStreak |
+| `lib/__tests__/utils.test.ts`                      | 5            | cn                                       |
+| `proxy.test.ts`                                    | 10           | 中间件认证                               |
+| `store/__tests__/index.test.ts`                    | 11           | Zustand store                            |
+<!-- /docgen:tests -->
 
 ### E2E 套件
 

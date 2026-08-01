@@ -16,7 +16,9 @@
     "test:watch": "vitest",
     "pretest:e2e": "rm -f .e2e-test.db",
     "test:e2e": "LD_LIBRARY_PATH=\"$PWD/.pw-libs/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\" playwright test && rm -f .e2e-test.db",
-    "analyze": "ANALYZE=true next build"
+    "analyze": "ANALYZE=true next build",
+    "docs:check": "tsx scripts/docs-check.ts",
+    "docs:gen": "tsx scripts/docgen.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
