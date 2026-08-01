@@ -7,7 +7,7 @@
 | 角色 | 环境 | 数据库 | 存储 | 入口 |
 |------|------|--------|------|------|
 | **主生产** | 阿里云 ECS Docker | 本地 SQLite (`lifeos.db`) | 本地磁盘 | `http://<IP>:3000` |
-| **备用** | Vercel (hkg1) | Turso 远程 | Vercel Blob | `https://opencode-demo.vercel.app` |
+| **备用** | Vercel (hkg1) | Turso 远程 | Vercel Blob | `https://lifeos.vercel.app` |
 
 数据完全独立，通过「设置 → 备份/恢复」JSON 手动同步。
 
@@ -36,7 +36,7 @@ EOF
 systemctl restart docker
 
 # 2. 克隆仓库
-git clone <你的仓库地址> && cd opencode-demo
+git clone <你的仓库地址> && cd lifeos
 
 # 3. 复制环境变量模板
 cp .env.prod.example .env
@@ -57,7 +57,7 @@ curl http://<IP>:3000
 ### 一键重新部署
 
 ```bash
-cd /root/opencode-demo && ./deploy.sh
+cd /root/lifeos && ./deploy.sh
 ```
 
 `deploy.sh` 执行 `git pull` → `docker image prune -f` → 后台 `docker build --no-cache` → `docker compose up -d`。构建日志：`/tmp/lifeos-build.log`。

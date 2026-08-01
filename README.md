@@ -5,7 +5,7 @@ PWA 应用，支持笔记管理、预算规划、习惯养成。
 ## 快速开始
 
 ```bash
-git clone <repo> && cd opencode-demo
+git clone <repo> && cd lifeos
 npm install
 cp .env.example .env.local       # 编辑 DATABASE_URL=file:./data/dev.db
 npm run dev                       # 首次自动建表，http://localhost:3000

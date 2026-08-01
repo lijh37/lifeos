@@ -18,7 +18,7 @@ LifeOS 是个人生活助手 PWA，支持笔记管理、预算规划、习惯养
 > 目录树为索引，可能滞后于代码；以实际文件为准。
 
 ```
-opencode-demo/
+lifeos/
 ├── app/                          # Next.js App Router
 │   ├── globals.css               # Tailwind + CSS 变量 + fadeIn/pulse-soft 动画
 │   ├── layout.tsx                # 根布局（Sidebar + MobileNav + PwaHandler + Toast）
