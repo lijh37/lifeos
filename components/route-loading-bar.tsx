@@ -18,14 +18,15 @@ function LoadingBarInner() {
       const timer = setTimeout(() => setIsLoading(false), 400)
       return () => clearTimeout(timer)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname])
 
   useEffect(() => {
-    setIsLoading(true)
-    const timer = setTimeout(() => setIsLoading(false), 400)
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const showTimer = setTimeout(() => setIsLoading(true), 0)
+    const hideTimer = setTimeout(() => setIsLoading(false), 400)
+    return () => {
+      clearTimeout(showTimer)
+      clearTimeout(hideTimer)
+    }
   }, [searchParams])
 
   return (

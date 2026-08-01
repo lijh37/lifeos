@@ -25,7 +25,7 @@ function loadEnvFile(file: string) {
     const m = line.match(/^\s*(?:export\s+)?([\w.]+)\s*=\s*(.*)\s*$/)
     if (!m) continue
     const key = m[1]
-    let val = m[2].replace(/^["']|["']$/g, '')
+    const val = m[2].replace(/^["']|["']$/g, '')
     if (key in process.env) continue // 已注入的环境变量优先
     process.env[key] = val
   }

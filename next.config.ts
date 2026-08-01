@@ -13,7 +13,8 @@ let nextConfig: NextConfig = {
 };
 
 if (process.env.ANALYZE === 'true') {
-  // next.config.ts 被 Next.js 转译为 CJS，require() 在此安全
+  // next.config.ts 被 Next.js 转译为 CJS，require() 在此安全（保留条件 require 避免生产环境加载 devDependency）
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const withBundleAnalyzer = require('@next/bundle-analyzer')({
     enabled: true,
   })

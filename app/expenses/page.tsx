@@ -26,6 +26,7 @@ export default function BudgetPage() {
   const [fixedActualInput, setFixedActualInput] = useState('')
   const [variableActualInput, setVariableActualInput] = useState('')
   const [notesText, setNotesText] = useState(budget?.notes || '')
+  const [prevBudgetNotes, setPrevBudgetNotes] = useState(budget?.notes)
   const notesTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const budgetAbortRef = useRef<AbortController | undefined>(undefined)
 
@@ -45,30 +46,35 @@ export default function BudgetPage() {
     setVariableActualInput(b?.variableActual !== null && b?.variableActual !== undefined ? String(b.variableActual) : '')
   }, [])
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [budgetRes, budgetsRes] = await Promise.all([
-        fetch(`/api/budgets?month=${currentMonth}`),
-        fetch('/api/budgets'),
-      ])
-      const bd = await budgetRes.json()
-      const bl = await budgetsRes.json()
-      setBudget(bd.budget)
-      setBudgets(bl.budgets)
-      syncInputs(bd.budget)
-    } catch (e) {
-      console.error('Failed to fetch budget data:', e)
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    let ignore = false
+    async function startFetching() {
+      try {
+        const [budgetRes, budgetsRes] = await Promise.all([
+          fetch(`/api/budgets?month=${currentMonth}`),
+          fetch('/api/budgets'),
+        ])
+        const bd = await budgetRes.json()
+        const bl = await budgetsRes.json()
+        if (ignore) return
+        setBudget(bd.budget)
+        setBudgets(bl.budgets)
+        syncInputs(bd.budget)
+      } catch (e) {
+        console.error('Failed to fetch budget data:', e)
+      } finally {
+        if (!ignore) setLoading(false)
+      }
     }
+    startFetching()
+    return () => { ignore = true }
   }, [currentMonth, syncInputs])
 
-  useEffect(() => { fetchData() }, [fetchData])
-
-  useEffect(() => {
+  // Sync notesText when budget.notes changes (adjust state during render)
+  if (budget?.notes !== prevBudgetNotes) {
+    setPrevBudgetNotes(budget?.notes)
     setNotesText(budget?.notes || '')
-  }, [budget?.notes])
+  }
 
   useEffect(() => {
     if (notesText === (budget?.notes || '')) return
@@ -123,10 +129,12 @@ export default function BudgetPage() {
   }
 
   function handlePrev() {
+    setLoading(true)
     setCurrentMonth(subMonths(new Date(currentMonth + '-01'), 1).toISOString().slice(0, 7))
   }
 
   function handleNext() {
+    setLoading(true)
     setCurrentMonth(addMonths(new Date(currentMonth + '-01'), 1).toISOString().slice(0, 7))
   }
 

@@ -1,4 +1,5 @@
 import { createClient } from '@libsql/client'
+import { mkdirSync } from 'node:fs'
 
 let client: ReturnType<typeof createClient> | null = null
 
@@ -45,7 +46,7 @@ export function getClient() {
     const filePath = url.slice('file:'.length).replace(/^\.\//, '')
     const dir = filePath.includes('/') ? filePath.slice(0, filePath.lastIndexOf('/')) : ''
     if (dir) {
-      try { require('node:fs').mkdirSync(dir, { recursive: true }) } catch { /* 目录已存在 */ }
+      try { mkdirSync(dir, { recursive: true }) } catch { /* 目录已存在 */ }
     }
   }
 

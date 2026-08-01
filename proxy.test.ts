@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import type { NextRequest } from 'next/server'
 import { proxy } from '@/proxy'
 
 // Minimal NextRequest stub — only the surface proxy.ts touches.
@@ -22,7 +23,7 @@ function makeRequest(pathname: string, opts: {
         return null
       },
     },
-  } as any
+  } as unknown as NextRequest
 }
 
 // Derive the expected token the same way the app does (HMAC of APP_PASSWORD).

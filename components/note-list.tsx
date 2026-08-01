@@ -51,8 +51,6 @@ export function NoteList() {
   const [activeTag, setActiveTag] = useState<string | null>(null)
   const [availableTags, setAvailableTags] = useState<{ name: string; count: number }[]>([])
   const [tagManagerOpen, setTagManagerOpen] = useState(false)
-  const activeTagRef = useRef<string | null>(null)
-  activeTagRef.current = activeTag
 
   const fetchNotes = useCallback(async () => {
     setInitialLoading(true)

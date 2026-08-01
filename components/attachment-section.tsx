@@ -52,21 +52,24 @@ export function AttachmentSection({ noteId }: AttachmentSectionProps) {
   const [isDragging, setIsDragging] = useState(false)
 
   // Fetch attachments
-  const fetchAttachments = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/notes/${noteId}/attachments`)
-      const data = await res.json()
-      setAttachments(data.attachments || [])
-    } catch {
-      // Silent fail on initial load
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    let ignore = false
+    async function startFetching() {
+      try {
+        const res = await fetch(`/api/notes/${noteId}/attachments`)
+        const data = await res.json()
+        if (!ignore) setAttachments(data.attachments || [])
+      } catch {
+        // Silent fail on initial load
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+    startFetching()
+    return () => {
+      ignore = true
     }
   }, [noteId])
-
-  useEffect(() => {
-    fetchAttachments()
-  }, [fetchAttachments])
 
   // Handle file upload
   const handleUpload = useCallback(async (files: FileList | File[]) => {

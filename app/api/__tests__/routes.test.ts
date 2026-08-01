@@ -6,6 +6,7 @@ delete process.env.TURSO_DATABASE_URL
 process.env.DATABASE_URL = 'file:./.routes-test.db'
 
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest'
+import { rmSync } from 'node:fs'
 import { NextRequest } from 'next/server'
 import { getClient, migrate } from '@/lib/db'
 
@@ -28,7 +29,7 @@ describe('API routes', () => {
   })
 
   afterAll(() => {
-    try { require('node:fs').rmSync('./.routes-test.db', { force: true }) } catch { /* ignore */ }
+    try { rmSync('./.routes-test.db', { force: true }) } catch { /* ignore */ }
   })
 
   beforeEach(async () => {

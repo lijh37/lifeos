@@ -49,7 +49,10 @@ export function TagManagerSheet({ open, onOpenChange, onTagSelect, onTagsChanged
   }
 
   useEffect(() => {
-    if (open) fetchTags()
+    if (open) {
+      const timer = setTimeout(fetchTags, 0)
+      return () => clearTimeout(timer)
+    }
   }, [open])
 
   const showMsg = (type: 'success' | 'error', text: string) => {

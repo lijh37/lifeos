@@ -53,11 +53,14 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
   const [deleting, setDeleting] = useState(false)
   const titleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  // Sync state when navigating between notes
-  useEffect(() => {
+  // Sync state when navigating between notes (adjust state during render)
+  const prevInitialKey = `${initialNote.id}:${initialNote.title ?? ''}`
+  const [prevKey, setPrevKey] = useState(prevInitialKey)
+  if (prevInitialKey !== prevKey) {
+    setPrevKey(prevInitialKey)
     setNote(initialNote)
     setTitle(initialNote.title || '')
-  }, [initialNote.id, initialNote.title])
+  }
 
   // Ensure note is in the list cache so back navigation shows it without a refresh
   useEffect(() => {
