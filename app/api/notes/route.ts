@@ -32,7 +32,9 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ notes }, noCache)
 }
 
-const NOTE_TYPES = ['note', 'todo', 'event'] as const
+// Note.type 类型定义为字面量 'note'（见 lib/types.ts），DB 层 rowToNote 也恒映射为 'note'。
+// 收紧校验只允许 'note'，避免 API 接受 todo/event 导致静默丢类型。
+const NOTE_TYPES = ['note'] as const
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
