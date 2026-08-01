@@ -14,6 +14,7 @@ import { POST as batchPOST } from '@/app/api/notes/batch/route'
 import { GET as tagsGET, PATCH as tagsPATCH, DELETE as tagsDELETE } from '@/app/api/tags/route'
 import { GET as budgetsGET, POST as budgetsPOST } from '@/app/api/budgets/route'
 import { GET as habitsGET, POST as habitsPOST } from '@/app/api/habits/route'
+import { GET as weightGET, POST as weightPOST, DELETE as weightDELETE } from '@/app/api/weight/route'
 import { GET as exportGET } from '@/app/api/export/route'
 import { GET as backupGET } from '@/app/api/backup/route'
 
@@ -39,6 +40,7 @@ describe('API routes', () => {
     await getClient().execute('DELETE FROM notes')
     await getClient().execute('DELETE FROM habits')
     await getClient().execute('DELETE FROM habit_completions')
+    await getClient().execute('DELETE FROM weight_logs')
     await getClient().execute('DELETE FROM budgets')
   })
 
@@ -213,6 +215,97 @@ describe('API routes', () => {
       const off = await habitsPOST(postReq('http://localhost/api/habits', { _action: 'toggle', habitId: habit.id, date: today }))
       const offData = await off.json()
       expect(offData.completed).toBe(false)
+    })
+  })
+
+  describe('weight', () => {
+    it('17. weight POST creates a log and GET returns grouped by person', async () => {
+      const res = await weightPOST(postReq('http://localhost/api/weight', {
+        person: 'me', date: '2026-01-15', weight: 70.5, note: '晨起',
+      }))
+      expect(res.status).toBe(200)
+      const { weightLog } = await res.json()
+      expect(weightLog.person).toBe('me')
+      expect(weightLog.date).toBe('2026-01-15')
+      expect(weightLog.weight).toBe(70.5)
+      expect(weightLog.note).toBe('晨起')
+
+      const getRes = await weightGET(new NextRequest('http://localhost/api/weight'))
+      expect(getRes.status).toBe(200)
+      const data = await getRes.json()
+      expect(data.me).toHaveLength(1)
+      expect(data.her).toHaveLength(0)
+      expect(data.me[0].id).toBe(weightLog.id)
+    })
+
+    it('18. weight POST overwrites same person + date', async () => {
+      await weightPOST(postReq('http://localhost/api/weight', {
+        person: 'her', date: '2026-01-15', weight: 52.0,
+      }))
+      const res = await weightPOST(postReq('http://localhost/api/weight', {
+        person: 'her', date: '2026-01-15', weight: 51.5,
+      }))
+      expect(res.status).toBe(200)
+
+      const getRes = await weightGET(new NextRequest('http://localhost/api/weight'))
+      const data = await getRes.json()
+      expect(data.her).toHaveLength(1)
+      expect(data.her[0].weight).toBe(51.5)
+    })
+
+    it('19. weight POST returns 400 for invalid person/date/weight', async () => {
+      const badPerson = await weightPOST(postReq('http://localhost/api/weight', {
+        person: 'other', date: '2026-01-15', weight: 70,
+      }))
+      expect(badPerson.status).toBe(400)
+      expect((await badPerson.json()).error).toBe('invalid person')
+
+      const badDate = await weightPOST(postReq('http://localhost/api/weight', {
+        person: 'me', date: '2026-13-40', weight: 70,
+      }))
+      expect(badDate.status).toBe(400)
+
+      const badDateFmt = await weightPOST(postReq('http://localhost/api/weight', {
+        person: 'me', date: '2026/01/15', weight: 70,
+      }))
+      expect(badDateFmt.status).toBe(400)
+
+      const badWeight = await weightPOST(postReq('http://localhost/api/weight', {
+        person: 'me', date: '2026-01-15', weight: 0,
+      }))
+      expect(badWeight.status).toBe(400)
+      expect((await badWeight.json()).error).toBe('invalid weight')
+
+      const badWeightHigh = await weightPOST(postReq('http://localhost/api/weight', {
+        person: 'me', date: '2026-01-15', weight: 501,
+      }))
+      expect(badWeightHigh.status).toBe(400)
+    })
+
+    it('20. weight GET returns empty arrays when no logs', async () => {
+      const res = await weightGET(new NextRequest('http://localhost/api/weight'))
+      expect(res.status).toBe(200)
+      const data = await res.json()
+      expect(data.me).toEqual([])
+      expect(data.her).toEqual([])
+    })
+
+    it('21. weight DELETE removes a log; missing id returns 400', async () => {
+      const created = await weightPOST(postReq('http://localhost/api/weight', {
+        person: 'me', date: '2026-01-15', weight: 70.5,
+      }))
+      const { weightLog } = await created.json()
+
+      const delRes = await weightDELETE(new NextRequest(`http://localhost/api/weight?id=${weightLog.id}`))
+      expect(delRes.status).toBe(200)
+      expect((await delRes.json()).success).toBe(true)
+
+      const getRes = await weightGET(new NextRequest('http://localhost/api/weight'))
+      const data = await getRes.json()
+      expect(data.me).toHaveLength(0)
+
+      const missing = await weightDELETE(new NextRequest('http://localhost/api/weight'))
+      expect(missing.status).toBe(400)
     })
   })
 

@@ -43,6 +43,15 @@ export async function migrate(db: Client): Promise<void> {
     )
   `)
 
+  // 兼容历史 schema：旧版追踪表含 checksum TEXT NOT NULL 列，新代码不再写入
+  // （CREATE TABLE IF NOT EXISTS 不会改动已存在的表，直接 INSERT 会违反 NOT NULL）。
+  // 检测到该列时删除，保留已应用记录。
+  const cols = await db.execute('PRAGMA table_info(_migrations)')
+  const hasChecksum = cols.rows.some((row) => row.name === 'checksum')
+  if (hasChecksum) {
+    await db.execute('ALTER TABLE _migrations DROP COLUMN checksum')
+  }
+
   // 读取已应用的迁移
   const applied = await db.execute('SELECT version FROM _migrations ORDER BY version')
   const appliedSet = new Set<number>()

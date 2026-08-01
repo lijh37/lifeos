@@ -8,6 +8,7 @@ interface BackupFile {
   budgets?: unknown[]
   habits?: unknown[]
   habitCompletions?: unknown[]
+  weightLogs?: unknown[]
 }
 
 function isString(v: unknown): v is string {
@@ -50,6 +51,16 @@ function validateBackup(data: BackupFile): string | null {
       if (!isString(completion.date)) return '无效的备份文件：habitCompletions[].date 必须是字符串'
     }
   }
+  if (data.weightLogs !== undefined) {
+    if (!Array.isArray(data.weightLogs)) return '无效的备份文件：weightLogs 必须是数组'
+    for (const wl of data.weightLogs) {
+      if (typeof wl !== 'object' || wl === null) return '无效的备份文件：weightLogs 元素格式错误'
+      const weightLog = wl as Record<string, unknown>
+      if (!isString(weightLog.id)) return '无效的备份文件：weightLogs[].id 必须是字符串'
+      if (!isString(weightLog.person)) return '无效的备份文件：weightLogs[].person 必须是字符串'
+      if (!isString(weightLog.date)) return '无效的备份文件：weightLogs[].date 必须是字符串'
+    }
+  }
   return null
 }
 
@@ -70,6 +81,16 @@ export async function GET(req: NextRequest) {
     completed: (r.completed as number) === 1,
     created_at: r.created_at as string,
   }))
+  const weightLogs = (await db.execute(
+    'SELECT id, person, date, weight, note, created_at FROM weight_logs'
+  )).rows.map(r => ({
+    id: r.id as string,
+    person: r.person as string,
+    date: r.date as string,
+    weight: Number(r.weight),
+    note: r.note as string,
+    created_at: r.created_at as string,
+  }))
 
   const data = {
     exportedAt: new Date().toISOString(),
@@ -78,6 +99,7 @@ export async function GET(req: NextRequest) {
     budgets,
     habits,
     habitCompletions,
+    weightLogs,
   }
 
   const filename = `lifeos-backup-${new Date().toISOString().slice(0, 10)}.json`
@@ -115,6 +137,7 @@ export async function POST(req: NextRequest) {
     await tx.execute('DELETE FROM attachments')
     await tx.execute('DELETE FROM habit_completions')
     await tx.execute('DELETE FROM habits')
+    await tx.execute('DELETE FROM weight_logs')
     await tx.execute('DELETE FROM note_tags')
     await tx.execute('DELETE FROM tags')
     await tx.execute('DELETE FROM budgets')
@@ -232,6 +255,25 @@ export async function POST(req: NextRequest) {
             hc.date as string,
             hc.completed ? 1 : 0,
             (hc.created_at as string) || new Date().toISOString(),
+          ],
+        })
+        imported++
+      }
+    }
+
+    // Import weight logs
+    if (Array.isArray(data.weightLogs)) {
+      for (const rawWeightLog of data.weightLogs) {
+        const wl = rawWeightLog as Record<string, unknown>
+        await tx.execute({
+          sql: 'INSERT INTO weight_logs (id, person, date, weight, note, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+          args: [
+            wl.id as string,
+            wl.person as string,
+            wl.date as string,
+            Number(wl.weight),
+            (wl.note as string) || '',
+            (wl.created_at as string) || new Date().toISOString(),
           ],
         })
         imported++

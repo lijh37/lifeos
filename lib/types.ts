@@ -1,6 +1,28 @@
 /** 未分类标签的常量标识（客户端与服务端共享，置于无 DB 依赖的模块） */
 export const UNTAGGED = '__untagged__'
 
+/** 体重记录人键：'me' = 我，'her' = 她 */
+export type WeightPersonKey = 'me' | 'her'
+
+/** 体重记录人常量定义（双人不建表，API 校验限定此键） */
+export const WEIGHT_PERSONS: { key: WeightPersonKey; label: string }[] = [
+  { key: 'me', label: '我' },
+  { key: 'her', label: '她' },
+]
+
+/** 体重记录数据结构 */
+export interface WeightLog {
+  id: string
+  person: WeightPersonKey
+  /** 日期（YYYY-MM-DD） */
+  date: string
+  /** 体重（kg） */
+  weight: number
+  /** 备注 */
+  note: string
+  createdAt: string
+}
+
 /** 笔记附件数据结构 */
 export interface Attachment {
   /** 唯一标识（UUID） */

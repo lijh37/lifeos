@@ -7,7 +7,9 @@ delete process.env.TURSO_DATABASE_URL
 process.env.DATABASE_URL = 'file:./.db-test.sqlite'
 
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
-import { createNote, getNotes, getNote, updateNote, deleteNote, getClient, createHabit, getHabits, toggleCompletion, getTodayCompletions, deleteHabit, upsertBudget, getBudget, getBudgets, searchNotes, getAllTags, renameTag, deleteTag, migrate } from '@/lib/db'
+import { createClient } from '@libsql/client'
+import fs from 'node:fs'
+import { createNote, getNotes, getNote, updateNote, deleteNote, getClient, createHabit, getHabits, toggleCompletion, getTodayCompletions, deleteHabit, upsertBudget, getBudget, getBudgets, searchNotes, getAllTags, renameTag, deleteTag, migrate, listWeightLogs, upsertWeightLog, deleteWeightLog } from '@/lib/db'
 import type { Note } from '@/lib/types'
 
 // Clean up the temp file DB after all tests in this file.
@@ -17,7 +19,7 @@ afterAll(async () => {
     await getClient().execute('DELETE FROM tags')
     await getClient().execute('DELETE FROM notes')
   } catch { /* ignore */ }
-  try { require('node:fs').unlinkSync('./.db-test.sqlite') } catch { /* ignore */ }
+  try { fs.unlinkSync('./.db-test.sqlite') } catch { /* ignore */ }
 })
 
 function makeNote(overrides: Partial<Note> = {}): Note {
@@ -326,5 +328,110 @@ describe('Database - Search and Tags', () => {
 
   it('should delete non-existent tag without error', async () => {
     await expect(deleteTag('nonexistent')).resolves.toBeUndefined()
+  })
+})
+
+describe('Database - Weight', () => {
+  beforeAll(async () => {
+    await migrate(getClient())
+  })
+
+  beforeEach(async () => {
+    await getClient().execute('DELETE FROM weight_logs')
+  })
+
+  it('should insert a weight log and list it', async () => {
+    const log = await upsertWeightLog({
+      person: 'me',
+      date: '2026-01-15',
+      weight: 70.5,
+      note: '晨起',
+    })
+    expect(log.person).toBe('me')
+    expect(log.date).toBe('2026-01-15')
+    expect(log.weight).toBe(70.5)
+    expect(log.note).toBe('晨起')
+    expect(log.id).toBeDefined()
+
+    const logs = await listWeightLogs()
+    expect(logs).toHaveLength(1)
+    expect(logs[0].id).toBe(log.id)
+  })
+
+  it('should overwrite same person + same date', async () => {
+    const first = await upsertWeightLog({ person: 'me', date: '2026-01-15', weight: 70.5 })
+    const second = await upsertWeightLog({ person: 'me', date: '2026-01-15', weight: 69.8, note: '更新' })
+
+    expect(second.id).toBe(first.id)
+    const logs = await listWeightLogs()
+    expect(logs).toHaveLength(1)
+    expect(logs[0].weight).toBe(69.8)
+    expect(logs[0].note).toBe('更新')
+  })
+
+  it('should keep two persons independent on the same date', async () => {
+    await upsertWeightLog({ person: 'me', date: '2026-01-15', weight: 70.5 })
+    await upsertWeightLog({ person: 'her', date: '2026-01-15', weight: 52.0 })
+
+    const logs = await listWeightLogs()
+    expect(logs).toHaveLength(2)
+    const me = logs.find(l => l.person === 'me')
+    const her = logs.find(l => l.person === 'her')
+    expect(me!.weight).toBe(70.5)
+    expect(her!.weight).toBe(52.0)
+  })
+
+  it('should list sorted by person then date asc', async () => {
+    await upsertWeightLog({ person: 'me', date: '2026-02-01', weight: 71 })
+    await upsertWeightLog({ person: 'her', date: '2026-01-20', weight: 52.5 })
+    await upsertWeightLog({ person: 'me', date: '2026-01-15', weight: 70.5 })
+    await upsertWeightLog({ person: 'her', date: '2026-01-10', weight: 53 })
+
+    const logs = await listWeightLogs()
+    expect(logs.map(l => `${l.person}:${l.date}`)).toEqual([
+      'her:2026-01-10',
+      'her:2026-01-20',
+      'me:2026-01-15',
+      'me:2026-02-01',
+    ])
+  })
+
+  it('should delete a weight log', async () => {
+    const log = await upsertWeightLog({ person: 'me', date: '2026-01-15', weight: 70.5 })
+    await deleteWeightLog(log.id)
+    const logs = await listWeightLogs()
+    expect(logs).toHaveLength(0)
+  })
+})
+
+describe('Database - Migrations (legacy schema)', () => {
+  it('should repair a legacy _migrations table that still has a checksum column', async () => {
+    const file = './.db-legacy-test.sqlite'
+    fs.rmSync(file, { force: true })
+    const db = createClient({ url: `file:${file}` })
+
+    // 模拟旧版本代码创建的追踪表（含 checksum NOT NULL 列，且已应用 001）
+    await db.execute(`
+      CREATE TABLE _migrations (
+        version INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        checksum TEXT NOT NULL,
+        applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `)
+    await db.execute(
+      `INSERT INTO _migrations (version, name, checksum) VALUES (1, '001_create_tables.sql', 'abc123')`
+    )
+
+    await expect(migrate(db)).resolves.toBeUndefined()
+
+    const cols = await db.execute('PRAGMA table_info(_migrations)')
+    expect(cols.rows.map((r) => r.name)).not.toContain('checksum')
+
+    const applied = await db.execute('SELECT version FROM _migrations ORDER BY version')
+    expect(applied.rows.map((r) => Number(r.version))).toEqual([1, 2])
+
+    db.close()
+    fs.rmSync(file, { force: true })
   })
 })

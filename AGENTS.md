@@ -138,26 +138,19 @@ lifeos/
 │   ├── manifest.json
 │   └── sw.js
 ├── scripts/
+│   ├── docgen.ts
+│   ├── docs-check.ts
 │   └── migrate.ts
 ├── store/
 │   ├── __tests__/
 │   │   └── index.test.ts
 │   └── index.ts
-├── tasks/
-│   ├── doing/
-│   │   └── .gitkeep
-│   ├── done/
-│   │   └── .gitkeep
-│   ├── todo/
-│   │   └── .gitkeep
-│   └── TEMPLATE.md
 ├── .dockerignore
 ├── .env.example
 ├── .env.prod.example
 ├── .gitignore
 ├── AGENTS.md
 ├── DEPLOY.md
-├── DESIGN.md
 ├── Dockerfile
 ├── README.md
 ├── components.json
@@ -229,6 +222,14 @@ lifeos/
 | PATCH | `/api/habits` | `{ id, name, description }` | 200 `{ success: true }` | 更新习惯（不支持 frequency 更新） |
 | DELETE | `/api/habits?id=<id>` | — | 200 `{ success: true }` | 删除（代码手动级联删除 habit_completions） |
 
+### /api/weight
+
+| 方法 | 路径 | 参数 | 响应 | 说明 |
+|------|------|------|------|------|
+| GET | `/api/weight` | — | 200 `{ me: WeightLog[], her: WeightLog[] }` | 按 person 分组、date 升序，空数组兜底；`Cache-Control: private, max-age=20, stale-while-revalidate=90` |
+| POST | `/api/weight` | `{ person, date, weight, note? }` | 200 `{ weightLog: WeightLog }` | 校验：person∈`WEIGHT_PERSONS` 键、date 匹配 `YYYY-MM-DD` 且真实日期、weight 有限且 >0 且 ≤500，否则 400；同人同日 upsert 覆盖 |
+| DELETE | `/api/weight?id=<id>` | — | 200 `{ success: true }` | 删除单条，缺 id 返回 400 |
+
 ### /api/tags
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
@@ -264,6 +265,10 @@ interface Habit {
 interface Attachment {
   id: string; noteId: string; filename: string; url: string; mimeType: string; fileSize: number; createdAt: string
 }
+type WeightPersonKey = 'me' | 'her'
+interface WeightLog {
+  id: string; person: WeightPersonKey; date: string; weight: number; note: string; createdAt: string
+}
 ```
 
 ### 认证
@@ -276,7 +281,7 @@ interface Attachment {
 
 ## 数据库 Schema
 
-7 表，DDL 见 `migrations/001_create_tables.sql`。`getClient()` (`lib/db/client.ts:20`) 自动管理连接和 `PRAGMA foreign_keys = ON`。
+8 表，DDL 见 `migrations/001_create_tables.sql` 与 `migrations/002_weight_logs.sql`。`getClient()` (`lib/db/client.ts:20`) 自动管理连接和 `PRAGMA foreign_keys = ON`。
 
 | 表 | 列 | 主键 | 外键 | 索引 |
 |----|----|------|------|------|
@@ -287,6 +292,7 @@ interface Attachment {
 | **habit_completions** | id TEXT PK, habit_id TEXT NOT NULL, date TEXT NOT NULL, completed INTEGER DEFAULT 0, created_at TEXT NOT NULL | id | —（无 FK，级联由 lib/db/habits.ts deleteHabit 手动实现） | `idx_habit_completions_habit(habit_id)`, `idx_habit_completions_unique(habit_id,date)` UNIQUE |
 | **tags** | id TEXT PK, name TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL | id | — | — |
 | **note_tags** | note_id TEXT, tag_id TEXT | (note_id, tag_id) 复合 PK | note_id → notes(id) ON DELETE CASCADE, tag_id → tags(id) ON DELETE CASCADE | `idx_note_tags_tag(tag_id)` |
+| **weight_logs** | id TEXT PK, person TEXT NOT NULL, date TEXT NOT NULL, weight REAL NOT NULL, note TEXT DEFAULT '', created_at TEXT NOT NULL | id | — | `idx_weight_person_date(person,date)` UNIQUE |
 
 迁移机制：`migrations/*.sql` → `_migrations` 追踪表 → `lib/db/migrate.ts` 执行器。命令：`npm run migrate` / `npm run migrate:dry` / `npm run migrate -- --reset`。
 
@@ -361,7 +367,7 @@ interface Attachment {
 
 | 层 | 工具 | 文件数 | 测试数 | 数据库 |
 |----|------|--------|--------|--------|
-| 单元测试 | vitest (jsdom) | ~13 | ~117 | `file:./.db-test.sqlite`（临时文件，非 `:memory:`） |
+| 单元测试 | vitest (jsdom) | ~13 | ~127 | `file:./.db-test.sqlite`（临时文件，非 `:memory:`） |
 | E2E | Playwright | 4 套件 | ~13 | `file:./.e2e-test.db`（自动清理） |
 
 ### 单元测试清单
@@ -369,21 +375,21 @@ interface Attachment {
 <!-- docgen:tests -->
 > 本清单由 npm run docs:gen 自动生成，计数为静态扫描近似值；精确数字以 npm test 实际输出为准。
 
-| 文件                                               | 测试数（约） | 覆盖范围                                 |
-| -------------------------------------------------- | ------------ | ---------------------------------------- |
-| `app/api/__tests__/routes.test.ts`                 | 15           | API 路由                                 |
-| `components/__tests__/attachment-section.test.tsx` | 5            | AttachmentSection                        |
-| `components/__tests__/batch-actions-bar.test.tsx`  | 5            | BatchActionsBar                          |
-| `components/__tests__/budget-habit.test.tsx`       | 8            | ProgressBar + BudgetCard + HabitRow      |
-| `components/__tests__/markdown-editor.test.tsx`    | 7            | MarkdownEditor                           |
-| `components/__tests__/note-list.test.tsx`          | 4            | NoteList                                 |
-| `components/__tests__/tag-manager-sheet.test.tsx`  | 7            | TagManagerSheet                          |
-| `lib/__tests__/db.test.ts`                         | 22           | 笔记 + 习惯 + 预算 + 搜索与标签          |
-| `lib/__tests__/markdown.test.tsx`                  | 5            | MarkdownRenderer XSS 净化                |
-| `lib/__tests__/streaks.test.ts`                    | 13           | computeCurrentStreak + computeBestStreak |
-| `lib/__tests__/utils.test.ts`                      | 5            | cn                                       |
-| `proxy.test.ts`                                    | 10           | 中间件认证                               |
-| `store/__tests__/index.test.ts`                    | 11           | Zustand store                            |
+| 文件                                               | 测试数（约） | 覆盖范围                                                              |
+| -------------------------------------------------- | ------------ | --------------------------------------------------------------------- |
+| `app/api/__tests__/routes.test.ts`                 | 20           | API 路由                                                              |
+| `components/__tests__/attachment-section.test.tsx` | 5            | AttachmentSection                                                     |
+| `components/__tests__/batch-actions-bar.test.tsx`  | 5            | BatchActionsBar                                                       |
+| `components/__tests__/budget-habit.test.tsx`       | 8            | ProgressBar + BudgetCard + HabitRow                                   |
+| `components/__tests__/markdown-editor.test.tsx`    | 7            | MarkdownEditor                                                        |
+| `components/__tests__/note-list.test.tsx`          | 4            | NoteList                                                              |
+| `components/__tests__/tag-manager-sheet.test.tsx`  | 7            | TagManagerSheet                                                       |
+| `lib/__tests__/db.test.ts`                         | 28           | 笔记 + 习惯 + 预算 + 搜索与标签 + Weight + Migrations (legacy schema) |
+| `lib/__tests__/markdown.test.tsx`                  | 5            | MarkdownRenderer XSS 净化                                             |
+| `lib/__tests__/streaks.test.ts`                    | 13           | computeCurrentStreak + computeBestStreak                              |
+| `lib/__tests__/utils.test.ts`                      | 5            | cn                                                                    |
+| `proxy.test.ts`                                    | 10           | 中间件认证                                                            |
+| `store/__tests__/index.test.ts`                    | 11           | Zustand store                                                         |
 <!-- /docgen:tests -->
 
 ### E2E 套件
@@ -432,58 +438,7 @@ npm run test:e2e         # Playwright E2E（自动启动 dev server + 自动清�
 
 > 委托边界：小改动直接做；多文件任务按目录拆多个 fixer 并行；同类任务复用会话省上下文。
 
-### 任务管理
-
-任务文件存放在 `tasks/` 目录，按状态分文件夹：
-
-```
-tasks/
-├── todo/           # 待办任务
-├── doing/          # 进行中（同时只能有一个任务）
-└── done/           # 已完成（保留作为开发历史）
-```
-
-任务文件是自包含的——任何代理接手时，读取任务文件即可理解上下文，无需依赖对话历史。
-
-任务文件模板（`tasks/{status}/xx-xxx.md`）：
-
-```markdown
-# 任务标题
-
-## 目标
-<!-- 要达成的可验证结果 -->
-
-## 文档影响
-<!-- AGENTS.md / DESIGN.md / 无 —— 涉及变更的文档，完成时必须同步，未同步 = 任务未完成 -->
-
-## 笔记
-<!-- 实现过程中的实时记录 -->
-```
-
-### 工作流程
-
-1. 读 `DESIGN.md` 了解当前需求和设计
-2. 读 `tasks/doing/` 了解当前任务（如有）
-3. 执行工作，实时更新任务文件的「笔记」区域
-4. 同步「文档影响」字段标注的文档；设计有变更时更新 `DESIGN.md`
-5. 移动任务文件到 `done/`
-
-### 文档读写规则
-
-| 场景 | 读 | 写 |
-|------|----|----|
-| 接手新任务 | `DESIGN.md` + 对应任务文件 | 任务文件状态改为 `doing` |
-| 实现过程中 | 任务文件 | 任务文件的笔记区域 |
-| 设计有变更 | `DESIGN.md` | `DESIGN.md` 对应章节 |
-| 任务完成 | — | 任务文件移到 `done/` |
-| 发现新需求 | `DESIGN.md` | 追加到 `DESIGN.md` 需求区 |
-| 变更涉及 AGENTS.md 记录的事实（目录结构/测试数/API 契约/环境变量） | 变更内容 | 完成时同步更新 AGENTS.md |
-
-> **文档维护纪律**：任何变更涉及 AGENTS.md 中记录的事实，完成时必须同步更新 AGENTS.md——文档漂移由 AI 在任务完成时顺手消除，不依赖人工记忆。AGENTS.md 中的精确计数（如测试数）为近似值，以 `npm test` 等实际输出为准。
-
-### 简单任务
-
-Bug 修复等简单任务不需要走完整流程，直接由 fixer 代理修复即可。是否需要写文档取决于复杂度。
+> **文档维护纪律**：任何变更涉及 AGENTS.md 中记录的事实（目录结构/测试数/API 契约/环境变量），完成时必须同步更新 AGENTS.md——文档漂移由 AI 在任务完成时顺手消除，不依赖人工记忆。AGENTS.md 中的精确计数（如测试数）为近似值，以 `npm test` 等实际输出为准。
 
 ## 添加新模块流程
 
@@ -494,5 +449,4 @@ Bug 修复等简单任务不需要走完整流程，直接由 fixer 代理修复
 | 3 | 创建页面（RSC + 客户端交互组件） | `app/<route>/page.tsx` |
 | 4 | 添加导航项 | `lib/navigation.ts`（`NAV_ITEMS` 数组） |
 | 5 | 构建验证 | `npm run build` |
-
 
