@@ -19,12 +19,13 @@ git pull --ff-only
 
 echo "==> [2/4] 后台重建镜像（日志: $BUILD_LOG，SSH 断开也不中断）"
 # 后台启动构建；构建脚本末尾写 BUILD_DONE 标记
-# 构建前先清掉悬空镜像（<none>），避免每次 --no-cache 构建叠加旧层把磁盘吃满
+# 构建前先清掉悬空镜像（<none>），避免失败构建残留的旧层叠加占用磁盘
 # 仅删除未被任何容器引用的悬空镜像，不影响运行中的 lifeos-next 容器与 lifeos-data 卷
+# 构建启用层缓存（npm ci / .next 层命中缓存，秒级重建），不叠加新层
 nohup bash -c "
   set -e
   docker image prune -f
-  docker build --no-cache -t '$IMAGE' -f Dockerfile . > '$BUILD_LOG' 2>&1
+  docker build -t '$IMAGE' -f Dockerfile . > '$BUILD_LOG' 2>&1
   touch '$BUILD_DONE'
 " >/dev/null 2>&1 &
 
@@ -57,6 +58,11 @@ done
 echo "    构建完成 ✓"
 echo "==> [3/4] 用新镜像重启容器"
 docker compose up -d
+
+# 重启后旧镜像已被新 tag 覆盖为悬空镜像（<none>），且不再被容器引用 → 立即清理，防止每次部署叠加一份旧镜像
+docker image prune -f
+# 清理 BuildKit 构建缓存：仅删除不被任何镜像引用的陈旧缓存（被引用层保留，下次构建仍命中），防止缓存随依赖变更累积
+docker builder prune -f
 
 echo "==> [4/4] 等待启动并查看日志（Ctrl+C 退出日志，容器已在后台运行）"
 sleep 3
