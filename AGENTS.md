@@ -45,7 +45,9 @@ lifeos/
 │   │   │   ├── batch/
 │   │   │   │   └── route.ts
 │   │   │   └── route.ts
-│   │   └── tags/
+│   │   ├── tags/
+│   │   │   └── route.ts
+│   │   └── weight/
 │   │       └── route.ts
 │   ├── expenses/
 │   │   └── page.tsx
@@ -60,6 +62,8 @@ lifeos/
 │   │   │   └── page.tsx
 │   │   └── page.tsx
 │   ├── settings/
+│   │   └── page.tsx
+│   ├── weight/
 │   │   └── page.tsx
 │   ├── favicon.ico
 │   ├── globals.css
@@ -98,7 +102,8 @@ lifeos/
 │   ├── pwa-handler.tsx
 │   ├── route-loading-bar.tsx
 │   ├── sidebar.tsx
-│   └── tag-manager-sheet.tsx
+│   ├── tag-manager-sheet.tsx
+│   └── weight-chart.tsx
 ├── e2e/
 │   ├── budgets.spec.ts
 │   ├── habits.spec.ts
@@ -119,7 +124,8 @@ lifeos/
 │   │   ├── index.ts
 │   │   ├── migrate.ts
 │   │   ├── notes.ts
-│   │   └── tags.ts
+│   │   ├── tags.ts
+│   │   └── weight.ts
 │   ├── auth-token.ts
 │   ├── markdown.tsx
 │   ├── navigation.ts
@@ -128,7 +134,8 @@ lifeos/
 │   ├── types.ts
 │   └── utils.ts
 ├── migrations/
-│   └── 001_create_tables.sql
+│   ├── 001_create_tables.sql
+│   └── 002_weight_logs.sql
 ├── nginx/
 │   └── lifeos.conf
 ├── public/
@@ -177,14 +184,14 @@ lifeos/
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| POST | `/api/auth` | `{ password: string }` | 200 `{ ok: true }` + cookie / 401 `{ ok: false }` | 密码登录，设置 `app_auth` cookie（30天, httpOnly, SameSite=lax） |
+| POST | `/api/auth` | `{ password: string }` | 200 `{ ok: true }` + cookie / 401 `{ ok: false }` | 密码登录，设置 `app_auth` cookie（30天, httpOnly, SameSite=lax）；`APP_PASSWORD` 为空时不设 cookie |
 
 ### /api/notes
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| GET | `/api/notes` | `q?`, `tag?`, `type?`, `limit?`(1-500, 默认200), `offset?`, `startDate?`, `endDate?` | 200 `{ notes: Note[] }` | 列表/搜索/分页。`offset` 仅 `startDate+endDate` 路径生效；搜索（`q`）固定返回最多 50 条 |
-| POST | `/api/notes` | `{ title?, content?, type?, tags?, dueDate? }` | 201 `{ note: Note }` | 创建笔记（type 仅允许 'note'） |
+| GET | `/api/notes` | `q?`, `tag?`, `type?`, `limit?`(1-500, 默认200), `offset?`, `startDate?`, `endDate?` | 200 `{ notes: Note[] }` | 列表/搜索/分页。`offset` 仅 `startDate+endDate` 路径生效；搜索（`q`）固定返回最多 50 条；`type` 参数已解析但当前无过滤效果 |
+| POST | `/api/notes` | `{ title?, content?, type?, tags?, dueDate? }` | 200 `{ note: Note }` | 创建笔记（type 仅允许 'note'） |
 | DELETE | `/api/notes?id=<id>` | — | 200 `{ success: true }` | 删除单条 |
 | PATCH | `/api/notes/[id]` | `{ title?, content?, tags?, dueDate?, done?, pinned? }` | 200 `{ note: Note }` | 更新笔记 |
 | GET | `/api/notes/[id]` | — | 200 `{ note: Note }` / 404 `{ error }` | 单条详情 |
@@ -194,14 +201,14 @@ lifeos/
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| POST | `/api/notes/batch` | `{ ids: string[], action: "delete"|"tag", tag? }` | 200 `{ success: true }` | 事务性批量操作 |
+| POST | `/api/notes/batch` | `{ ids: string[], action: "delete"|"tag", tag? }` | 200 `{ success: true }` | 事务性批量操作（注：当前代码不校验 action 值，未知值静默返回 {success:true}） |
 
 ### /api/notes/[id]/attachments
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
 | GET | `/api/notes/[id]/attachments` | — | 200 `{ attachments: Attachment[] }` | 附件列表 |
-| POST | `/api/notes/[id]/attachments` | `file` (multipart/form-data) | 201 `{ attachment: Attachment }` | 上传附件（≤10MB） |
+| POST | `/api/notes/[id]/attachments` | `file` (multipart/form-data) | 201 `{ attachment: Attachment }` | 上传附件（≤10MB，超限返回 413） |
 | DELETE | `/api/notes/[id]/attachments?attachmentId=<id>` | — | 200 `{ success: true }` | 删除附件（校验附件归属，不属该笔记返回 404） |
 
 ### /api/budgets
@@ -210,7 +217,7 @@ lifeos/
 |------|------|------|------|------|
 | GET | `/api/budgets` | — | 200 `{ budgets: Budget[] }` | 全部预算 |
 | GET | `/api/budgets` | `month=YYYY-MM` | 200 `{ budget: Budget | null }` | 单月预算（未设置时返回 null） |
-| POST | `/api/budgets` | `{ month, fixedBudget, variableBudget, fixedActual?, variableActual?, notes?, isCompleted?, savingsCompleted? }` | 200 `{ budget: Budget }` | Upsert |
+| POST | `/api/budgets` | `{ month, fixedBudget, variableBudget, fixedActual?, variableActual?, notes?, isCompleted?, savingsCompleted? }` | 200 `{ budget: Budget }` | Upsert（非法数值返回 400） |
 
 ### /api/habits
 
@@ -234,7 +241,7 @@ lifeos/
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| GET | `/api/tags` | — | 200 `{ tags: { name, count }[] }` | 列表（含计数） |
+| GET | `/api/tags` | — | 200 `{ tags: { name, count }[] }` | 列表（含计数；存在未加标签笔记时含 `__untagged__` 条目） |
 | PATCH | `/api/tags` | `{ oldName, newName }` | 200 `{ success: true }` | 重命名/合并 |
 | DELETE | `/api/tags` | `name=` | 200 `{ success: true }` | 删除（级联 note_tags） |
 
@@ -243,7 +250,7 @@ lifeos/
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
 | GET | `/api/backup` | — | 200 `{ ...backupData }` | 导出全部数据 JSON |
-| POST | `/api/backup` | `{ ...backupData }` | 200 `{ success: true }` / 400 `{ error }` | 恢复 JSON（validateBackup 校验） |
+| POST | `/api/backup` | `{ ...backupData }` | 200 `{ success, imported }` / 400 `{ error }`（事务失败 500） | 恢复 JSON（validateBackup 校验） |
 | GET | `/api/export` | — | 200 `text/markdown` | 导出全部笔记为 Markdown 文件 |
 
 ### 类型定义（`lib/types.ts`）
@@ -281,18 +288,18 @@ interface WeightLog {
 
 ## 数据库 Schema
 
-8 表，DDL 见 `migrations/001_create_tables.sql` 与 `migrations/002_weight_logs.sql`。`getClient()` (`lib/db/client.ts:20`) 自动管理连接和 `PRAGMA foreign_keys = ON`。
+8 表，DDL 见 `migrations/001_create_tables.sql` 与 `migrations/002_weight_logs.sql`。`getClient()`（`lib/db/client.ts:20`；`PRAGMA foreign_keys = ON` 在 client.ts:65，仅本地 SQLite 开启）。
 
 | 表 | 列 | 主键 | 外键 | 索引 |
 |----|----|------|------|------|
-| **notes** | id TEXT PK, content TEXT NOT NULL, title TEXT, type TEXT DEFAULT 'note', due_date TEXT, done INTEGER DEFAULT 0, pinned INTEGER DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL | id | — | `idx_notes_type`, `idx_notes_created`, `idx_notes_due_date`, `idx_notes_search(content,title)`, `idx_notes_pinned_created`, `idx_notes_type_due`, `idx_notes_done` |
-| **budgets** | id TEXT PK, month TEXT NOT NULL UNIQUE, fixed_budget REAL DEFAULT 0, variable_budget REAL DEFAULT 0, fixed_actual REAL, variable_actual REAL, notes TEXT DEFAULT '', is_completed INTEGER DEFAULT 0, savings_completed INTEGER DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL | id | — | — |
-| **attachments** | id TEXT PK, note_id TEXT NOT NULL, filename TEXT NOT NULL, url TEXT NOT NULL, mime_type TEXT DEFAULT '', file_size INTEGER DEFAULT 0, created_at TEXT NOT NULL | id | note_id → notes(id) ON DELETE CASCADE | `idx_attachments_note(note_id)` |
-| **habits** | id TEXT PK, name TEXT NOT NULL, description TEXT DEFAULT '', frequency TEXT DEFAULT 'daily', created_at TEXT NOT NULL | id | — | — |
+| **notes** | id TEXT PK, content TEXT NOT NULL, title TEXT, type TEXT NOT NULL DEFAULT 'note', due_date TEXT, done INTEGER DEFAULT 0, pinned INTEGER DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL | id | — | `idx_notes_type`, `idx_notes_created`, `idx_notes_due_date`, `idx_notes_search(content,title)`, `idx_notes_pinned_created`, `idx_notes_type_due`, `idx_notes_done` |
+| **budgets** | id TEXT PK, month TEXT NOT NULL UNIQUE, fixed_budget REAL NOT NULL DEFAULT 0, variable_budget REAL NOT NULL DEFAULT 0, fixed_actual REAL, variable_actual REAL, notes TEXT DEFAULT '', is_completed INTEGER DEFAULT 0, savings_completed INTEGER DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL | id | — | — |
+| **attachments** | id TEXT PK, note_id TEXT NOT NULL, filename TEXT NOT NULL, url TEXT NOT NULL, mime_type TEXT NOT NULL DEFAULT '', file_size INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL | id | note_id → notes(id) ON DELETE CASCADE | `idx_attachments_note(note_id)` |
+| **habits** | id TEXT PK, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', frequency TEXT NOT NULL DEFAULT 'daily', created_at TEXT NOT NULL | id | — | — |
 | **habit_completions** | id TEXT PK, habit_id TEXT NOT NULL, date TEXT NOT NULL, completed INTEGER DEFAULT 0, created_at TEXT NOT NULL | id | —（无 FK，级联由 lib/db/habits.ts deleteHabit 手动实现） | `idx_habit_completions_habit(habit_id)`, `idx_habit_completions_unique(habit_id,date)` UNIQUE |
 | **tags** | id TEXT PK, name TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL | id | — | — |
-| **note_tags** | note_id TEXT, tag_id TEXT | (note_id, tag_id) 复合 PK | note_id → notes(id) ON DELETE CASCADE, tag_id → tags(id) ON DELETE CASCADE | `idx_note_tags_tag(tag_id)` |
-| **weight_logs** | id TEXT PK, person TEXT NOT NULL, date TEXT NOT NULL, weight REAL NOT NULL, note TEXT DEFAULT '', created_at TEXT NOT NULL | id | — | `idx_weight_person_date(person,date)` UNIQUE |
+| **note_tags** | note_id TEXT NOT NULL, tag_id TEXT NOT NULL | (note_id, tag_id) 复合 PK | note_id → notes(id) ON DELETE CASCADE, tag_id → tags(id) ON DELETE CASCADE | `idx_note_tags_tag(tag_id)` |
+| **weight_logs** | id TEXT PK, person TEXT NOT NULL, date TEXT NOT NULL, weight REAL NOT NULL, note TEXT DEFAULT '', created_at TEXT NOT NULL | id | — | UNIQUE(person, date)（表级约束，无命名索引） |
 
 迁移机制：`migrations/*.sql` → `_migrations` 追踪表 → `lib/db/migrate.ts` 执行器。命令：`npm run migrate` / `npm run migrate:dry` / `npm run migrate -- --reset`。
 
@@ -303,8 +310,8 @@ interface WeightLog {
 | 变量 | 必需？ | 用途 | 开发 (`.env.local`) | 主生产 Docker (`.env`) | 备用 Vercel |
 |------|--------|------|---------|---------|---------|
 | `DATABASE_URL` | 开发/主生产必需 | 本地 SQLite 路径 | `file:./data/dev.db` | `file:./data/db/lifeos.db` | — |
-| `TURSO_DATABASE_URL` | 备用必需 | Turso 远程库地址 | **不得设置**（dev 护栏） | **显式清空** | `libsql://...` |
-| `TURSO_AUTH_TOKEN` | 备用必需 | Turso 认证 Token | **不得设置** | **显式清空** | Turso token |
+| `TURSO_DATABASE_URL` | 备用必需 | Turso 远程库地址 | **不得设置**（dev 护栏） | docker-compose.yml 置空 | `libsql://...` |
+| `TURSO_AUTH_TOKEN` | 备用必需 | Turso 认证 Token | **不得设置** | docker-compose.yml 置空 | Turso token |
 | `APP_PASSWORD` | 否 | 登录密码 | 不设 或 `demo` | 自定义 | 自定义 |
 | `BLOB_READ_WRITE_TOKEN` | 否（附件） | Vercel Blob 存储（由 @vercel/blob 库隐式读取，代码无直接 process.env 引用） | — | — | Vercel token |
 | `STORAGE_DRIVER` | 否 | 存储后端 | `vercel`（默认） | `local` | `vercel`（默认） |
@@ -314,13 +321,15 @@ interface WeightLog {
 | `ANALYZE` | 否 | bundle-analyzer 构建开关 | 不设 | 不设 | 不设 |
 | `BASE_URL` | 否（E2E） | Playwright 目标地址 | 不设 | 不设 | 不设 |
 
+> 注：`NODE_ENV`/`CI`/`PORT`/`HOSTNAME`/`NEXT_TELEMETRY_DISABLED`/`NODE_OPTIONS` 等平台内置变量由运行时注入，不列入上表。
+
 数据库选择逻辑：`url = TURSO_DATABASE_URL \|\| DATABASE_URL`（`lib/db/client.ts:25`）。dev 护栏：非生产 + `TURSO_DATABASE_URL` 匹配 `/turso\.(io\|tech)/i` → 抛错。E2E 隔离：`playwright.config.ts` 显式清空 `TURSO_*`。
 
 ## 关键约定
 
 ### UI 组件体系
 
-组件库：`components/ui/` 封装 `@base-ui/react`（Button/Card/Input/Textarea/Badge/Checkbox/AlertDialog/ScrollArea/Sheet）。shadcn 配置 `components.json`：style `base-nova`, rsc `true`, baseColor `neutral`。
+组件库：`components/ui/` 封装 `@base-ui/react`（Button/Input/Badge/AlertDialog/ScrollArea/Sheet）；Card/Checkbox/Textarea 为纯 HTML 手写组件。shadcn 配置 `components.json`：style `base-nova`, rsc `true`, baseColor `neutral`。
 
 ### 性能优化
 
@@ -336,7 +345,7 @@ interface WeightLog {
 
 ### UI 动效
 
-`PageAnimation` 组件包裹 `animate-fade-in` class。CSS 动画定义于 `app/globals.css:199-216`：`fadeIn` keyframe（淡入 + 上移 8px, 0.35s ease-out），`pulse-soft` keyframe（透明度脉动）。加载态无独立骨架屏，内联 `skeleton-pulse` class div。
+`PageAnimation` 组件包裹 `animate-fade-in` class。CSS 动画定义于 `app/globals.css:199-216`：`fadeIn` keyframe（淡入 + 上移 8px, 0.35s ease-out），`pulse-soft` keyframe（透明度脉动）。笔记详情页有独立骨架屏（`app/notes/[id]/loading.tsx`），其余页面加载态内联 `skeleton-pulse` class div。
 
 ### PWA
 
@@ -421,6 +430,8 @@ npm run test:e2e         # Playwright E2E（自动启动 dev server + 自动清�
 | `npm run migrate:dry` | 仅列出待执行迁移 |
 | `npm run migrate -- --reset` | 清空所有表后重新迁移 |
 | `npm run analyze` | 构建产物体积分析（`@next/bundle-analyzer`） |
+| `npm run docs:check` | 校验 AGENTS.md 与代码/示例文件一致性（CI 执行） |
+| `npm run docs:gen` | 重新生成 AGENTS.md 目录树与测试清单区块 |
 
 ## AI 协作流程
 

@@ -45,6 +45,7 @@ const DROP_TABLES = [
   'DROP TABLE IF EXISTS habits;',
   'DROP TABLE IF EXISTS budgets;',
   'DROP TABLE IF EXISTS notes;',
+  'DROP TABLE IF EXISTS weight_logs;',
   'DROP TABLE IF EXISTS _migrations;',
 ]
 

@@ -64,6 +64,7 @@ const API_CONTRACTS: Array<{ path: string; methods: string[] }> = [
   { path: '/api/tags', methods: ['GET', 'PATCH', 'DELETE'] },
   { path: '/api/backup', methods: ['GET', 'POST'] },
   { path: '/api/export', methods: ['GET'] },
+  { path: '/api/weight', methods: ['GET', 'POST', 'DELETE'] },
 ]
 
 for (const c of API_CONTRACTS) {
