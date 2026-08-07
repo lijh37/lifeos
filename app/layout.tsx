@@ -57,7 +57,7 @@ export default function RootLayout({
                   rel="noreferrer"
                   className="text-xs text-muted-foreground/50 transition-colors hover:text-muted-foreground"
                 >
-                  ICP备XXXXXXXX号
+                  豫ICP备2026036606号-1
                 </a>
               </footer>
             </main>
