@@ -48,7 +48,19 @@ export default function RootLayout({
         <div className="flex h-full">
           <Sidebar />
           <PageAnimation>
-            <main className="pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">{children}</main>
+            <main className="pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">
+              {children}
+              <footer className="flex justify-center px-4 py-5 md:justify-start">
+                <a
+                  href="https://beian.miit.gov.cn/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-muted-foreground/50 transition-colors hover:text-muted-foreground"
+                >
+                  ICP备XXXXXXXX号
+                </a>
+              </footer>
+            </main>
           </PageAnimation>
           <MobileNav />
         </div>

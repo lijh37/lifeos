@@ -315,7 +315,7 @@ interface WeightLog {
 | `APP_PASSWORD` | 否 | 登录密码 | 不设 或 `demo` | 自定义 | 自定义 |
 | `BLOB_READ_WRITE_TOKEN` | 否（附件） | Vercel Blob 存储（由 @vercel/blob 库隐式读取，代码无直接 process.env 引用） | — | — | Vercel token |
 | `STORAGE_DRIVER` | 否 | 存储后端 | `vercel`（默认） | `local` | `vercel`（默认） |
-| `COOKIE_SECURE` | 否 | cookie Secure 标志 | 不设 | `false`（HTTP 阶段） | `true` |
+| `COOKIE_SECURE` | 否 | cookie Secure 标志 | 不设 | `true`（HTTPS 阶段） | `true` |
 | `UPLOAD_DIR` | 否（local 驱动） | 本地上传目录 | — | `/app/data/uploads` | — |
 | `UPLOAD_URL_PREFIX` | 否（local 驱动） | 本地附件 URL 前缀 | — | `/uploads` | — |
 | `ANALYZE` | 否 | bundle-analyzer 构建开关 | 不设 | 不设 | 不设 |

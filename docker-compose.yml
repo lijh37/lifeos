@@ -1,8 +1,8 @@
 # LifeOS 自托管部署（Docker Compose）
-# 架构：nginx 反代 → next 容器；数据持久化到 volumes
+# 架构：nginx(80/443 HTTPS) 反代 → next 容器；数据持久化到 volumes
 #
-# 临时访问（备案前）：http://<服务器IP>:3000
-# 备案后：改 nginx 配置切到 :80/:443 + 域名，见 DEPLOY.md
+# 正式访问：https://daimoli.xyz
+# 证书：宿主机 ./certs 目录（fullchain.pem + privkey.pem）挂载进 nginx 容器，见 DEPLOY.md
 
 services:
   next:
@@ -21,9 +21,8 @@ services:
       - UPLOAD_URL_PREFIX=/uploads
       # ── 认证 ──
       - APP_PASSWORD=${APP_PASSWORD:-demo}
-      # 备案前经 http://IP:3000 访问时必须为 false（否则 Secure cookie 不被回传，登录后跳回登录页）
-      # 备案后切 HTTPS 时改为 true
-      - COOKIE_SECURE=false
+      # HTTPS 阶段必须为 true（Secure cookie 仅在 HTTPS 下回传）
+      - COOKIE_SECURE=true
       # ── 其他 ──
       - NODE_ENV=production
       - PORT=3000
@@ -47,13 +46,12 @@ services:
     container_name: lifeos-nginx
     restart: unless-stopped
     ports:
-      # 临时访问端口（备案前用，不受备案限制）
-      - "3000:3000"
-      # 备案通过后取消注释，并改 nginx/lifeos.conf 为 80/443
-      # - "80:80"
-      # - "443:443"
+      - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/lifeos.conf:/etc/nginx/conf.d/default.conf:ro
+      # TLS 证书：宝塔/certbot 在宿主机申请后放入 ./certs 目录（fullchain.pem + privkey.pem）
+      - ./certs:/etc/nginx/certs:ro
       # 附件静态目录：与 next 容器共享同一 volume，由 nginx 直出（更快）
       - lifeos-data:/app/data:ro
     depends_on:

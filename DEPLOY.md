@@ -6,7 +6,7 @@
 
 | 角色 | 环境 | 数据库 | 存储 | 入口 |
 |------|------|--------|------|------|
-| **主生产** | 阿里云 ECS Docker | 本地 SQLite (`lifeos.db`) | 本地磁盘 | `http://<IP>:3000` |
+| **主生产** | 阿里云 ECS Docker | 本地 SQLite (`lifeos.db`) | 本地磁盘 | `https://daimoli.xyz` |
 | **备用** | Vercel (hkg1) | Turso 远程 | Vercel Blob | `https://lifeos-daimo.vercel.app` |
 
 数据完全独立，通过「设置 → 备份/恢复」JSON 手动同步。
@@ -16,7 +16,7 @@
 ### 前置条件
 
 - 服务器面板（如宝塔）+ Docker（已安装）
-- 放行端口：8888(面板), 3000(Web), 22(SSH)；备案后追加 80, 443
+- 放行端口：8888(面板), 80(Web), 443(HTTPS), 22(SSH)；3000 已不对公网开放
 
 ### 步骤
 
@@ -49,7 +49,7 @@ docker build -t lifeos-next -f Dockerfile .
 docker compose up -d
 
 # 6. 验证
-curl http://<IP>:3000
+curl -I https://daimoli.xyz
 ```
 
 启动后迁移脚本在容器入口自动建表（`command: sh -c "mkdir -p /app/data/db && npm run migrate && npm run start"`）。
@@ -71,7 +71,7 @@ cd /root/lifeos && ./deploy.sh
 | `DATABASE_URL` | `file:./data/db/lifeos.db` | 本地 SQLite |
 | `STORAGE_DRIVER` | `local` | 本地磁盘存储 |
 | `UPLOAD_DIR` | `/app/data/uploads` | 附件目录 |
-| `COOKIE_SECURE` | `false`（HTTP 阶段，HTTPS 后改为 `true`） | cookie Secure 标志 |
+| `COOKIE_SECURE` | `true`（HTTPS 阶段） | cookie Secure 标志 |
 
 ### 数据持久化
 
@@ -114,17 +114,17 @@ npm 在 Node 22/24 的已知 bug（npm/cli#7639, #8974）。项目已通过 `nod
 
 #### 4. 登录后刷新跳回登录页
 
-原因：cookie 被设了 `Secure` 标记，HTTP 下浏览器不传 cookie。解决：`.env` 中设 `COOKIE_SECURE=false`。
+原因：cookie 被设了 `Secure` 标记，HTTP 下浏览器不传 cookie。解决：确保经 `https://daimoli.xyz` 访问（`:3000` 已不对公网开放）；排查 `.env` 中 `COOKIE_SECURE=true`。
 
 排查命令：
 
 ```bash
-curl -s -i -X POST http://127.0.0.1:3000/api/auth \
+curl -s -i -X POST https://daimoli.xyz/api/auth \
   -H 'Content-Type: application/json' \
   -d '{"password":"你的密码"}' | grep -i set-cookie
 ```
 
-正常 HTTP 阶段应有 `HttpOnly; SameSite=lax`，**无** `Secure`。
+HTTPS 阶段正常应有 `HttpOnly; Secure; SameSite=lax`。
 
 #### 5. nginx 反代报 `502 Bad Gateway`
 
@@ -145,15 +145,44 @@ curl -s -i -X POST http://127.0.0.1:3000/api/auth \
 
 周期：初审 1-2 工作日 + 管局审核 1-20 工作日
 
-### 备案通过后切换
+### 备案通过后切换（已完成：域名 daimoli.xyz）
 
-1. 域名 A 记录指向服务器 IP
-2. 服务器面板添加站点，申请 Let's Encrypt 免费证书
-3. 修改 `nginx/lifeos.conf`：取消 80/443 server 块注释，填 `server_name your-domain.com;`
-4. 修改 `docker-compose.yml`：放开 `nginx` 的 `80:80` / `443:443` 端口映射
-5. 改 `.env`：`COOKIE_SECURE=true`
-6. 重新部署：`./deploy.sh`
-7. 验证 `https://your-domain.com` 可访问
+1. **DNS**：域名 A 记录指向服务器公网 IP，等解析生效
+2. **安全组**：放行入方向 80、443
+3. **申请证书**（宝塔或 certbot，二选一）：
+   - certbot：`certbot certonly --standalone -d daimoli.xyz`（申请时先 `docker compose stop nginx`，申请完再启动），或 webroot 方式
+   - 宝塔：面板申请 Let's Encrypt 证书
+   - 将证书复制到仓库根目录 `./certs/`：
+     ```bash
+     mkdir -p certs
+     cp /etc/letsencrypt/live/daimoli.xyz/fullchain.pem certs/
+     cp /etc/letsencrypt/live/daimoli.xyz/privkey.pem certs/
+     chmod 600 certs/privkey.pem
+     ```
+4. **仓库配置已就绪**：`nginx/lifeos.conf` 已切 80→443 跳转 + HTTPS（`server_name daimoli.xyz`）；`docker-compose.yml` 已放开 80/443 并挂载 `./certs` 目录
+5. **改 `.env`**：`COOKIE_SECURE=true`
+6. **重新部署**：`./deploy.sh`
+7. **验证**：`curl -I https://daimoli.xyz` 返回 200；`curl -I http://daimoli.xyz` 返回 301
+
+> ⚠️ 注意：宝塔面板的 Let's Encrypt 只自动配置**宿主** nginx，不会配置 Docker 容器内的 nginx。
+> 必须手动把证书复制到 `./certs/` 并重启 nginx 容器，否则 443 不会生效。
+
+### 证书续期
+
+Let's Encrypt 证书 90 天有效，续期后需让容器内 nginx 重新加载证书：
+
+```bash
+certbot renew
+docker compose restart nginx    # 或 docker exec lifeos-nginx nginx -s reload
+```
+
+建议 crontab 每月自动续期：
+
+```bash
+crontab -e
+# 每月 1 日 03:15
+15 3 1 * * cd /root/lifeos && certbot renew --quiet && docker compose restart nginx
+```
 
 ## 备用部署（Vercel）
 
