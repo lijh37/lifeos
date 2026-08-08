@@ -4,7 +4,7 @@
 
 ## 项目概述
 
-LifeOS 是个人生活助手 PWA，支持笔记管理、预算规划、习惯养成。
+LifeOS 是个人生活助手，支持笔记管理、预算规划、习惯养成。运行形态三态：**Android 手机（主力）**——Capacitor APK + 原生 SQLite 完全离线；**桌面 web（保留）**——`npm run start` 本地运行；**测试**——jsdom 单测 + Playwright E2E。
 
 - **定位**: 单用户、自托管优先、无外部服务依赖
 - **架构**: Next.js 16 App Router 单体（SSR + API Routes 同仓）
@@ -173,7 +173,6 @@ lifeos/
 ├── AGENTS.md
 ├── DEPLOY.md
 ├── Dockerfile
-├── OFFLINE_PLAN.md
 ├── README.md
 ├── capacitor.config.json
 ├── components.json
@@ -387,6 +386,15 @@ interface WeightLog {
 ### 数据库约定
 
 迁移 SQL 内联于 `lib/db/migrations.ts`（与 `migrations/*.sql` 保持同步，漂移由 `lib/__tests__/migrations-inline.test.ts` 拦截）。`getClient()` 单例（惰性门面），不在测试间共享；Capacitor 适配器测试用唯一临时库文件（libsql 同路径连接删库后进入只读坏态）。本地 SQLite 用 `PRAGMA foreign_keys = ON`。
+
+### 离线/移动端构建约束（export 静态导出，spike/阶段 5 实测沉淀）
+
+- **typescript 锁 `^5`**：tsgo（TS 7）与 Next 16 build worker 不兼容（报 `The "id" argument must be of type string. Received undefined`），勿升 7。
+- **export 下动态段不可用**：动态段 API 路由即使导出 `generateStaticParams` + `dynamicParams:false` 仍报 missing（export 收集器不识别）→ 必须合并静态化：单笔记 API 已并入 `/api/notes`（GET `?id=` / PATCH / DELETE `?id=`）；页面动态路由改查询参数路由 `/notes/detail?id=` + `useSearchParams`（**必须包 Suspense**，Next 15+ 无关闭 flag；生产构建报 missing-suspense-with-csr-bailout，dev 不报）。
+- **E301 规避**：`output:'export'` 下路由含 GET 处理器且无任何静态声明（force-static/error/revalidate/generateStaticParams）→ 构建抛错。已用条件 GET 置空规避：`export const GET = process.env.BUILD_TARGET === 'export' ? undefined : GETHandler`（配 `as typeof GETHandler` 断言还原类型）；仅 POST 的路由（auth、notes/batch）不触发。
+- **RSC prefetch 404 风险**：`<Link>` prefetch 的 RSC payload `.txt` 路径与生成路径不匹配 → 404（Next issues #85374/#73427/#87682，16.0~16.2.x 均受影响）。spike（16.2.9 扁平结构）未复现，但真实路由树更复杂，真机 WebView 仍须终验；兜底 `<Link prefetch={false}>`。
+- **@libsql/client 不可在 WebView 持久化**（纯内存，无 OPFS/IDB 支持）→ 移动端必须走原生 `@capacitor-community/sqlite`。
+- **写库单端**：手机与桌面不同时写同一库（WAL/文件锁风险）；数据经设置页 JSON 导出/导入互通，不直接拷贝 .db。
 
 ## 测试策略
 
