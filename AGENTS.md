@@ -165,6 +165,7 @@ lifeos/
 │   ├── __tests__/
 │   │   └── index.test.ts
 │   └── index.ts
+├── "\345\220\257\345\212\250.bat"
 ├── .dockerignore
 ├── .env.example
 ├── .env.prod.example

@@ -202,6 +202,56 @@ git push origin main    # Vercel 自动部署
 
 `STORAGE_DRIVER` 默认 `vercel`，Vercel 环境无需显式设置。
 
+## 桌面部署（Windows 原生）
+
+本机 Windows 直跑桌面版（web 形态，数据本地 SQLite），与 Docker / 手机端数据相互独立，通过「设置 → 备份/恢复」JSON 手动同步。
+
+### 前置条件
+
+- Windows 10/11（64 位）
+- Node.js LTS（建议 22 或 24；本机实测 Node 24 + npm 11 正常）：<https://nodejs.org>
+- 将项目拷贝/解压到本地目录，例如 `D:\LifeOS\`
+
+### 首次安装
+
+```bat
+cd /d D:\LifeOS
+npm install
+copy .env.example .env.local
+```
+
+编辑 `.env.local`：
+
+| 变量 | 值 | 说明 |
+|------|----|------|
+| `DATABASE_URL` | `file:./data/lifeos.db` | 本地 SQLite（相对仓库根目录；`.env.example` 中默认注释，需取消注释） |
+| `APP_PASSWORD` | 留空 或 自定义 | 留空=免登录（不推荐）；设置=启用登录 |
+
+> `.env*` 与 `data/` 均已在 .gitignore，不会误提交。
+
+### 日常启动
+
+双击仓库根目录 `启动.bat`，自动依次执行：
+
+1. （首次）`npm install`
+2. `npm run migrate` —— 建表/迁移
+3. `npm run build` —— 生产构建
+4. `npm run start` —— 启动服务
+
+浏览器访问 <http://localhost:3000>。关闭启动窗口即停止服务。
+
+### 数据与备份
+
+- 数据库文件：`D:\LifeOS\data\lifeos.db`
+- 备份/恢复：应用内「设置 → 备份/恢复」导出/导入 JSON（与服务器端格式一致，可双向迁移）
+
+### 注意事项
+
+- ⚠️ **WSL 文件锁**：若项目放在 WSL 的 `/mnt/c/...`（drvfs 挂载）下，SQLite WAL 写入可能与 Windows 文件锁冲突。建议放 Windows 原生盘（`D:\`），或数据库文件留在 WSL 文件系统内。
+- **单端写库**：同一 `.db` 文件同一时间只允许一个实例读写。桌面 / 服务器 / 手机三端数据各自独立，用 JSON 备份手动同步，不要直接共享同一个数据库文件。
+- 端口占用：`.env.local` 设 `PORT=3001` 后重启。
+- `npm install` 偶发 `Exit handler never called!`（npm 在 Node 22/24 的已知 bug）：升级 npm 重试：`npm i -g npm@latest`。
+
 ## 环境切换（主 → 备）
 
 主生产「设置 → 备份」导出 JSON → 备用实例「设置 → 恢复」导入。

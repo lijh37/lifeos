@@ -118,7 +118,7 @@ describe('API routes', () => {
       const res = await batchPOST(postReq('http://localhost/api/notes/batch', { action: 'tag', ids: [idA, idB], tag: 'work' }))
       expect(res.status).toBe(200)
 
-      const tagsRes = await tagsGET(new NextRequest('http://localhost/api/tags'))
+      const tagsRes = await tagsGET()
       const tags = await tagsRes.json()
       const work = tags.tags.find((t: { name: string }) => t.name === 'work')
       expect(work).toBeDefined()
@@ -133,11 +133,11 @@ describe('API routes', () => {
 
   describe('tags', () => {
     it('8. tags GET returns tags; tag appears after creating a note with it', async () => {
-      const empty = await tagsGET(new NextRequest('http://localhost/api/tags'))
+      const empty = await tagsGET()
       expect((await empty.json()).tags).toHaveLength(0)
 
       await notesPOST(postReq('http://localhost/api/notes', { content: 'tagged', tags: ['mytag'] }))
-      const res = await tagsGET(new NextRequest('http://localhost/api/tags'))
+      const res = await tagsGET()
       const tags = await res.json()
       const mytag = tags.tags.find((t: { name: string }) => t.name === 'mytag')
       expect(mytag).toBeDefined()
@@ -150,7 +150,7 @@ describe('API routes', () => {
       const patchRes = await tagsPATCH(postReq('http://localhost/api/tags', { oldName: 'old', newName: 'new' }))
       expect(patchRes.status).toBe(200)
 
-      const res = await tagsGET(new NextRequest('http://localhost/api/tags'))
+      const res = await tagsGET()
       const tags = await res.json()
       const names = tags.tags.map((t: { name: string }) => t.name)
       expect(names).toContain('new')
@@ -163,7 +163,7 @@ describe('API routes', () => {
       const delRes = await tagsDELETE(new NextRequest('http://localhost/api/tags?name=temp'))
       expect(delRes.status).toBe(200)
 
-      const res = await tagsGET(new NextRequest('http://localhost/api/tags'))
+      const res = await tagsGET()
       const tags = await res.json()
       const names = tags.tags.map((t: { name: string }) => t.name)
       expect(names).not.toContain('temp')
@@ -197,7 +197,7 @@ describe('API routes', () => {
       const { habit } = await res.json()
       expect(habit.name).toBe('exercise')
 
-      const dashRes = await habitsGET(new NextRequest('http://localhost/api/habits'))
+      const dashRes = await habitsGET()
       expect(dashRes.status).toBe(200)
       const dash = await dashRes.json()
       expect(dash.habits.some((h: { id: string }) => h.id === habit.id)).toBe(true)
@@ -231,7 +231,7 @@ describe('API routes', () => {
       expect(weightLog.weight).toBe(70.5)
       expect(weightLog.note).toBe('晨起')
 
-      const getRes = await weightGET(new NextRequest('http://localhost/api/weight'))
+      const getRes = await weightGET()
       expect(getRes.status).toBe(200)
       const data = await getRes.json()
       expect(data.me).toHaveLength(1)
@@ -248,7 +248,7 @@ describe('API routes', () => {
       }))
       expect(res.status).toBe(200)
 
-      const getRes = await weightGET(new NextRequest('http://localhost/api/weight'))
+      const getRes = await weightGET()
       const data = await getRes.json()
       expect(data.her).toHaveLength(1)
       expect(data.her[0].weight).toBe(51.5)
@@ -284,7 +284,7 @@ describe('API routes', () => {
     })
 
     it('20. weight GET returns empty arrays when no logs', async () => {
-      const res = await weightGET(new NextRequest('http://localhost/api/weight'))
+      const res = await weightGET()
       expect(res.status).toBe(200)
       const data = await res.json()
       expect(data.me).toEqual([])
@@ -301,7 +301,7 @@ describe('API routes', () => {
       expect(delRes.status).toBe(200)
       expect((await delRes.json()).success).toBe(true)
 
-      const getRes = await weightGET(new NextRequest('http://localhost/api/weight'))
+      const getRes = await weightGET()
       const data = await getRes.json()
       expect(data.me).toHaveLength(0)
 
