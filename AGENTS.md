@@ -93,7 +93,6 @@ lifeos/
 │   ├── note-list.tsx
 │   ├── page-animation.tsx
 │   ├── progress-bar.tsx
-│   ├── pwa-handler.tsx
 │   ├── route-loading-bar.tsx
 │   ├── sidebar.tsx
 │   ├── tag-manager-sheet.tsx
@@ -151,12 +150,6 @@ lifeos/
 │   └── 002_weight_logs.sql
 ├── nginx/
 │   └── lifeos.conf
-├── public/
-│   ├── icons/
-│   │   ├── icon-192.png
-│   │   └── icon-512.png
-│   ├── manifest.json
-│   └── sw.js
 ├── scripts/
 │   ├── docgen.ts
 │   ├── docs-check.ts
@@ -290,7 +283,7 @@ interface WeightLog {
 - **Header**: `app_auth` cookie 或 `Authorization: Bearer <token>`
 - **未认证**: API 返回 401 `{ error: "Unauthorized" }`，页面 307 → `/login?from=<path>`
 - **跳过**: `APP_PASSWORD` 空值时认证完全跳过
-- **公开路径**: `/login`, `/api/auth`, `/manifest.json`, `/icons/`, `/uploads/`
+- **公开路径**: `/login`, `/api/auth`, `/uploads/`
 - **底层**: `lib/auth-token.ts` 用 `crypto.subtle.sign('HMAC', key, password)` 派生，`verifyToken()` 常量时间比较
 
 ## 数据库 Schema
@@ -364,16 +357,6 @@ interface WeightLog {
 
 `PageAnimation` 组件包裹 `animate-fade-in` class。CSS 动画定义于 `app/globals.css:199-216`：`fadeIn` keyframe（淡入 + 上移 8px, 0.35s ease-out），`pulse-soft` keyframe（透明度脉动）。笔记详情页有独立骨架屏（`app/notes/[id]/loading.tsx`），其余页面加载态内联 `skeleton-pulse` class div。
 
-### PWA
-
-| 项 | 说明 |
-|----|------|
-| SW | `public/sw.js`——install 预缓存 + activate 清理旧缓存 + `/_next/static/` cache-first |
-| 离线 | 无离线 RSC/API 缓存，无离线 fallback |
-| 安装引导 | 已移除，依赖浏览器原生提示 |
-| manifest | `standalone`, `portrait`, 192x192 + 512x512 PNG（含 maskable） |
-| theme-color | `#0f172a`（固定） |
-
 ### 命名规范
 
 | 类型 | 规范 | 示例 |
@@ -433,7 +416,7 @@ interface WeightLog {
 
 ### E2E 套件
 
-`e2e/smoke.spec.ts`（登录重定向 + PWA manifest）、`e2e/notes.spec.ts`（笔记 CRUD + 搜索 + 标签 + 置顶）、`e2e/budgets.spec.ts`（预算设置 + 结算）、`e2e/habits.spec.ts`（习惯创建/打卡/删除）。
+`e2e/smoke.spec.ts`（登录重定向 + 免认证访问）、`e2e/notes.spec.ts`（笔记 CRUD + 搜索 + 标签 + 置顶）、`e2e/budgets.spec.ts`（预算设置 + 结算）、`e2e/habits.spec.ts`（习惯创建/打卡/删除）。
 
 认证绕过：E2E 以 `APP_PASSWORD=''` 启动 dev server，中间件自动放行。
 

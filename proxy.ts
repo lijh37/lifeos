@@ -7,8 +7,6 @@ const PASSWORD_COOKIE = 'app_auth'
 const publicPaths = [
   '/login',
   '/api/auth',
-  '/manifest.json',
-  '/icons/',
   '/uploads/',
 ]
 

@@ -12,12 +12,4 @@ test.describe('LifeOS smoke test', () => {
     // With APP_PASSWORD='' the middleware auto-allows, so /notes renders directly
     await expect(page.getByLabel('搜索笔记')).toBeVisible({ timeout: 5000 })
   })
-
-  test('PWA manifest is served', async ({ page }) => {
-    const response = await page.goto('/manifest.json')
-    expect(response?.status()).toBe(200)
-    const manifest = await response?.json()
-    expect(manifest.name).toContain('LifeOS')
-    expect(manifest.display).toBe('standalone')
-  })
 })

@@ -1,7 +1,6 @@
 import type { Metadata } from "next"
 import "./globals.css"
 import { Sidebar, MobileNav } from "@/components/sidebar"
-import { PwaHandler } from "@/components/pwa-handler"
 import { PageAnimation } from "@/components/page-animation"
 import { RouteLoadingBar } from "@/components/route-loading-bar"
 import { Toaster } from "sonner"
@@ -9,8 +8,6 @@ import { Toaster } from "sonner"
 export const metadata: Metadata = {
   title: "LifeOS - 生活助手",
   description: "个人生活助手，记录笔记、追踪习惯、管理预算",
-  manifest: "/manifest.json",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "LifeOS" },
 }
 
 export const viewport = {
@@ -31,10 +28,6 @@ export default function RootLayout({
       lang="zh-CN"
       className="h-full antialiased"
     >
-      <head>
-        <link rel="apple-touch-icon" href="/icons/icon-512.png" />
-        <meta name="theme-color" content="#0f172a" />
-      </head>
       <body className="h-full overflow-x-hidden">
         <Toaster
           position="top-center"
@@ -43,7 +36,6 @@ export default function RootLayout({
             duration: 3000,
           }}
         />
-        <PwaHandler />
         <RouteLoadingBar />
         <div className="flex h-full">
           <Sidebar />
