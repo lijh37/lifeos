@@ -79,11 +79,12 @@ test.describe('Notes E2E', () => {
       const note = await createNoteViaApi(title)
       noteId = note.id
 
-      // Add tag via API instead of UI (more reliable)
+      // Add tag via API instead of UI (more reliable).
+      // PATCH 路由从 body 解构 id（与 lib/services/notes.ts 一致），query 参数不生效。
       const addTagRes = await fetch(`${process.env.BASE_URL || 'http://localhost:3000'}/api/notes?id=${note.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tags: [tag] }),
+        body: JSON.stringify({ id: note.id, tags: [tag] }),
       })
       expect(addTagRes.ok).toBe(true)
       const addTagData = await addTagRes.json()

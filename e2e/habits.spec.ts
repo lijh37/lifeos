@@ -67,8 +67,8 @@ test.describe('Habits E2E', () => {
     // Wait for the habit to appear
     await expect(page.getByText(uniqueName)).toBeVisible()
 
-    // Find the row containing the habit name
-    const row = page.locator('.card-hover', { hasText: uniqueName })
+    // Find the row containing the habit name (Card uses data-slot="card")
+    const row = page.locator('[data-slot="card"]', { hasText: uniqueName })
 
     // Click the toggle button (first button in the row - Circle/CheckCircle)
     const toggleButton = row.getByRole('button').first()
@@ -97,8 +97,8 @@ test.describe('Habits E2E', () => {
     // Wait for the habit to appear
     await expect(page.getByText(uniqueName)).toBeVisible()
 
-    // Find the row containing the habit name
-    const row = page.locator('.card-hover', { hasText: uniqueName })
+    // Find the row containing the habit name (Card uses data-slot="card")
+    const row = page.locator('[data-slot="card"]', { hasText: uniqueName })
 
     // Click the Trash2 delete button (last button in the row)
     const trashButton = row.locator('button').last()
