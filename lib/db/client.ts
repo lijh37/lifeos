@@ -18,10 +18,20 @@ import type { DbClient } from './db-client'
 let singleton: DbClient | null = null
 let adapterFactory: (() => Promise<DbClient>) | null = null
 
-/** 惰性初始化门面：首次 execute/transaction 时才真正打开连接 */
+/** 惰性初始化门面：首次 execute/transaction 时才真正打开连接。
+ *  初始化失败不缓存 rejected promise——重置后下次调用重试（真机首次失败
+ *  多为一次性环境问题，如插件连接残留；永久缓存会导致全部接口持续失败）。 */
 function lazyFacade(factory: () => Promise<DbClient>): DbClient {
   let init: Promise<DbClient> | null = null
-  const ensure = () => (init ??= factory())
+  const ensure = () => {
+    if (!init) {
+      init = factory()
+      init.catch(() => {
+        init = null
+      })
+    }
+    return init
+  }
   return {
     execute: (query) => ensure().then((db) => db.execute(query)),
     transaction: () => ensure().then((db) => db.transaction()),

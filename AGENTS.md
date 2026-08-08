@@ -395,6 +395,7 @@ interface WeightLog {
 - **RSC prefetch 404 风险**：`<Link>` prefetch 的 RSC payload `.txt` 路径与生成路径不匹配 → 404（Next issues #85374/#73427/#87682，16.0~16.2.x 均受影响）。spike（16.2.9 扁平结构）未复现，但真实路由树更复杂，真机 WebView 仍须终验；兜底 `<Link prefetch={false}>`。
 - **@libsql/client 不可在 WebView 持久化**（纯内存，无 OPFS/IDB 支持）→ 移动端必须走原生 `@capacitor-community/sqlite`。
 - **写库单端**：手机与桌面不同时写同一库（WAL/文件锁风险）；数据经设置页 JSON 导出/导入互通，不直接拷贝 .db。
+- **原生连接跨上下文残留**（真机实测）：`isConnection()` 只查 JS 侧 `_connectionDict`，检测不到原生侧连接；整页重载（RSC 404 等触发新 JS 上下文）后新上下文 dict 为空 → `createConnection` 报 `Connection lifeos already exists` → 全接口连环挂。修复：`lib/db/adapters/capacitor.ts` 的 `openNativeConnection` 在 createConnection 抛 already-exists 时主动 `closeConnection()`（真正调原生、按库名关、跨上下文有效）后重试一次，isConnection 守卫仅作 JS 侧快路径。配套：`lib/db/client.ts` lazyFacade 初始化失败不缓存 rejected promise（`init.catch(() => { init = null })`），否则首次失败会永久毒化单例。
 
 ## 测试策略
 

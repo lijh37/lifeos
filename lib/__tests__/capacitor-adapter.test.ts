@@ -33,6 +33,10 @@ class FakeNativeConnection implements NativeConnection {
 
   async open(): Promise<void> {}
 
+  async close(): Promise<void> {
+    this.client.close()
+  }
+
   async execute(statement: string): Promise<{ changes: { changes: number } }> {
     const r = this.tx ? await this.tx.execute(statement) : await this.client.execute(statement)
     return { changes: { changes: r.rowsAffected } }
@@ -45,13 +49,21 @@ class FakeNativeConnection implements NativeConnection {
     return { changes: { changes: r.rowsAffected } }
   }
 
-  async query(statement: string, values: unknown[] = []): Promise<{ values: unknown[][] }> {
+  /** 高保真模拟真机 @capacitor-community/sqlite：返回对象行（列名内嵌） */
+  async query(
+    statement: string,
+    values: unknown[] = []
+  ): Promise<{ values: Record<string, unknown>[] }> {
     const r = this.tx
       ? await this.tx.execute({ sql: statement, args: values as InValue[] })
       : await this.client.execute({ sql: statement, args: values as InValue[] })
-    const rows = r.rows.map((row) =>
-      r.columns.map((col) => (row as unknown as Record<string, unknown>)[col])
-    )
+    const rows = r.rows.map((row) => {
+      const obj: Record<string, unknown> = {}
+      for (const col of r.columns) {
+        obj[col] = (row as unknown as Record<string, unknown>)[col]
+      }
+      return obj
+    })
     return { values: rows }
   }
 

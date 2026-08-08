@@ -2,8 +2,10 @@
  * Android 端适配器：@capacitor-community/sqlite（真 SQLite 文件）。
  *
  * 该模块只在 Capacitor 原生环境被 client.ts 动态加载（getClient() 的 Capacitor 分支），
- * 不会被打进 Web/桌面 bundle。@capacitor-community/sqlite 在查询时只返回
- * 数组行（{ values: any[][] }），不提供列名 → 由 columns.ts（analyzeSelect）重建对象行：
+ * 不会被打进 Web/桌面 bundle。@capacitor-community/sqlite 8.x 的 query() 返回
+ * 对象行（{ values: Record<string, unknown>[] }，列名由插件按 SQL 列/别名提供），
+ * 直接以首行键作列名即可；仅当结果为空或遇到数组行（测试 Fake/旧版行为）时，
+ * 才回退 columns.ts（analyzeSelect）重建列名：
  *   - SELECT * FROM <单表>        → PRAGMA table_info(<table>) 取列名（带缓存）
  *   - 显式列列表（含 AS 别名）      → 解析 select 列表，别名即列名
  *   - PRAGMA table_info(...)      → 固定列名（cid,name,type,notnull,dflt_value,pk）
@@ -28,6 +30,7 @@ const ENCRYPTION_MODE = 'no-encryption'
 /** @capacitor-community/sqlite 8.x SQLiteDBConnection 的最小结构（便于测试注入 Fake） */
 export interface NativeConnection {
   open(): Promise<void>
+  close(): Promise<void>
   execute(
     statement: string,
     transaction?: boolean,
@@ -40,7 +43,12 @@ export interface NativeConnection {
     returnMode?: string,
     isSQL92?: boolean
   ): Promise<CapChanges>
-  query(statement: string, values?: unknown[], isSQL92?: boolean): Promise<{ values?: unknown[][] }>
+  /** 真机返回对象行（列名内嵌）；测试 Fake 模拟同一形态 */
+  query(
+    statement: string,
+    values?: unknown[],
+    isSQL92?: boolean
+  ): Promise<{ values?: (unknown[] | Record<string, unknown>)[] }>
   beginTransaction(): Promise<unknown>
   commitTransaction(): Promise<unknown>
   rollbackTransaction(): Promise<unknown>
@@ -77,9 +85,41 @@ async function openNativeConnection(): Promise<NativeConnection> {
   const mod = await import('@capacitor-community/sqlite')
   const { CapacitorSQLite, SQLiteConnection } = mod
   const sqlite = new SQLiteConnection(CapacitorSQLite)
-  const conn = await sqlite.createConnection(DB_NAME, false, ENCRYPTION_MODE, 1, false)
-  await conn.open()
-  return conn as unknown as NativeConnection
+
+  // 注意：isConnection() 只查 JS 侧 _connectionDict（web 本地注册表），检测不到
+  // 原生侧残留。整页重载（如 RSC .txt 404 触发的新 JS 上下文）后，新上下文里的
+  // dict 为空 → isConnection 返回 false → 但原生侧上一个上下文的连接仍存活 →
+  // createConnection 抛 "Connection lifeos already exists"。因此不能只靠
+  // isConnection 守卫，必须在 createConnection 失败时主动 closeConnection
+  // （真正调原生、按库名关闭、跨上下文有效）后重试一次。
+  async function create(): Promise<NativeConnection> {
+    const conn = await sqlite.createConnection(DB_NAME, false, ENCRYPTION_MODE, 1, false)
+    await conn.open()
+    return conn as unknown as NativeConnection
+  }
+
+  // 上次初始化失败可能残留未关闭连接 → 先探测并关闭（JS 侧可见的部分）
+  try {
+    const existing = await sqlite.isConnection(DB_NAME, false)
+    if (existing?.result) await sqlite.closeConnection(DB_NAME, false)
+  } catch {
+    /* isConnection 失败不阻塞，交由 createConnection 抛出真实错误 */
+  }
+
+  try {
+    return await create()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (/already exists/i.test(message)) {
+      try {
+        await sqlite.closeConnection(DB_NAME, false)
+      } catch {
+        /* 关闭失败也继续尝试重连，真实错误由下方 create 抛出 */
+      }
+      return await create()
+    }
+    throw err
+  }
 }
 
 export class CapacitorDbClient implements DbClient {
@@ -140,10 +180,23 @@ export class CapacitorDbClient implements DbClient {
     return { rows: [], rowsAffected: res.changes?.changes ?? 0, columns: [] }
   }
 
-  /** 数组行 → 对象行（列名由 SQL 形态重建） */
-  private async toResultSet(statement: string, values: unknown[][]): Promise<DbResultSet> {
+  /** 插件返回行 → 对象行。真机为对象行（列名内嵌，直接取首行键）；
+   *  数组行（测试 Fake/空结果回退）由 SQL 形态重建列名。 */
+  private async toResultSet(
+    statement: string,
+    values: (unknown[] | Record<string, unknown>)[]
+  ): Promise<DbResultSet> {
+    const first = values[0]
+    if (first && !Array.isArray(first)) {
+      const columns = Object.keys(first)
+      const rows = values.map((row) => ({ ...(row as Record<string, unknown>) })) as Record<
+        string,
+        DbValue
+      >[]
+      return { rows, rowsAffected: 0, columns }
+    }
     const columns = await this.columnsFor(statement)
-    const rows: Record<string, DbValue>[] = values.map((row) => {
+    const rows: Record<string, DbValue>[] = (values as unknown[][]).map((row) => {
       const obj: Record<string, DbValue> = {}
       for (let i = 0; i < columns.length; i++) obj[columns[i]] = (row[i] ?? null) as DbValue
       return obj
@@ -170,7 +223,10 @@ export class CapacitorDbClient implements DbClient {
     const cached = this.tableCache.get(table)
     if (cached) return cached
     const res = await this.conn.query(`PRAGMA table_info(${table})`)
-    const names = (res.values ?? []).map((row) => String(row[1])) // name 列固定在下标 1
+    // 真机对象行取 .name；数组行（Fake）取固定下标 1
+    const names = (res.values ?? []).map((row) =>
+      Array.isArray(row) ? String(row[1]) : String((row as Record<string, unknown>).name)
+    )
     this.tableCache.set(table, names)
     return names
   }
@@ -182,9 +238,19 @@ export class CapacitorDbClient implements DbClient {
  */
 export async function createCapacitorDb(connector?: CapacitorConnector): Promise<DbClient> {
   const conn = connector ? await connector.openConnection() : await openNativeConnection()
-  // 外键按连接启用；execute 默认包事务，PRAGMA foreign_keys 在事务内为 no-op → transaction=false
-  await conn.execute('PRAGMA foreign_keys = ON', false)
-  const db = new CapacitorDbClient(conn)
-  await migrate(db)
-  return db
+  try {
+    // 外键按连接启用；execute 默认包事务，PRAGMA foreign_keys 在事务内为 no-op → transaction=false
+    await conn.execute('PRAGMA foreign_keys = ON', false)
+    const db = new CapacitorDbClient(conn)
+    await migrate(db)
+    return db
+  } catch (err) {
+    // 初始化失败关闭连接，避免插件内残留连接导致下次 createConnection 报 already exists
+    try {
+      await conn.close()
+    } catch {
+      /* ok */
+    }
+    throw err
+  }
 }

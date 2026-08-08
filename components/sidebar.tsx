@@ -22,8 +22,10 @@ export function Sidebar() {
       <nav className="flex flex-col gap-1">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href
+          // 静态导出下 Link prefetch 会请求不存在的 RSC .txt 路径（Next #85374/#73427/#87682）→ 404，
+          // 触发整页重载 → 原生 SQLite 连接残留 "Connection lifeos already exists" → 全接口挂。必须 prefetch={false}
           return (
-            <Link key={item.href} href={item.href} prefetch={['/notes', '/habits'].includes(item.href)}>
+            <Link key={item.href} href={item.href} prefetch={false}>
               <Button
                 variant={isActive ? 'secondary' : 'ghost'}
                 className={cn('w-full justify-start gap-3', isActive && 'font-medium')}
@@ -52,6 +54,7 @@ export function MobileNav() {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={false}
               className={cn(
                 'flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[11px] leading-tight min-h-[56px]',
                 isActive ? 'text-primary' : 'text-muted-foreground'
@@ -85,6 +88,7 @@ export function MobileNav() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={false}
                   onClick={() => setMoreOpen(false)}
                   className={cn(
                     'flex flex-col items-center justify-center gap-1 rounded-lg p-3 min-h-[56px]',
