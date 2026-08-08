@@ -252,6 +252,36 @@ copy .env.example .env.local
 - 端口占用：`.env.local` 设 `PORT=3001` 后重启。
 - `npm install` 偶发 `Exit handler never called!`（npm 在 Node 22/24 的已知 bug）：升级 npm 重试：`npm i -g npm@latest`。
 
+## 移动端（Android APK）
+
+手机端为**主力形态**：Next 静态导出 + Capacitor 原生 SQLite，**完全离线**（无任何网络依赖，卸载即数据清除）。与服务器/桌面数据相互独立，通过「设置 → 备份/恢复」JSON 手动同步。
+
+### 构建
+
+前置：Node 20.x + Android SDK + JDK 17；`android/local.properties` 含 `sdk.dir=/home/demo/android-sdk`（.gitignore 已忽略，不随仓库分发）。
+
+```bash
+npm run build:mobile          # BUILD_TARGET=export 静态导出 → out/
+npx cap sync android          # 同步 out/ → android/app/src/main/assets/public
+cd android && ./gradlew assembleDebug
+```
+
+- 产物：`android/app/build/outputs/apk/debug/app-debug.apk`
+- 只改 JS/静态资源无需重新 `cap add`，重跑上面三步即可；修改 Capacitor 配置/插件才需重新 sync
+
+### 安装
+
+```bash
+adb install -r <apk路径>      # -r 覆盖安装保留数据；debug 签名不变则数据保留
+```
+
+### 注意事项
+
+- **写库单端**：手机 / 桌面 / 服务器三端各自独立，不要共享同一个 .db 文件（WAL/文件锁风险）；互通只走 JSON 导出/导入
+- **备份**：手机数据存 App 私有 SQLite，卸载即清除 → 养成「设置 → 导出备份」定期存档习惯
+- **免登录**：原生离线模式登录恒放行（`lib/services/auth.ts` 原生分支恒 `{ok:true}`），`APP_PASSWORD` 不影响移动端
+- 真机已知无害噪音：控制台一条 `favicon.ico 404`（Capacitor WebViewLocalServer 不 serve .ico，不影响任何功能）
+
 ## 环境切换（主 → 备）
 
 主生产「设置 → 备份」导出 JSON → 备用实例「设置 → 恢复」导入。
