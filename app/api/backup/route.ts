@@ -1,70 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getNotes, getBudgets, getHabits } from '@/lib/db'
 import { getClient } from '@/lib/db/client'
+import { validateBackup, type BackupFile } from '@/lib/services/backup'
 
-interface BackupFile {
-  version: string
-  notes: unknown[]
-  budgets?: unknown[]
-  habits?: unknown[]
-  habitCompletions?: unknown[]
-  weightLogs?: unknown[]
-}
-
-function isString(v: unknown): v is string {
-  return typeof v === 'string'
-}
-
-function validateBackup(data: BackupFile): string | null {
-  if (!Array.isArray(data.notes)) return '无效的备份文件：notes 必须是数组'
-  for (const n of data.notes) {
-    if (typeof n !== 'object' || n === null) return '无效的备份文件：notes 元素格式错误'
-    const note = n as Record<string, unknown>
-    if (!isString(note.id)) return '无效的备份文件：notes[].id 必须是字符串'
-    if (!isString(note.content) && note.content !== null && note.content !== undefined) {
-      return '无效的备份文件：notes[].content 必须是字符串'
-    }
-  }
-  if (data.budgets !== undefined) {
-    if (!Array.isArray(data.budgets)) return '无效的备份文件：budgets 必须是数组'
-    for (const b of data.budgets) {
-      if (typeof b !== 'object' || b === null) return '无效的备份文件：budgets 元素格式错误'
-      const budget = b as Record<string, unknown>
-      if (!isString(budget.month)) return '无效的备份文件：budgets[].month 必须是字符串'
-    }
-  }
-  if (data.habits !== undefined) {
-    if (!Array.isArray(data.habits)) return '无效的备份文件：habits 必须是数组'
-    for (const h of data.habits) {
-      if (typeof h !== 'object' || h === null) return '无效的备份文件：habits 元素格式错误'
-      const habit = h as Record<string, unknown>
-      if (!isString(habit.id)) return '无效的备份文件：habits[].id 必须是字符串'
-    }
-  }
-  if (data.habitCompletions !== undefined) {
-    if (!Array.isArray(data.habitCompletions)) return '无效的备份文件：habitCompletions 必须是数组'
-    for (const hc of data.habitCompletions) {
-      if (typeof hc !== 'object' || hc === null) return '无效的备份文件：habitCompletions 元素格式错误'
-      const completion = hc as Record<string, unknown>
-      if (!isString(completion.id)) return '无效的备份文件：habitCompletions[].id 必须是字符串'
-      if (!isString(completion.habit_id)) return '无效的备份文件：habitCompletions[].habit_id 必须是字符串'
-      if (!isString(completion.date)) return '无效的备份文件：habitCompletions[].date 必须是字符串'
-    }
-  }
-  if (data.weightLogs !== undefined) {
-    if (!Array.isArray(data.weightLogs)) return '无效的备份文件：weightLogs 必须是数组'
-    for (const wl of data.weightLogs) {
-      if (typeof wl !== 'object' || wl === null) return '无效的备份文件：weightLogs 元素格式错误'
-      const weightLog = wl as Record<string, unknown>
-      if (!isString(weightLog.id)) return '无效的备份文件：weightLogs[].id 必须是字符串'
-      if (!isString(weightLog.person)) return '无效的备份文件：weightLogs[].person 必须是字符串'
-      if (!isString(weightLog.date)) return '无效的备份文件：weightLogs[].date 必须是字符串'
-    }
-  }
-  return null
-}
-
-export async function GET(req: NextRequest) {
+const GETHandler = async function GET(req: NextRequest) {
   const [notes, budgets, habits] = await Promise.all([
     getNotes(Number.MAX_SAFE_INTEGER),
     getBudgets(),
@@ -111,6 +50,11 @@ export async function GET(req: NextRequest) {
     },
   })
 }
+
+// export 构建（BUILD_TARGET=export）下 GET 置空（静态导出无服务端运行时，E301）。
+// `as typeof GETHandler` 断言使 tsc 视 GET 为纯函数类型（消除 TS2722/TS18048），
+// 运行时在 export 下仍为 undefined。
+export const GET = (process.env.BUILD_TARGET === 'export' ? undefined : GETHandler) as typeof GETHandler
 
 export async function POST(req: NextRequest) {
   let data: BackupFile

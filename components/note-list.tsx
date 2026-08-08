@@ -20,6 +20,16 @@ import { UNTAGGED } from '@/lib/types'
 import { useAppStore } from '@/store'
 import { toast } from 'sonner'
 import { NoteCard } from '@/components/note-card'
+import {
+  listNotes,
+  createNote,
+  deleteNote,
+  updateNote as apiUpdateNote,
+  batchDeleteNotes,
+  batchTagNotes,
+  exportNotesMarkdown,
+} from '@/lib/services/notes'
+import { listTags } from '@/lib/services/tags'
 
 const TagManagerSheet = dynamic(() => import('@/components/tag-manager-sheet').then(mod => ({ default: mod.TagManagerSheet })), {
   loading: () => null,
@@ -55,12 +65,8 @@ export function NoteList() {
   const fetchNotes = useCallback(async () => {
     setInitialLoading(true)
     try {
-      const params = new URLSearchParams()
-      params.set('limit', '500')
-      params.set('summary', 'true')
-      const res = await fetch(`/api/notes?${params}`)
-      const data = await res.json()
-      setNotes(data.notes)
+      const notes = await listNotes({ limit: 500 })
+      setNotes(notes)
     } catch (e) {
       console.error('Failed to fetch notes:', e)
     } finally {
@@ -72,13 +78,8 @@ export function NoteList() {
   // list reflects the change authoritatively instead of relying solely on the
   // optimistic Zustand patch, which can desync from the server.
   const refreshNotes = useCallback(() => {
-    const params = new URLSearchParams()
-    params.set('limit', '500')
-    params.set('summary', 'true')
-    params.set('_t', Date.now().toString())
-    fetch(`/api/notes?${params}`, { cache: 'no-store' })
-      .then(res => { if (!res.ok) throw new Error(res.statusText); return res.json() })
-      .then(data => { if (Array.isArray(data.notes)) setNotes(data.notes) })
+    listNotes({ limit: 500 })
+      .then(notes => { if (Array.isArray(notes)) setNotes(notes) })
       .catch(e => console.error('refreshNotes failed:', e))
   }, [setNotes])
 
@@ -102,9 +103,8 @@ export function NoteList() {
 
   // Fetch available tags for the filter bar (defined early because used by handleDelete)
   const refreshAvailableTags = useCallback(() => {
-    fetch(`/api/tags?_t=${Date.now()}`, { cache: 'no-store' })
-      .then(res => { if (!res.ok) throw new Error(res.statusText); return res.json() })
-      .then(data => setAvailableTags(data.tags || []))
+    listTags()
+      .then(tags => setAvailableTags(tags || []))
       .catch(e => console.error('refreshAvailableTags failed:', e))
   }, [])
 
@@ -121,7 +121,7 @@ export function NoteList() {
 
   const handleDelete = useCallback(async (id: string) => {
     try {
-      await fetch(`/api/notes/${id}`, { method: 'DELETE' })
+      await deleteNote(id)
       removeNote(id)
       refreshAvailableTags()
       toast.success('笔记已删除')
@@ -133,13 +133,8 @@ export function NoteList() {
 
   const handleCreateNote = useCallback(async () => {
     try {
-      const res = await fetch('/api/notes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'note', title: '', content: '', tags: [] }),
-      })
-      const data = await res.json()
-      router.push(`/notes/${data.note.id}`)
+      const note = await createNote({ title: '', content: '', tags: [] })
+      router.push(`/notes/detail?id=${note.id}`)
     } catch (e) {
       console.error('Failed to create note:', e)
       toast.error('创建笔记失败，请重试')
@@ -164,16 +159,9 @@ export function NoteList() {
       searchController.current = controller
 
       try {
-        const searchParams = new URLSearchParams()
-        searchParams.set('q', q)
-        searchParams.set('summary', 'true')
-        if (activeTag) searchParams.set('tag', activeTag)
-        const res = await fetch(`/api/notes?${searchParams}`, {
-          signal: controller.signal,
-        })
+        const notes = await listNotes({ q, tag: activeTag || undefined })
         if (!controller.signal.aborted) {
-          const data = await res.json()
-          setSearchResults(data && Array.isArray(data.notes) ? data.notes : [])
+          setSearchResults(Array.isArray(notes) ? notes : [])
         }
       } catch (e) {
         if (e instanceof DOMException && e.name === 'AbortError') return
@@ -194,7 +182,7 @@ export function NoteList() {
   }, [])
 
   const handleEdit = useCallback((note: Note) => {
-    router.push(`/notes/${note.id}`)
+    router.push(`/notes/detail?id=${note.id}`)
   }, [router])
 
   const handleTagSelect = useCallback((tag: string | null) => {
@@ -253,11 +241,7 @@ export function NoteList() {
     if (selectedIds.size === 0) return
     const ids = Array.from(selectedIds)
     try {
-      await fetch('/api/notes/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete', ids }),
-      })
+      await batchDeleteNotes(ids)
       ids.forEach(id => removeNote(id))
       clearSelection()
       refreshAvailableTags()
@@ -272,11 +256,7 @@ export function NoteList() {
     if (!tag.trim() || selectedIds.size === 0) return
     const ids = Array.from(selectedIds)
     try {
-      await fetch('/api/notes/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'tag', ids, tag }),
-      })
+      await batchTagNotes(ids, tag)
       clearSelection()
       refreshAvailableTags()
       fetchNotes()
@@ -302,11 +282,7 @@ export function NoteList() {
     }
     setNotes(withOutNote)
     try {
-      await fetch(`/api/notes/${note.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pinned: newPinned }),
-      })
+      await apiUpdateNote(note.id, { pinned: newPinned })
       toast.success(newPinned ? '已置顶' : '已取消置顶')
     } catch (e) {
       console.error('Failed to toggle pin:', e)
@@ -315,6 +291,22 @@ export function NoteList() {
       setNotes(notes.map(n => n.id === note.id ? { ...n, pinned: !newPinned } : n))
     }
   }, [notes, setNotes])
+
+  const handleExport = useCallback(async () => {
+    try {
+      const md = await exportNotesMarkdown()
+      const blob = new Blob([md], { type: 'text/markdown' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `lifeos-export-${new Date().toISOString().slice(0, 10)}.md`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      console.error('Export failed:', e)
+      toast.error('导出失败')
+    }
+  }, [])
 
 
 
@@ -347,7 +339,7 @@ export function NoteList() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open('/api/export', '_blank')}
+              onClick={handleExport}
               className="gap-1 text-xs"
             >
               <Download className="h-3.5 w-3.5" />

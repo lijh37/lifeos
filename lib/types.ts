@@ -23,24 +23,6 @@ export interface WeightLog {
   createdAt: string
 }
 
-/** 笔记附件数据结构 */
-export interface Attachment {
-  /** 唯一标识（UUID） */
-  id: string
-  /** 所属笔记 ID */
-  noteId: string
-  /** 文件名（含扩展名） */
-  filename: string
-  /** 附件访问 URL */
-  url: string
-  /** MIME 类型（如 image/png） */
-  mimeType: string
-  /** 文件大小（字节） */
-  fileSize: number
-  /** 创建时间（ISO 8601） */
-  createdAt: string
-}
-
 /** 完整笔记数据结构 */
 export interface Note {
   /** 唯一标识（UUID） */

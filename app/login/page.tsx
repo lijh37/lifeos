@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Lock, Eye, EyeOff } from 'lucide-react'
+import { login } from '@/lib/services/auth'
 
 function LoginForm() {
   const [password, setPassword] = useState('')
@@ -14,8 +15,7 @@ function LoginForm() {
 
   useEffect(() => {
     const from = searchParams.get('from') || '/'
-    fetch('/api/auth', { method: 'POST', body: JSON.stringify({ password: '' }) })
-      .then(r => r.json())
+    login('')
       .then(d => { if (d.ok) window.location.href = from })
       .catch(() => {})
   }, [])
@@ -24,16 +24,16 @@ function LoginForm() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const res = await fetch('/api/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
-    })
-    const data = await res.json()
-    setLoading(false)
-    if (data.ok) {
-      window.location.href = searchParams.get('from') || '/'
-    } else {
+    try {
+      const data = await login(password)
+      setLoading(false)
+      if (data.ok) {
+        window.location.href = searchParams.get('from') || '/'
+      } else {
+        setError('密码错误')
+      }
+    } catch {
+      setLoading(false)
       setError('密码错误')
     }
   }

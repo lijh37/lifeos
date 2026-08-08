@@ -1,29 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { listWeightLogs, upsertWeightLog, deleteWeightLog } from '@/lib/db'
-import { WEIGHT_PERSONS, type WeightLog, type WeightPersonKey } from '@/lib/types'
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
-
-/** 校验日期字符串为合法真实日期（YYYY-MM-DD）。 */
-function isValidDate(date: string): boolean {
-  if (!DATE_RE.test(date)) return false
-  const [y, m, d] = date.split('-').map(Number)
-  const dt = new Date(y, m - 1, d)
-  return (
-    dt.getFullYear() === y &&
-    dt.getMonth() === m - 1 &&
-    dt.getDate() === d
-  )
-}
-
-function isWeightPersonKey(v: unknown): v is WeightPersonKey {
-  return WEIGHT_PERSONS.some(p => p.key === v)
-}
-
-/** 校验 weight 为有限数值且 > 0 且 ≤ 500。 */
-function isValidWeight(v: unknown): v is number {
-  return typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= 500
-}
+import { validateWeightInput } from '@/lib/services/weight'
+import type { WeightLog, WeightPersonKey } from '@/lib/types'
 
 /** 按 person 分组、各自按 date 升序。 */
 function groupByPerson(logs: WeightLog[]): { me: WeightLog[]; her: WeightLog[] } {
@@ -34,12 +12,17 @@ function groupByPerson(logs: WeightLog[]): { me: WeightLog[]; her: WeightLog[] }
   return grouped
 }
 
-export async function GET() {
+const GETHandler = async function GET() {
   const logs = await listWeightLogs()
   return NextResponse.json(groupByPerson(logs), {
     headers: { 'Cache-Control': 'private, max-age=20, stale-while-revalidate=90' },
   })
 }
+
+// export 构建（BUILD_TARGET=export）下 GET 置空（静态导出无服务端运行时，E301）。
+// `as typeof GETHandler` 断言使 tsc 视 GET 为纯函数类型（消除 TS2722/TS18048），
+// 运行时在 export 下仍为 undefined。
+export const GET = (process.env.BUILD_TARGET === 'export' ? undefined : GETHandler) as typeof GETHandler
 
 export async function POST(req: NextRequest) {
   let body: unknown
@@ -50,20 +33,15 @@ export async function POST(req: NextRequest) {
   }
   const b = (body ?? {}) as Record<string, unknown>
 
-  if (!isWeightPersonKey(b.person)) {
-    return NextResponse.json({ error: 'invalid person' }, { status: 400 })
-  }
-  if (typeof b.date !== 'string' || !isValidDate(b.date)) {
-    return NextResponse.json({ error: 'invalid date' }, { status: 400 })
-  }
-  if (!isValidWeight(b.weight)) {
-    return NextResponse.json({ error: 'invalid weight' }, { status: 400 })
+  const validationError = validateWeightInput(b)
+  if (validationError) {
+    return NextResponse.json({ error: validationError }, { status: 400 })
   }
 
   const weightLog = await upsertWeightLog({
-    person: b.person,
-    date: b.date,
-    weight: b.weight,
+    person: b.person as WeightPersonKey,
+    date: b.date as string,
+    weight: b.weight as number,
     note: typeof b.note === 'string' ? b.note : '',
   })
   return NextResponse.json({ weightLog })

@@ -15,5 +15,5 @@ export async function createNoteViaApi(
 }
 
 export async function deleteNoteViaApi(id: string): Promise<void> {
-  await fetch(`${BASE_URL}/api/notes/${id}`, { method: 'DELETE' })
+  await fetch(`${BASE_URL}/api/notes?id=${id}`, { method: 'DELETE' })
 }

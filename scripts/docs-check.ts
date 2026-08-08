@@ -3,9 +3,8 @@
  *
  * 把关键契约硬编码为「唯一真相」，检查代码与 AGENTS.md 文档是否一致：
  *   断言组 1：API 路径 + 导出 HTTP 方法（route.ts 实际导出 === 契约清单，不多不少）
- *   断言组 2：关键契约细节
+ * 断言组 2：关键契约细节
  *             - notes/batch action 白名单含 'tag'、不含已废弃 'addTag'
- *             - attachments DELETE 用 'attachmentId' 参数、不含已废弃 '?url='
  *             - AGENTS.md 防回潮：不得出现已废弃表述
  *             - AGENTS.md 必须包含全部契约路径字符串
  *   断言组 3：环境变量双向一致性
@@ -55,10 +54,8 @@ console.log('\n[断言组 1] API 路径与 HTTP 方法存在性')
 // 契约清单（唯一真相）：路径 → 应导出方法集合（不多不少）
 const API_CONTRACTS: Array<{ path: string; methods: string[] }> = [
   { path: '/api/auth', methods: ['POST'] },
-  { path: '/api/notes', methods: ['GET', 'POST', 'DELETE'] },
-  { path: '/api/notes/[id]', methods: ['GET', 'PATCH', 'DELETE'] },
+  { path: '/api/notes', methods: ['GET', 'POST', 'PATCH', 'DELETE'] },
   { path: '/api/notes/batch', methods: ['POST'] },
-  { path: '/api/notes/[id]/attachments', methods: ['GET', 'POST', 'DELETE'] },
   { path: '/api/budgets', methods: ['GET', 'POST'] },
   { path: '/api/habits', methods: ['GET', 'POST', 'PATCH', 'DELETE'] },
   { path: '/api/tags', methods: ['GET', 'PATCH', 'DELETE'] },
@@ -77,7 +74,7 @@ for (const c of API_CONTRACTS) {
 
   const src = readFile(rel)
   const exported = new Set(
-    [...src.matchAll(/export\s+async\s+function\s+(GET|POST|PATCH|DELETE)\b/g)].map(m => m[1])
+    [...src.matchAll(/export\s+(?:async\s+function\s+|const\s+)(GET|POST|PATCH|DELETE)\b/g)].map(m => m[1])
   )
   const expected = new Set(c.methods)
   const missing = [...expected].filter(m => !exported.has(m))
@@ -105,19 +102,14 @@ assert(
 )
 assert(!batchSrc.includes('addTag'), 'notes/batch 不含已废弃 action "addTag"')
 
-// 2.2 attachments DELETE：使用 attachmentId 参数，而非 ?url=
-const attSrc = readFile('app/api/notes/[id]/attachments/route.ts')
-assert(attSrc.includes('attachmentId'), 'attachments DELETE 使用 "attachmentId" 参数')
-assert(!attSrc.includes('?url='), 'attachments 不含已废弃删除参数 "?url="')
-
-// 2.3 AGENTS.md 防回潮：全文不得出现已废弃表述（精确匹配）
+// 2.2 AGENTS.md 防回潮：全文不得出现已废弃表述（精确匹配）
 const agents = readFile('AGENTS.md')
 const DEPRECATED_PHRASES = ['addTag', '?url=', '游标分页', '校验和']
 for (const phrase of DEPRECATED_PHRASES) {
   assert(!agents.includes(phrase), `AGENTS.md 不含已废弃表述 "${phrase}"`)
 }
 
-// 2.4 AGENTS.md 必须包含每个契约路径字符串
+// 2.3 AGENTS.md 必须包含每个契约路径字符串
 const CONTRACT_PATHS = API_CONTRACTS.map(c => c.path)
 for (const p of CONTRACT_PATHS) {
   assert(agents.includes(p), `AGENTS.md 包含契约路径 "${p}"`)

@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { UNTAGGED } from '@/lib/types'
 import { useAppStore } from '@/store'
+import { listTags, renameTag, deleteTag } from '@/lib/services/tags'
 
 interface TagManagerSheetProps {
   open: boolean
@@ -42,9 +43,8 @@ export function TagManagerSheet({ open, onOpenChange, onTagSelect, onTagsChanged
 
   const fetchTags = () => {
     setLoading(true)
-    fetch('/api/tags')
-      .then(res => res.json())
-      .then(data => setTags(data.tags))
+    listTags()
+      .then(tags => setTags(tags))
       .finally(() => setLoading(false))
   }
 
@@ -66,12 +66,8 @@ export function TagManagerSheet({ open, onOpenChange, onTagSelect, onTagsChanged
       setEditing(null)
       return
     }
-    const res = await fetch('/api/tags', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ oldName, newName }),
-    })
-    if (res.ok) {
+    try {
+      await renameTag(oldName, newName)
       showMsg('success', `已重命名为「${newName}」`)
       setTags(prev => prev.map(t => t.name === oldName ? { ...t, name: newName } : t))
       // 同步更新缓存笔记中的标签名
@@ -82,15 +78,15 @@ export function TagManagerSheet({ open, onOpenChange, onTagSelect, onTagsChanged
         }
       })
       onTagsChanged?.()
-    } else {
+    } catch {
       showMsg('error', '重命名失败')
     }
     setEditing(null)
   }
 
   const handleDelete = async (name: string) => {
-    const res = await fetch(`/api/tags?name=${encodeURIComponent(name)}`, { method: 'DELETE' })
-    if (res.ok) {
+    try {
+      await deleteTag(name)
       showMsg('success', `标签「${name}」已删除`)
       setTags(prev => prev.filter(t => t.name !== name))
       // 同步从缓存笔记中移除该标签
@@ -101,7 +97,7 @@ export function TagManagerSheet({ open, onOpenChange, onTagSelect, onTagsChanged
         }
       })
       onTagsChanged?.()
-    } else {
+    } catch {
       showMsg('error', '删除失败')
     }
     setDeleteTarget(null)

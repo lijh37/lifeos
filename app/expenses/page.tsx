@@ -11,6 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 
 import { ChevronLeft, ChevronRight, PiggyBank, CheckCircle2, AlertCircle, Sparkles, Loader2 } from 'lucide-react'
 import type { Budget } from '@/lib/types'
+import { fetchBudget, fetchAllBudgets, saveBudget } from '@/lib/services/budgets'
 import { ProgressBar } from '@/components/progress-bar'
 import { BudgetCard } from '@/components/budget-card'
 import { BudgetForm } from '@/components/budget-form'
@@ -50,16 +51,11 @@ export default function BudgetPage() {
     let ignore = false
     async function startFetching() {
       try {
-        const [budgetRes, budgetsRes] = await Promise.all([
-          fetch(`/api/budgets?month=${currentMonth}`),
-          fetch('/api/budgets'),
-        ])
-        const bd = await budgetRes.json()
-        const bl = await budgetsRes.json()
+        const [bd, bl] = await Promise.all([fetchBudget(currentMonth), fetchAllBudgets()])
         if (ignore) return
-        setBudget(bd.budget)
-        setBudgets(bl.budgets)
-        syncInputs(bd.budget)
+        setBudget(bd)
+        setBudgets(bl)
+        syncInputs(bd)
       } catch (e) {
         console.error('Failed to fetch budget data:', e)
       } finally {
@@ -97,16 +93,10 @@ export default function BudgetPage() {
     budgetAbortRef.current = controller
 
     try {
-      const res = await fetch('/api/budgets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month: currentMonth, ...data }),
-        signal: controller.signal,
-      })
-      if (res.ok) {
-        const result = await res.json()
-        setBudget(result.budget)
-      }
+      const result = await saveBudget(currentMonth, data)
+      // Service ignores the abort signal; discard stale responses via the signal flag
+      if (controller.signal.aborted) return
+      setBudget(result)
     } catch (e) {
       // AbortError is expected when user clicks rapidly - ignore
       if ((e as DOMException)?.name === 'AbortError') return

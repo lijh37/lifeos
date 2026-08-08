@@ -1,7 +1,11 @@
+import { Suspense } from 'react'
+import { ErrorBoundary } from '@/components/error-boundary'
+import NoteDetailPage from './note-detail-page'
+
 /**
- * 编辑页骨架屏 — 匹配 note-detail-client.tsx 布局
+ * 笔记详情页骨架屏 — 复用原 loading.tsx 骨架布局（匹配 note-detail-client.tsx 布局）
  */
-export default function NoteDetailLoading() {
+function NoteDetailPageSkeleton() {
   return (
     <div className="flex min-h-dvh flex-col">
       {/* Header */}
@@ -30,5 +34,15 @@ export default function NoteDetailLoading() {
         <div className="h-5 w-16 rounded-full skeleton-pulse" />
       </div>
     </div>
+  )
+}
+
+export default function NoteDetailRoutePage() {
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={<NoteDetailPageSkeleton />}>
+        <NoteDetailPage />
+      </Suspense>
+    </ErrorBoundary>
   )
 }

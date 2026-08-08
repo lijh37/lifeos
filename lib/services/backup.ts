@@ -1,0 +1,302 @@
+/**
+ * 备份/恢复服务（lib/services 环境分流层）
+ *
+ * - Capacitor 原生：直接调用 lib/db 模块 + getClient() 裸查询，复刻 app/api/backup/route.ts
+ *   GET（导出）与 POST（恢复事务）逻辑
+ * - Web / 测试：fetch('/api/backup') 透传
+ */
+
+import { isNativeCapacitor } from './env'
+
+export interface BackupFile {
+  version: string
+  notes: unknown[]
+  budgets?: unknown[]
+  habits?: unknown[]
+  habitCompletions?: unknown[]
+  weightLogs?: unknown[]
+}
+
+function isString(v: unknown): v is string {
+  return typeof v === 'string'
+}
+
+/** 从 app/api/backup/route.ts 逐字复制的校验逻辑（错误消息保持一致）。 */
+export function validateBackup(data: BackupFile): string | null {
+  if (!Array.isArray(data.notes)) return '无效的备份文件：notes 必须是数组'
+  for (const n of data.notes) {
+    if (typeof n !== 'object' || n === null) return '无效的备份文件：notes 元素格式错误'
+    const note = n as Record<string, unknown>
+    if (!isString(note.id)) return '无效的备份文件：notes[].id 必须是字符串'
+    if (!isString(note.content) && note.content !== null && note.content !== undefined) {
+      return '无效的备份文件：notes[].content 必须是字符串'
+    }
+  }
+  if (data.budgets !== undefined) {
+    if (!Array.isArray(data.budgets)) return '无效的备份文件：budgets 必须是数组'
+    for (const b of data.budgets) {
+      if (typeof b !== 'object' || b === null) return '无效的备份文件：budgets 元素格式错误'
+      const budget = b as Record<string, unknown>
+      if (!isString(budget.month)) return '无效的备份文件：budgets[].month 必须是字符串'
+    }
+  }
+  if (data.habits !== undefined) {
+    if (!Array.isArray(data.habits)) return '无效的备份文件：habits 必须是数组'
+    for (const h of data.habits) {
+      if (typeof h !== 'object' || h === null) return '无效的备份文件：habits 元素格式错误'
+      const habit = h as Record<string, unknown>
+      if (!isString(habit.id)) return '无效的备份文件：habits[].id 必须是字符串'
+    }
+  }
+  if (data.habitCompletions !== undefined) {
+    if (!Array.isArray(data.habitCompletions)) return '无效的备份文件：habitCompletions 必须是数组'
+    for (const hc of data.habitCompletions) {
+      if (typeof hc !== 'object' || hc === null) return '无效的备份文件：habitCompletions 元素格式错误'
+      const completion = hc as Record<string, unknown>
+      if (!isString(completion.id)) return '无效的备份文件：habitCompletions[].id 必须是字符串'
+      if (!isString(completion.habit_id)) return '无效的备份文件：habitCompletions[].habit_id 必须是字符串'
+      if (!isString(completion.date)) return '无效的备份文件：habitCompletions[].date 必须是字符串'
+    }
+  }
+  if (data.weightLogs !== undefined) {
+    if (!Array.isArray(data.weightLogs)) return '无效的备份文件：weightLogs 必须是数组'
+    for (const wl of data.weightLogs) {
+      if (typeof wl !== 'object' || wl === null) return '无效的备份文件：weightLogs 元素格式错误'
+      const weightLog = wl as Record<string, unknown>
+      if (!isString(weightLog.id)) return '无效的备份文件：weightLogs[].id 必须是字符串'
+      if (!isString(weightLog.person)) return '无效的备份文件：weightLogs[].person 必须是字符串'
+      if (!isString(weightLog.date)) return '无效的备份文件：weightLogs[].date 必须是字符串'
+    }
+  }
+  return null
+}
+
+/** 读取响应体 error 并抛出统一错误（web 分支共用） */
+async function throwHttpError(res: Response): Promise<never> {
+  const body = await res.json().catch(() => null)
+  throw new Error(body?.error || `HTTP ${res.status}`)
+}
+
+export async function exportBackupData(): Promise<BackupFile> {
+  if (isNativeCapacitor()) {
+    const { getNotes, getBudgets, getHabits, getClient } = await import('@/lib/db/native')
+
+    const [notes, budgets, habits] = await Promise.all([
+      getNotes(Number.MAX_SAFE_INTEGER),
+      getBudgets(),
+      getHabits(),
+    ])
+
+    const db = getClient()
+    const habitCompletions = (await db.execute(
+      'SELECT id, habit_id, date, completed, created_at FROM habit_completions'
+    )).rows.map(r => ({
+      id: r.id as string,
+      habit_id: r.habit_id as string,
+      date: r.date as string,
+      completed: (r.completed as number) === 1,
+      created_at: r.created_at as string,
+    }))
+    const weightLogs = (await db.execute(
+      'SELECT id, person, date, weight, note, created_at FROM weight_logs'
+    )).rows.map(r => ({
+      id: r.id as string,
+      person: r.person as string,
+      date: r.date as string,
+      weight: Number(r.weight),
+      note: r.note as string,
+      created_at: r.created_at as string,
+    }))
+
+    const data = {
+      exportedAt: new Date().toISOString(),
+      version: '1',
+      notes,
+      budgets,
+      habits,
+      habitCompletions,
+      weightLogs,
+    }
+    return data
+  }
+
+  const res = await fetch('/api/backup')
+  if (!res.ok) await throwHttpError(res)
+  return res.json()
+}
+
+export async function importBackupData(data: BackupFile): Promise<{ success: boolean; imported: number }> {
+  if (isNativeCapacitor()) {
+    if (!data.version || !Array.isArray(data.notes)) {
+      throw new Error('无效的备份文件')
+    }
+    const validationError = validateBackup(data)
+    if (validationError) throw new Error(validationError)
+
+    const { getClient } = await import('@/lib/db/native')
+    const db = getClient()
+
+    const tx = await db.transaction()
+    try {
+      // 以 FK 安全顺序清空现有数据（8 表，与 route POST 一致）
+      await tx.execute('DELETE FROM attachments')
+      await tx.execute('DELETE FROM habit_completions')
+      await tx.execute('DELETE FROM habits')
+      await tx.execute('DELETE FROM weight_logs')
+      await tx.execute('DELETE FROM note_tags')
+      await tx.execute('DELETE FROM tags')
+      await tx.execute('DELETE FROM budgets')
+      await tx.execute('DELETE FROM notes')
+
+      let imported = 0
+
+      // 导入笔记（保留原 id + 按名重建标签）
+      for (const rawNote of data.notes) {
+        const n = rawNote as Record<string, unknown>
+        await tx.execute({
+          sql: `INSERT INTO notes (id, content, title, type, due_date, done, pinned, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          args: [
+            n.id as string,
+            (n.content as string) ?? '',
+            (n.title as string) ?? null,
+            (n.type as string) ?? 'note',
+            (n.dueDate as string) ?? (n.due_date as string) ?? null,
+            n.done ? 1 : 0,
+            n.pinned ? 1 : 0,
+            (n.createdAt as string) ?? (n.created_at as string) ?? new Date().toISOString(),
+            (n.updatedAt as string) ?? (n.updated_at as string) ?? new Date().toISOString(),
+          ],
+        })
+        const tags = (n.tags ?? []) as string[]
+        for (const tagName of tags) {
+          if (!tagName.trim()) continue
+          const existing = await tx.execute({ sql: 'SELECT id FROM tags WHERE name = ?', args: [tagName.trim()] })
+          let tagId: string
+          if (existing.rows.length > 0) {
+            tagId = existing.rows[0].id as string
+          } else {
+            tagId = crypto.randomUUID()
+            await tx.execute({
+              sql: 'INSERT OR IGNORE INTO tags (id, name, created_at) VALUES (?, ?, ?)',
+              args: [tagId, tagName.trim(), new Date().toISOString()],
+            })
+          }
+          await tx.execute({
+            sql: 'INSERT OR IGNORE INTO note_tags (note_id, tag_id) VALUES (?, ?)',
+            args: [n.id as string, tagId],
+          })
+        }
+        imported++
+      }
+
+      // 导入预算（按 month upsert）
+      if (Array.isArray(data.budgets)) {
+        for (const rawBudget of data.budgets) {
+          const b = rawBudget as Record<string, unknown>
+          const month = b.month as string
+          const existing = await tx.execute({ sql: 'SELECT id FROM budgets WHERE month = ?', args: [month] })
+          const now = new Date().toISOString()
+          if (existing.rows.length > 0) {
+            await tx.execute({
+              sql: `UPDATE budgets SET fixed_budget=?, variable_budget=?, fixed_actual=?, variable_actual=?,
+                    notes=?, is_completed=?, savings_completed=?, updated_at=? WHERE month=?`,
+              args: [
+                (b.fixedBudget as number) ?? (b.fixed_budget as number) ?? 0,
+                (b.variableBudget as number) ?? (b.variable_budget as number) ?? 0,
+                (b.fixedActual as number) ?? (b.fixed_actual as number) ?? null,
+                (b.variableActual as number) ?? (b.variable_actual as number) ?? null,
+                (b.notes as string) ?? '',
+                ((b.isCompleted as boolean) ?? (b.is_completed as boolean) ?? false) ? 1 : 0,
+                ((b.savingsCompleted as boolean) ?? (b.savings_completed as boolean) ?? false) ? 1 : 0,
+                now,
+                month,
+              ],
+            })
+          } else {
+            await tx.execute({
+              sql: `INSERT INTO budgets (id, month, fixed_budget, variable_budget, fixed_actual, variable_actual,
+                    notes, is_completed, savings_completed, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              args: [
+                crypto.randomUUID(), month,
+                (b.fixedBudget as number) ?? (b.fixed_budget as number) ?? 0,
+                (b.variableBudget as number) ?? (b.variable_budget as number) ?? 0,
+                (b.fixedActual as number) ?? (b.fixed_actual as number) ?? null,
+                (b.variableActual as number) ?? (b.variable_actual as number) ?? null,
+                (b.notes as string) ?? '',
+                ((b.isCompleted as boolean) ?? (b.is_completed as boolean) ?? false) ? 1 : 0,
+                ((b.savingsCompleted as boolean) ?? (b.savings_completed as boolean) ?? false) ? 1 : 0,
+                now, now,
+              ],
+            })
+          }
+          imported++
+        }
+      }
+
+      // 导入习惯
+      if (Array.isArray(data.habits)) {
+        for (const rawHabit of data.habits) {
+          const h = rawHabit as Record<string, unknown>
+          await tx.execute({
+            sql: 'INSERT INTO habits (id, name, description, frequency, created_at) VALUES (?, ?, ?, ?, ?)',
+            args: [h.id as string, h.name as string, (h.description as string) || '', (h.frequency as string) || 'daily', (h.createdAt as string) || (h.created_at as string) || new Date().toISOString()],
+          })
+          imported++
+        }
+      }
+
+      // 导入习惯打卡
+      if (Array.isArray(data.habitCompletions)) {
+        for (const rawCompletion of data.habitCompletions) {
+          const hc = rawCompletion as Record<string, unknown>
+          await tx.execute({
+            sql: 'INSERT INTO habit_completions (id, habit_id, date, completed, created_at) VALUES (?, ?, ?, ?, ?)',
+            args: [
+              hc.id as string,
+              hc.habit_id as string,
+              hc.date as string,
+              hc.completed ? 1 : 0,
+              (hc.created_at as string) || new Date().toISOString(),
+            ],
+          })
+          imported++
+        }
+      }
+
+      // 导入体重记录
+      if (Array.isArray(data.weightLogs)) {
+        for (const rawWeightLog of data.weightLogs) {
+          const wl = rawWeightLog as Record<string, unknown>
+          await tx.execute({
+            sql: 'INSERT INTO weight_logs (id, person, date, weight, note, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+            args: [
+              wl.id as string,
+              wl.person as string,
+              wl.date as string,
+              Number(wl.weight),
+              (wl.note as string) || '',
+              (wl.created_at as string) || new Date().toISOString(),
+            ],
+          })
+          imported++
+        }
+      }
+
+      await tx.commit()
+      return { success: true, imported }
+    } catch (e) {
+      await tx.rollback()
+      throw e
+    }
+  }
+
+  const res = await fetch('/api/backup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) await throwHttpError(res)
+  return res.json()
+}

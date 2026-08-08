@@ -17,8 +17,8 @@ test.describe('Notes E2E', () => {
       // Wait for the note detail page to render (title placeholder means component loaded)
       await expect(page.getByPlaceholder('笔记标题')).toBeVisible({ timeout: 8000 })
       
-      // Try to extract note ID from URL
-      noteId = page.url().split('/notes/')[1]?.split('?')[0] ?? ''
+      // Try to extract note ID from URL query param
+      noteId = new URL(page.url()).searchParams.get('id') ?? ''
       await page.getByPlaceholder('笔记标题').fill(title)
 
       // Wait for the 500ms autosave debounce + network roundtrip
@@ -80,7 +80,7 @@ test.describe('Notes E2E', () => {
       noteId = note.id
 
       // Add tag via API instead of UI (more reliable)
-      const addTagRes = await fetch(`${process.env.BASE_URL || 'http://localhost:3000'}/api/notes/${note.id}`, {
+      const addTagRes = await fetch(`${process.env.BASE_URL || 'http://localhost:3000'}/api/notes?id=${note.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tags: [tag] }),
@@ -90,7 +90,7 @@ test.describe('Notes E2E', () => {
       expect(addTagData.note.tags).toContain(tag)
 
       // Navigate to note detail page and verify tag appears
-      await page.goto(`/notes/${note.id}`)
+      await page.goto(`/notes/detail?id=${note.id}`)
       await expect(page.getByPlaceholder('笔记标题')).toBeVisible({ timeout: 5000 })
 
       await expect(page.getByText(tag, { exact: false })).toBeVisible({ timeout: 5000 })
@@ -106,7 +106,7 @@ test.describe('Notes E2E', () => {
     const note = await createNoteViaApi(title)
     // No API cleanup needed — the note is deleted through the UI
 
-    await page.goto(`/notes/${note.id}`)
+    await page.goto(`/notes/detail?id=${note.id}`)
     await expect(page.getByPlaceholder('笔记标题')).toBeVisible({ timeout: 5000 })
 
     // Click the Trash2 delete button in the header (title="删除")

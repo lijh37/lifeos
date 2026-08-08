@@ -1,6 +1,5 @@
-import type { Client } from '@libsql/client'
-import fs from 'fs'
-import path from 'path'
+import type { DbClient } from './db-client'
+import { MIGRATIONS } from './migrations'
 
 /** 将 SQL 文本按分号拆分为单条语句。 */
 function splitStatements(sql: string): string[] {
@@ -25,15 +24,16 @@ function splitStatements(sql: string): string[] {
 /**
  * 对指定数据库执行所有待处理的迁移：
  * 1. 创建 `_migrations` 追踪表（如果不存在）
- * 2. 扫描 `migrations/` 目录的 `.sql` 文件（按文件名排序）
+ * 2. 遍历内联迁移定义（lib/db/migrations.ts，与 migrations/*.sql 一致）
  * 3. 对比已应用的迁移，执行新增的迁移
  * 4. 每次迁移在一个事务中完成
  * 5. 按 version 追踪已应用迁移（appliedSet.has(version)），防止重复执行
  *
- * 兼容 SQLite（:memory: / 文件）和 Turso（libSQL 云端）。
+ * 兼容 SQLite（:memory: / 文件）、Turso（libSQL 云端）与 capacitor-sqlite（Android）。
+ * 迁移 SQL 内联进 bundle（铁律③），不再扫描文件系统。
  * 在测试中可直接调用：`await migrate(getClient())`
  */
-export async function migrate(db: Client): Promise<void> {
+export async function migrate(db: DbClient): Promise<void> {
   // 创建迁移追踪表
   await db.execute(`
     CREATE TABLE IF NOT EXISTS _migrations (
@@ -59,38 +59,18 @@ export async function migrate(db: Client): Promise<void> {
     appliedSet.add(Number(row.version))
   }
 
-  // 扫描迁移文件
-  const dir = path.join(process.cwd(), 'migrations')
-  if (!fs.existsSync(dir)) {
-    console.warn('[migrate] migrations/ 目录不存在，跳过')
-    return
-  }
-
-  const files = fs.readdirSync(dir)
-    .filter(f => f.endsWith('.sql'))
-    .sort()
-
-  if (files.length === 0) {
+  if (MIGRATIONS.length === 0) {
     console.log('[migrate] 无待执行迁移')
     return
   }
 
-  for (const file of files) {
-    const version = parseInt(file.split('_')[0], 10)
-    if (isNaN(version)) {
-      console.warn(`[migrate] 跳过文件名不符合约定的迁移: ${file}`)
-      continue
-    }
-
+  for (const { version, name, sql } of MIGRATIONS) {
     if (appliedSet.has(version)) continue
 
-    const sql = fs.readFileSync(path.join(dir, file), 'utf-8')
-
-    // 执行迁移
     const statements = splitStatements(sql)
     if (statements.length === 0) continue
 
-    console.log(`[migrate] 执行迁移: ${file}`)
+    console.log(`[migrate] 执行迁移: ${name}`)
 
     // Turso 远程：使用 db.transaction() 确保原子性
     // 本地 SQLite：直接逐条执行（DDL 幂等，IF NOT EXISTS）
@@ -103,13 +83,17 @@ export async function migrate(db: Client): Promise<void> {
         for (const stmt of statements) await tx.execute(stmt)
         await tx.execute({
           sql: 'INSERT INTO _migrations (version, name) VALUES (?, ?)',
-          args: [version, file],
+          args: [version, name],
         })
         await tx.commit()
-        console.log(`[migrate]   ✓ ${file}`)
+        console.log(`[migrate]   ✓ ${name}`)
       } catch (err) {
-        try { await tx.rollback() } catch { /* ok */ }
-        console.error(`[migrate]   ✗ ${file} 失败`)
+        try {
+          await tx.rollback()
+        } catch {
+          /* ok */
+        }
+        console.error(`[migrate]   ✗ ${name} 失败`)
         throw err
       }
     } else {
@@ -117,11 +101,11 @@ export async function migrate(db: Client): Promise<void> {
         for (const stmt of statements) await db.execute(stmt)
         await db.execute({
           sql: 'INSERT INTO _migrations (version, name) VALUES (?, ?)',
-          args: [version, file],
+          args: [version, name],
         })
-        console.log(`[migrate]   ✓ ${file}`)
+        console.log(`[migrate]   ✓ ${name}`)
       } catch (err) {
-        console.error(`[migrate]   ✗ ${file} 失败`)
+        console.error(`[migrate]   ✗ ${name} 失败`)
         throw err
       }
     }

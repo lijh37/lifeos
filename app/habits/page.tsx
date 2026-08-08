@@ -11,6 +11,13 @@ import { Plus, Trophy } from 'lucide-react'
 import { HabitRow } from '@/components/habit-row'
 import type { Habit } from '@/lib/types'
 import {
+  fetchHabitsDashboard,
+  toggleHabit,
+  createHabit,
+  updateHabit,
+  deleteHabit,
+} from '@/lib/services/habits'
+import {
   AlertDialogRoot,
   AlertDialogContent,
   AlertDialogHeader,
@@ -37,8 +44,7 @@ function HabitsPageInner() {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/habits')
-      .then((res) => res.json())
+    fetchHabitsDashboard()
       .then((data) => {
         setHabits(data.habits)
         setTodayMap(data.todayCompletions)
@@ -57,12 +63,7 @@ function HabitsPageInner() {
     setTodayMap((prev) => ({ ...prev, [habitId]: !(prev[habitId] ?? false) }))
 
     try {
-      const res = await fetch('/api/habits', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ _action: 'toggle', habitId, date }),
-      })
-      const data = await res.json()
+      const data = await toggleHabit(habitId, date)
       // Sync server state (may differ from optimistic guess for edge cases)
       setTodayMap((prev) => ({ ...prev, [habitId]: data.completed }))
       setStreaks((prev) => ({ ...prev, [habitId]: data.streak }))
@@ -84,7 +85,7 @@ function HabitsPageInner() {
   const confirmDelete = useCallback(async () => {
     if (!deleteTarget) return
     try {
-      await fetch(`/api/habits?id=${deleteTarget}`, { method: 'DELETE' })
+      await deleteHabit(deleteTarget)
       setHabits((prev) => prev.filter((h) => h.id !== deleteTarget))
     } catch (e) {
       console.error('Failed to delete habit:', e)
@@ -101,16 +102,10 @@ function HabitsPageInner() {
     if (!editingId || !editValue.trim()) return
     const editingHabit = habits.find((h) => h.id === editingId)
     try {
-      const res = await fetch('/api/habits', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: editingId, name: editValue.trim(), description: editingHabit?.description ?? '' }),
-      })
-      if (res.ok) {
-        setHabits((prev) =>
-          prev.map((h) => (h.id === editingId ? { ...h, name: editValue.trim() } : h))
-        )
-      }
+      await updateHabit(editingId, editValue.trim(), editingHabit?.description ?? '')
+      setHabits((prev) =>
+        prev.map((h) => (h.id === editingId ? { ...h, name: editValue.trim() } : h))
+      )
     } catch (e) {
       console.error('Failed to edit habit:', e)
     }
@@ -125,15 +120,14 @@ function HabitsPageInner() {
 
   const handleCreate = useCallback(async () => {
     if (!newName.trim()) return
-    const res = await fetch('/api/habits', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName.trim() }),
-    })
-    const data = await res.json()
-    setHabits((prev) => [data.habit, ...prev])
-    setNewName('')
-    setShowInput(false)
+    try {
+      const habit = await createHabit(newName.trim())
+      setHabits((prev) => [habit, ...prev])
+      setNewName('')
+      setShowInput(false)
+    } catch (e) {
+      console.error('Failed to create habit:', e)
+    }
   }, [newName])
 
   const today = new Date().toISOString().slice(0, 10)

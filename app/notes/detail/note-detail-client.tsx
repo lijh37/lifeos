@@ -26,9 +26,6 @@ const MarkdownEditor = dynamic(() => import('@/components/markdown-editor').then
   ),
 })
 
-const AttachmentSection = dynamic(() => import('@/components/attachment-section').then(mod => ({ default: mod.AttachmentSection })), {
-  loading: () => null,
-})
 import {
   AlertDialogRoot,
   AlertDialogContent,
@@ -42,6 +39,7 @@ import {
 import { toast } from 'sonner'
 import type { Note } from '@/lib/types'
 import { useAppStore } from '@/store'
+import { updateNote, deleteNote } from '@/lib/services/notes'
 
 export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
   const router = useRouter()
@@ -86,11 +84,7 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
     clearTimeout(titleTimer.current)
     titleTimer.current = setTimeout(() => {
       const trimmed = newTitle.trim()
-      fetch(`/api/notes/${note.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: trimmed || null }),
-      }).then(() => {
+      updateNote(note.id, { title: trimmed || null }).then(() => {
         useAppStore.getState().updateNote(note.id, { title: trimmed || '' })
         setSaving(false)
       }).catch(() => {
@@ -102,11 +96,7 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
 
   async function handleSaveContent(content: string) {
     try {
-      await fetch(`/api/notes/${note.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
-      })
+      await updateNote(note.id, { content })
       useAppStore.getState().updateNote(note.id, { content })
     } catch {
       toast.error('保存内容失败')
@@ -120,11 +110,7 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
     setTagInput('')
     useAppStore.getState().updateNote(note.id, { tags: newTags })
     try {
-      await fetch(`/api/notes/${note.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tags: newTags }),
-      })
+      await updateNote(note.id, { tags: newTags })
     } catch {
       toast.error('添加标签失败')
       // Rollback optimistic update
@@ -138,11 +124,7 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
     setNote(prev => ({ ...prev, tags: newTags }))
     useAppStore.getState().updateNote(note.id, { tags: newTags })
     try {
-      await fetch(`/api/notes/${note.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tags: newTags }),
-      })
+      await updateNote(note.id, { tags: newTags })
     } catch {
       toast.error('移除标签失败')
       setNote(prev => ({ ...prev, tags: note.tags }))
@@ -153,7 +135,7 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
   async function handleDelete() {
     setDeleting(true)
     try {
-      await fetch(`/api/notes/${note.id}`, { method: 'DELETE' })
+      await deleteNote(note.id)
       useAppStore.getState().removeNote(note.id)
       toast.success('笔记已删除')
       router.replace('/notes')
@@ -231,9 +213,6 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
           placeholder="开始写笔记..."
         />
       </div>
-
-      {/* Attachment section */}
-      <AttachmentSection noteId={note.id} />
 
       {/* Tags bar */}
       <div className="flex flex-wrap items-center gap-1.5 border-t px-4 py-2 shrink-0">

@@ -15,6 +15,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog'
+import { exportBackupData, importBackupData } from '@/lib/services/backup'
 
 export default function SettingsPage() {
   const [backingUp, setBackingUp] = useState(false)
@@ -31,8 +32,8 @@ export default function SettingsPage() {
   const handleBackup = async () => {
     setBackingUp(true)
     try {
-      const res = await fetch('/api/backup')
-      const blob = await res.blob()
+      const data = await exportBackupData()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -53,17 +54,18 @@ export default function SettingsPage() {
     try {
       const text = await file.text()
       const data = JSON.parse(text)
-      const res = await fetch('/api/backup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-      const result = await res.json()
-      if (res.ok) {
+      try {
+        const result = await importBackupData(data)
         showMsg('success', `成功恢复 ${result.imported} 条记录，请刷新页面`)
         setTimeout(() => window.location.reload(), 1500)
-      } else {
-        showMsg('error', result.error || '恢复失败')
+      } catch (e) {
+        console.error('Failed to restore backup:', e)
+        const msg = (e as Error).message
+        if (msg.startsWith('无效的备份文件') || msg === '无效的 JSON 格式') {
+          showMsg('error', msg)
+        } else {
+          showMsg('error', '恢复失败')
+        }
       }
     } catch {
       showMsg('error', '无效的备份文件')

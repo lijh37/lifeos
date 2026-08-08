@@ -29,6 +29,7 @@ import {
   Activity,
 } from 'lucide-react'
 import { WEIGHT_PERSONS, type WeightLog, type WeightPersonKey } from '@/lib/types'
+import { fetchWeightData, saveWeightLog, deleteWeightLog } from '@/lib/services/weight'
 import { WeightChart, WEIGHT_RANGES, type WeightRangeKey } from '@/components/weight-chart'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -115,9 +116,7 @@ function WeightPageInner() {
   const [deleteTarget, setDeleteTarget] = useState<WeightLog | null>(null)
 
   const fetchWeight = useCallback(async (): Promise<{ me: WeightLog[]; her: WeightLog[] }> => {
-    const res = await fetch('/api/weight', { cache: 'no-store' })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return res.json()
+    return fetchWeightData()
   }, [])
 
   useEffect(() => {
@@ -167,16 +166,7 @@ function WeightPageInner() {
     }
     setSaving(true)
     try {
-      const res = await fetch('/api/weight', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ person, date, weight, note: note.trim() || undefined }),
-      })
-      const body = await res.json().catch(() => null)
-      if (!res.ok) {
-        toast.error(body?.error === 'invalid weight' ? '体重数值不合法' : '保存失败，请重试')
-        return
-      }
+      await saveWeightLog({ person, date, weight, note: note.trim() || undefined })
       const fresh = await fetchWeight().catch(() => null)
       if (fresh) setData({ me: fresh.me ?? [], her: fresh.her ?? [] })
       setWeightInput('')
@@ -184,7 +174,9 @@ function WeightPageInner() {
       toast.success('已保存')
     } catch (e) {
       console.error('Failed to save weight:', e)
-      toast.error('保存失败，请检查网络')
+      const msg = (e as Error).message
+      if (msg === 'invalid weight') toast.error('体重数值不合法')
+      else toast.error('保存失败，请检查网络')
     } finally {
       setSaving(false)
     }
@@ -193,8 +185,7 @@ function WeightPageInner() {
   const confirmDelete = useCallback(async () => {
     if (!deleteTarget) return
     try {
-      const res = await fetch(`/api/weight?id=${deleteTarget.id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      await deleteWeightLog(deleteTarget.id)
       setData((prev) => ({
         ...prev,
         [person]: prev[person].filter((l) => l.id !== deleteTarget.id),

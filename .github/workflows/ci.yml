@@ -50,3 +50,46 @@ jobs:
           name: next-build
           path: .next/
           retention-days: 1
+
+  mobile-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Static export build (Capacitor)
+        run: npm run build:mobile
+        env:
+          DATABASE_URL: ':memory:'
+          APP_PASSWORD: ''
+
+      - name: Verify export output
+        run: |
+          test -f .next-export/index.html
+          test -f .next-export/sw.js
+
+      - name: Generate native project
+        run: npx cap add android  # 无需 Android SDK，仅生成原生工程骨架
+
+      - name: Sync web assets into native shell
+        run: npx cap sync android
+
+      - name: Verify web assets in native shell
+        run: test -f android/app/src/main/assets/public/index.html
+
+      - name: Upload export artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mobile-export
+          path: .next-export/
+          retention-days: 1
