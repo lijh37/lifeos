@@ -11,7 +11,7 @@ LifeOS 是个人生活助手，支持笔记管理、预算规划、习惯养成�
 - **认证**: 无状态 HMAC（`crypto.subtle.sign`），无 session store
 - **数据库**: `@libsql/client`（本地 SQLite / 远程 Turso）+ Capacitor 原生 `@capacitor-community/sqlite`（移动端）双适配器，`getClient()` 单例按运行环境惰性切换
 - **存储**: 无附件场景，存储层（`lib/storage.ts`）已剔除（阶段 3）；备份走 JSON 导出/导入
-- **部署**: 双生产环境（阿里云 ECS Docker + Vercel 备用），数据独立
+- **部署**: 可选形态——默认手机 APK 完全离线；服务器 Docker（阿里云 ECS）与 Vercel 部署代码保留但**暂不启用**（数据独立，见 DEPLOY.md「部署形态现状」）
 
 ## 目录结构
 
@@ -316,6 +316,7 @@ interface WeightLog {
 | `BLOB_READ_WRITE_TOKEN` | 否（已废弃） | Vercel Blob 存储（附件已剔除，阶段 3；仅旧部署残留） | — | — | Vercel token |
 | `STORAGE_DRIVER` | 否（已废弃） | 存储后端（附件已剔除，代码无引用） | `vercel` | `local` | `vercel` |
 | `COOKIE_SECURE` | 否 | cookie Secure 标志 | 不设 | `true`（HTTPS 阶段） | `true` |
+| `NEXT_PUBLIC_ICP_BEIAN` | 否 | 备案号页脚文案（仅公网域名部署时设置；不设则不渲染页脚，APK/桌面本地无需） | 不设 | `豫ICP备2026036606号-1` | 不设 |
 | `UPLOAD_DIR` | 否（已废弃） | 本地上传目录（附件已剔除，代码无引用） | — | `/app/data/uploads` | — |
 | `UPLOAD_URL_PREFIX` | 否（已废弃） | 本地附件 URL 前缀（附件已剔除，代码无引用） | — | `/uploads` | — |
 | `ANALYZE` | 否 | bundle-analyzer 构建开关 | 不设 | 不设 | 不设 |

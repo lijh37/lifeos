@@ -1,13 +1,19 @@
 # LifeOS — 部署指南
 
-> 双生产环境部署与运维。自包含（部署步骤独立可执行；环境变量完整说明以 AGENTS.md 为单点源）。
+> 可选部署（**暂不启用**）。当前主力形态为手机 APK 完全离线 + 桌面 web 本机；以下 ECS / Vercel 部署代码保留在仓库，需要浏览器远程访问或集中备份时再按本指南启用。环境变量完整说明以 AGENTS.md 为单点源。
+
+## 部署形态现状
+
+- **当前主力**：手机 APK（离线）+ 桌面 web（localhost）——不需要本指南的任何步骤
+- **阿里云 ECS Docker**：代码就绪、域名 daimoli.xyz 已备案，**暂未启用**（如需浏览器远程访问或集中备份，按「主生产部署」启用）
+- **Vercel + Turso**：代码与配置保留，**暂未启用**（备用方案，与 ECS 数据独立，无实时同步）
 
 ## 双环境概览
 
-| 角色 | 环境 | 数据库 | 存储 | 入口 |
-|------|------|--------|------|------|
-| **主生产** | 阿里云 ECS Docker | 本地 SQLite (`lifeos.db`) | 本地磁盘 | `https://daimoli.xyz` |
-| **备用** | Vercel (hkg1) | Turso 远程 | Vercel Blob | `https://lifeos-daimo.vercel.app` |
+| 角色 | 环境 | 数据库 | 存储 | 入口 | 状态 |
+|------|------|--------|------|------|------|
+| **主生产** | 阿里云 ECS Docker | 本地 SQLite (`lifeos.db`) | 本地磁盘 | `https://daimoli.xyz` | 暂未启用 |
+| **备用** | Vercel (hkg1) | Turso 远程 | — | `https://lifeos-daimo.vercel.app` | 暂未启用 |
 
 数据完全独立，通过「设置 → 备份/恢复」JSON 手动同步。
 

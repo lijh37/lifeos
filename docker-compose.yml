@@ -23,6 +23,8 @@ services:
       - APP_PASSWORD=${APP_PASSWORD:-demo}
       # HTTPS 阶段必须为 true（Secure cookie 仅在 HTTPS 下回传）
       - COOKIE_SECURE=true
+      # 备案号页脚（工信部要求公网域名首页底部展示；不设则无页脚）
+      - NEXT_PUBLIC_ICP_BEIAN=${NEXT_PUBLIC_ICP_BEIAN:-豫ICP备2026036606号-1}
       # ── 其他 ──
       - NODE_ENV=production
       - PORT=3000

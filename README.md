@@ -8,7 +8,7 @@
 |------|------|------|----------|
 | **Android APK** | 主力——日常随手记录/打卡 | 手机内置 SQLite，**完全离线** | 直接安装（构建步骤见下） |
 | 桌面 web | 辅助——偶尔用电脑整理 | 本地 `data/lifeos.db` | 双击 `启动.bat`（Windows）/ `npm run start` |
-| 服务器 | 远程访问/备份 | SQLite / Turso | 见 [DEPLOY.md](DEPLOY.md) |
+| 服务器 | 远程访问/备份（可选，暂未启用） | SQLite / Turso | 见 [DEPLOY.md](DEPLOY.md) |
 
 三端数据独立存储，通过「设置 → 备份/恢复」JSON 导出/导入互通（**同一时间只允许一端写库**）。
 

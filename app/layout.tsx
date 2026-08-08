@@ -18,6 +18,10 @@ export const viewport = {
   viewportFit: "cover",
 }
 
+// 备案号页脚：仅公网域名部署（ECS Docker）时通过 NEXT_PUBLIC_ICP_BEIAN 注入；
+// APK / 桌面本地（localhost）非公开网站不要求展示，不设变量即不渲染。
+const ICP_BEIAN = process.env.NEXT_PUBLIC_ICP_BEIAN
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -42,16 +46,18 @@ export default function RootLayout({
           <PageAnimation>
             <main className="pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">
               {children}
-              <footer className="flex justify-center px-4 py-5 md:justify-start">
-                <a
-                  href="https://beian.miit.gov.cn/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs text-muted-foreground/50 transition-colors hover:text-muted-foreground"
-                >
-                  豫ICP备2026036606号-1
-                </a>
-              </footer>
+              {ICP_BEIAN ? (
+                <footer className="flex justify-center px-4 py-5 md:justify-start">
+                  <a
+                    href="https://beian.miit.gov.cn/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-muted-foreground/50 transition-colors hover:text-muted-foreground"
+                  >
+                    {ICP_BEIAN}
+                  </a>
+                </footer>
+              ) : null}
             </main>
           </PageAnimation>
           <MobileNav />
