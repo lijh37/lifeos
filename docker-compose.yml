@@ -2,7 +2,7 @@
 # 架构：nginx(80/443 HTTPS) 反代 → next 容器；SQLite 数据持久化到 volume
 #
 # 正式访问：https://daimoli.xyz
-# 证书：宿主机 ./certs 目录（fullchain.pem + privkey.pem）挂载进 nginx 容器，见 DEPLOY.md
+# 证书：宿主机 ./certs 目录（fullchain.pem + privkey.pem）挂载进 nginx 容器，见 README.md
 
 services:
   next:

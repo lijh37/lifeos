@@ -30,6 +30,7 @@ import {
   exportNotesMarkdown,
 } from '@/lib/services/notes'
 import { listTags } from '@/lib/services/tags'
+import { saveFileToDevice } from '@/lib/services/file-share'
 
 const TagManagerSheet = dynamic(() => import('@/components/tag-manager-sheet').then(mod => ({ default: mod.TagManagerSheet })), {
   loading: () => null,
@@ -295,13 +296,11 @@ export function NoteList() {
   const handleExport = useCallback(async () => {
     try {
       const md = await exportNotesMarkdown()
-      const blob = new Blob([md], { type: 'text/markdown' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `lifeos-export-${new Date().toISOString().slice(0, 10)}.md`
-      a.click()
-      URL.revokeObjectURL(url)
+      await saveFileToDevice({
+        filename: `lifeos-export-${new Date().toISOString().slice(0, 10)}.md`,
+        content: md,
+        mime: 'text/markdown',
+      })
     } catch (e) {
       console.error('Export failed:', e)
       toast.error('导出失败')

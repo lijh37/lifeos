@@ -1,16 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { listWeightLogs, upsertWeightLog, deleteWeightLog } from '@/lib/db'
-import { validateWeightInput } from '@/lib/services/weight'
-import type { WeightLog, WeightPersonKey } from '@/lib/types'
-
-/** 按 person 分组、各自按 date 升序。 */
-function groupByPerson(logs: WeightLog[]): { me: WeightLog[]; her: WeightLog[] } {
-  const grouped: { me: WeightLog[]; her: WeightLog[] } = { me: [], her: [] }
-  for (const log of logs) {
-    grouped[log.person].push(log)
-  }
-  return grouped
-}
+import { validateWeightInput, groupByPerson } from '@/lib/services/weight'
+import type { WeightPersonKey } from '@/lib/types'
 
 const GETHandler = async function GET() {
   const logs = await listWeightLogs()

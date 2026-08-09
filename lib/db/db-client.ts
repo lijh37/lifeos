@@ -1,7 +1,7 @@
 /**
  * 数据库客户端薄接口（DbClient）
  *
- * 目标：lib/db 各模块的 SQL 语句与 migrations/*.sql 迁移文件零改动，
+ * 目标：lib/db 各模块的 SQL 语句与 lib/db/migrations.ts 内联迁移定义零改动，
  * 只新增连接器适配层。本接口只暴露 lib/db 实际用到的能力：
  *   - execute()：双形态（字符串 / { sql, args }）
  *   - transaction()：手动事务（execute / commit / rollback）

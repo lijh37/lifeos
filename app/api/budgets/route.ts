@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getBudget, getBudgets, upsertBudget } from '@/lib/db'
-import { validateBudgetInput } from '@/lib/services/budgets'
+import { validateBudgetInput, numOrNull } from '@/lib/services/budgets'
 
 const GETHandler = async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -28,12 +28,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: validationError }, { status: 400 })
   }
 
-  // Numeric fields must be numbers (or null/undefined). Reject NaN / non-numeric.
-  const numOrNull = (v: unknown): number | null | undefined => {
-    if (v === undefined || v === null) return v
-    const n = Number(v)
-    return Number.isFinite(n) ? n : undefined
-  }
   const fixedBudgetN = numOrNull(fixedBudget)
   const variableBudgetN = numOrNull(variableBudget)
   const fixedActualN = numOrNull(fixedActual)

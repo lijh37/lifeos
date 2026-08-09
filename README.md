@@ -1,76 +1,17 @@
 # LifeOS — 个人生活助手
 
-个人生活助手：笔记管理、预算规划、习惯养成、体重记录。**手机 APK 完全离线（主力） + 电脑桌面 web（辅助）**，数据经 JSON 备份互通。
+个人生活助手：笔记管理、预算规划、习惯养成、体重记录。四种运行方式：**手机 APK（完全离线）**、**桌面 web（本地运行）**、**Docker（服务器）**、**Vercel + Turso（远程）**，各端数据经 JSON 备份互通。
 
 ## 运行形态
 
 | 形态 | 定位 | 数据 | 启动方式 |
 |------|------|------|----------|
-| **Android APK** | 主力——日常随手记录/打卡 | 手机内置 SQLite，**完全离线** | 直接安装（构建步骤见下） |
-| 桌面 web | 辅助——偶尔用电脑整理 | 本地 `data/lifeos.db` | `npm run start` |
-| 服务器 | 远程访问/备份（可选，暂未启用） | SQLite / Turso | 见 [DEPLOY.md](DEPLOY.md) |
+| **Android APK** | 手机端，随手记录/打卡，完全离线 | 手机内置 SQLite | 构建见下 |
+| 桌面 web | 电脑端，大屏整理/长文编辑 | 本地 `data/lifeos.db` | `npm run start` |
+| Docker | 服务器端，浏览器远程访问/集中备份 | Docker volume（`lifeos-data`） | 见下文 Docker 章节 |
+| Vercel + Turso | 服务器端，远程访问 | Turso 远程库 | 见下文 Vercel 章节 |
 
-三端数据独立存储，通过「设置 → 备份/恢复」JSON 导出/导入互通（**同一时间只允许一端写库**）。
-
-## 功能概览
-
-| 功能 | 路由 | 说明 |
-|------|------|------|
-| 笔记 | `/notes` | Markdown 编辑、标签分类、搜索、置顶、批量操作 |
-| 预算 | `/expenses` | 月度预算设置、实际支出对比、结算 |
-| 习惯 | `/habits` | 每日/每周打卡、连续天数、趋势统计 |
-| 体重 | `/weight` | 体重记录与趋势（本人/家人两人） |
-| 设置 | `/settings` | JSON 备份导出/恢复、登录密码 |
-
-## 最佳使用方案（手机为主，电脑偶尔）
-
-### 日常：手机 APK
-
-- **完全离线**，无需联网，打开即用；无网络也不影响任何功能
-- 笔记随手记、习惯打卡、体重记录，全部在手机上完成
-- 手机端为原生离线模式，自动跳过登录
-
-### 偶尔：电脑
-
-- 适合长文编辑、批量整理、导出 Markdown 阅读
-- 命令行启动：`npm run dev`（开发）或 `npm run migrate && npm run build && npm run start`（生产），详见 [DEPLOY.md](DEPLOY.md)
-- 浏览器访问 <http://localhost:3000>，`Ctrl+C` 停止
-
-### 数据同步（重要规则）
-
-三端数据各自独立，**不要直接拷贝/共享数据库文件**。同步唯一方式：
-
-```
-导出备份 JSON（一端） → 导入恢复（另一端）
-```
-
-⚠️ **导入恢复会清空目标端现有数据并整体替换**，操作前务必先导出一份当前数据。
-
-推荐节奏：
-
-1. **以手机为数据主源**。定期（建议每周或每月）在手机「设置 → 导出备份」，备份文件存手机或网盘归档
-2. 想在电脑上看/整理：手机「导出备份」→ 电脑「导入恢复」（电脑旧数据被覆盖，以手机为准，符合预期）
-3. 电脑上也写过新数据：先在电脑「导出备份」另存一份 → 再导入手机最新备份 → 把电脑端新增内容人工并入手机 → 此后以合并后的手机数据为主源
-4. **换机**：旧手机导出 JSON → 新手机装 APK → 导入 → 全部数据迁移完成
-
-> 移动端数据存于 App 私有目录，**卸载 App 即清除**，务必养成定期导出的习惯。
-
-## 手机安装（构建 APK）
-
-前置：Node 20.x + Android SDK（`android/local.properties` 配置 `sdk.dir`）。
-
-```bash
-npm run build:mobile          # ① 静态导出（BUILD_TARGET=export → .next-export/）
-npx cap sync android          # ② 同步到 Android 工程
-cd android && ./gradlew assembleDebug   # ③ 构建 debug APK
-```
-
-- 产物：`android/app/build/outputs/apk/debug/app-debug.apk`
-- 安装（覆盖安装保留数据）：
-
-```bash
-adb install -r app-debug.apk
-```
+各端数据独立存储，通过「设置 → 备份/恢复」JSON 导出/导入互通（**同一时间只允许一端写库**）。
 
 ## 桌面快速开始
 
@@ -82,26 +23,207 @@ npm run dev                   # 开发模式，http://localhost:3000
 # 或生产模式：npm run build && npm run start
 ```
 
-Windows 原生运行（Node 22/24 亦可）见 [DEPLOY.md → 桌面部署](DEPLOY.md)。
+- `.env.local` **不得**设置 `TURSO_DATABASE_URL`，否则 dev 护栏拒绝连接
+- 完整部署（APK / Windows / Docker / Vercel）见下文对应章节
 
-> `.env.local` **不得**设置 `TURSO_DATABASE_URL`，否则 dev 护栏拒绝连接。
+## 移动端（Android APK）
 
-## 数据与备份
+Next 静态导出 + Capacitor 原生 SQLite，卸载即数据清除。
 
-- 手机：App 私有 SQLite（**卸载清除**）
-- 电脑：`data/lifeos.db`
-- 服务器：Docker volume（`lifeos-data`）
-- 备份文件：`lifeos-backup-YYYY-MM-DD.json`（含全部笔记/预算/习惯/体重）
+前置：Node 20.x + Android SDK + JDK 17；`android/local.properties` 含 `sdk.dir`（不随仓库分发）。
 
-## 文档索引
+```bash
+npm run build:mobile          # BUILD_TARGET=export 静态导出 → .next-export/
+npx cap sync android          # 同步 .next-export/ → android/app/src/main/assets/public
+cd android && ./gradlew assembleDebug
+```
 
-- [技术参考 → AGENTS.md](AGENTS.md)（面向 AI Agent 的完整项目技术文档）
-- [部署指南 → DEPLOY.md](DEPLOY.md)（服务器 / 桌面 / 移动端构建与运维）
+- 产物：`android/app/build/outputs/apk/debug/app-debug.apk`
+- 只改 JS/静态资源无需重新 `cap add`，重跑上面三步即可；修改 Capacitor 配置/插件才需重新 sync
+- 安装：`adb install -r <apk路径>`（-r 覆盖安装保留数据）
 
-## 技术栈
+注意事项：
+- 手机数据卸载即清除 → 定期「设置 → 导出备份」
+- 移动端免登录；`APP_PASSWORD` 不影响移动端
+- 真机控制台一条 `favicon.ico 404` 属已知无害噪音
 
-**Next.js 16.2.9 (App Router)** + **React 19.2.4** + **TypeScript ^5** + **Tailwind v4** + **@base-ui/react ^1.6.0** + **`@libsql/client` ^0.17.4** (SQLite/Turso) + **Zustand ^5.0.14** + **date-fns ^4.4.0** + **lucide-react ^1.21.0** + **react-markdown ^10.1.0** + **Capacitor ^8.5.0** + **`@capacitor-community/sqlite` ^8.1.1**（移动端离线存储）
+## 桌面部署（Windows 原生）
 
-## 项目状态
+前置：Windows 10/11 + Node.js LTS（20/22/24 均可）：<https://nodejs.org>；项目拷贝到本地目录（如 `D:\LifeOS\`）。
 
-**版本**: 1.0.0 | **Node**: 20.x（移动端构建与 Docker 固定用 20，规避 npm bug；桌面运行 20/22/24 均可，见 DEPLOY.md） | **License**: 私有
+```bat
+cd /d D:\LifeOS
+npm install
+copy .env.example .env.local
+```
+
+编辑 `.env.local`：
+
+| 变量 | 值 | 说明 |
+|------|----|------|
+| `DATABASE_URL` | `file:./data/lifeos.db` | 本地 SQLite（`.env.example` 已默认，一般无需改） |
+| `APP_PASSWORD` | 留空 或 自定义 | 留空=免登录；设置=启用登录 |
+
+启动：
+
+```bash
+npm run start                                # 已构建：直接启动
+# 或完整流程（首次 / 升级依赖后）：
+npm run migrate && npm run build && npm run start
+```
+
+浏览器访问 <http://localhost:3000>。`.env*` 与 `data/` 已在 .gitignore。
+
+注意事项：
+- **WSL 文件锁**：项目放 `/mnt/c/...`（drvfs 挂载）下 SQLite WAL 写入可能与 Windows 文件锁冲突 → 放 Windows 原生盘（`D:\`），或数据库文件留在 WSL 文件系统内
+- **单端写库**：同一 `.db` 同一时间只允许一个实例读写
+- 端口占用：`.env.local` 设 `PORT=3001` 后重启
+- `npm install` 偶发 `Exit handler never called!`（Node 22/24 npm bug）：`npm i -g npm@latest` 重试
+
+## 阿里云 ECS + Docker
+
+本地使用（手机/桌面）无需本节。
+
+### 首次部署
+
+前置：服务器面板（如宝塔）+ Docker；放行端口 8888(面板)、80、443、22；3000 不对公网开放。
+
+```bash
+# 1. 配置 Docker daemon（解决 EAI_AGAIN / i/o timeout）
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json <<'EOF'
+{
+  "dns": ["223.5.5.5", "8.8.8.8", "114.114.114.114"],
+  "registry-mirrors": [
+    "https://hub-mirror.c.163.com",
+    "https://docker.m.daocloud.io",
+    "https://registry.docker-cn.com"
+  ]
+}
+EOF
+systemctl restart docker
+
+# 2. 克隆 + 环境变量
+git clone <你的仓库地址> && cd lifeos
+cp .env.prod.example .env
+sed -i 's/^APP_PASSWORD=demo/APP_PASSWORD=你的密码/' .env
+
+# 3. 构建 + 启动 + 验证
+docker build -t lifeos-next -f Dockerfile .
+docker compose up -d
+curl -I https://daimoli.xyz
+```
+
+迁移脚本在容器入口自动建表（`command: sh -c "mkdir -p /app/data/db && npm run migrate && npm run start"`）。
+
+### 一键重新部署
+
+```bash
+cd /root/lifeos && ./deploy.sh     # git pull → docker build（层缓存）→ compose up -d → 清理
+```
+
+构建日志：`/tmp/lifeos-build.log`。
+
+### 环境变量（`.env`）
+
+| 变量 | 值 | 说明 |
+|------|----|------|
+| `DATABASE_URL` | `file:./data/db/lifeos.db` | 容器内路径，对应 volume 的 `/app/data` |
+| `COOKIE_SECURE` | `true`（HTTPS 阶段） | cookie Secure 标志 |
+| `APP_PASSWORD` | 自定义 | 登录密码 |
+| `NEXT_PUBLIC_ICP_BEIAN` | `豫ICP备2026036606号-1` | 备案号页脚（公网域名首页要求） |
+
+> compose 已显式清空 `TURSO_*`，确保走本地 SQLite。环境变量完整说明见 AGENTS.md「环境变量」表（单点源）。
+
+### 数据持久化
+
+Volume `lifeos-data` → `/app/data`，SQLite 在 `/app/data/db/lifeos.db`。
+
+备份 volume：
+
+```bash
+docker compose down
+docker run --rm -v lifeos-data:/data -v $PWD:/backup alpine \
+  tar czf /backup/lifeos-backup.tar.gz -C /data .
+```
+
+恢复到新机器：
+
+```bash
+docker compose up -d && docker compose down
+docker run --rm -v lifeos-data:/data -v $PWD:/backup alpine \
+  tar xzf /backup/lifeos-backup.tar.gz -C /data
+docker compose up -d
+```
+
+也可通过「设置 → 备份/恢复」JSON 导入导出。
+
+### 常见问题
+
+1. `docker build` 报 `EAI_AGAIN` / `getaddrinfo failed` → 配置 Docker daemon 公共 DNS（见首次部署步骤 1）；Dockerfile 已 `ENV NODE_OPTIONS=--dns-result-order=ipv4first`
+2. `docker build` 卡 `FROM node:20-slim` 报 `i/o timeout` → 配置 `registry-mirrors` 国内加速器（见步骤 1）
+3. `npm ci` 报 `Exit handler never called!` → npm 在 Node 22/24 的已知 bug，项目已用 `node:20-slim` 规避，**不要改回 Node 22+**
+4. 登录后刷新跳回登录页 → cookie 被设 `Secure` 但走 HTTP 不传 cookie：确保经 `https://daimoli.xyz` 访问；排查 `.env` 中 `COOKIE_SECURE=true`。验证：`curl -s -i -X POST https://daimoli.xyz/api/auth -H 'Content-Type: application/json' -d '{"password":"你的密码"}' | grep -i set-cookie`（正常应有 `HttpOnly; Secure; SameSite=lax`）
+5. nginx 反代报 `502 Bad Gateway` → `lifeos.conf` 中 `proxy_pass http://next:3000;` 的 `next` 是容器名，确保 `docker-compose.yml` 的 service 名匹配
+
+## 证书续期
+
+Let's Encrypt 证书 90 天有效，续期后需让容器内 nginx 重新加载：
+
+```bash
+certbot renew
+docker compose restart nginx    # 或 docker exec lifeos-nginx nginx -s reload
+```
+
+建议 crontab 每月自动续期：
+
+```bash
+crontab -e
+# 每月 1 日 03:15
+15 3 1 * * cd /root/lifeos && certbot renew --quiet && docker compose restart nginx
+```
+
+## Vercel
+
+```bash
+git push origin main    # Vercel 自动部署
+```
+
+**必须配置** Turso 远程库（`vercel.json` 构建期执行 `scripts/migrate.ts` 建表，未配置构建将失败）：
+
+| 变量 | 说明 |
+|------|------|
+| `TURSO_DATABASE_URL` | Turso 远程库地址（必需） |
+| `TURSO_AUTH_TOKEN` | Turso 认证 Token（必需） |
+
+其余变量（`APP_PASSWORD`/`COOKIE_SECURE`）按需配置，完整说明见 AGENTS.md「环境变量」。
+
+## 环境切换
+
+任一端「设置 → 备份」导出 JSON → 另一端「设置 → 恢复」导入。
+
+## 常用运维命令
+
+```bash
+docker compose ps                      # 查看容器状态
+docker compose logs -f next            # 看应用日志
+docker compose restart                 # 重启
+docker compose down                    # 停止（数据保留在 volume）
+npm run migrate                        # 手动执行迁移（容器内或本地）
+```
+
+重置环境（清空全部数据）：
+
+```bash
+docker compose down -v                 # 停容器 + 删 lifeos-data 卷
+docker system prune -a -f              # 清镜像/容器/构建缓存
+df -h /                                # 确认磁盘恢复
+```
+
+之后重新 `./deploy.sh` 拉起全新实例。
+
+## 技术参考
+
+- [AGENTS.md](AGENTS.md)：面向 AI Agent 的完整技术文档（架构 / Schema / API / 环境变量单点源）
+
+**版本**: 1.0.0 | **License**: 私有

@@ -18,7 +18,7 @@
  *
  * 连接生命周期：createConnection('lifeos', false, 'no-encryption', 1, false) → open()。
  * Android 端 WAL2 为默认，无需设置 journal_mode。外键按连接启用（PRAGMA foreign_keys = ON）。
- * 首启自动执行内联迁移（migrate()，幂等，_migrations 追踪）。
+ * 首启自动执行内联迁移（migrate()，幂等）。
  */
 import { migrate } from '../migrate'
 import { analyzeSelect, PRAGMA_TABLE_INFO_COLUMNS } from './columns'

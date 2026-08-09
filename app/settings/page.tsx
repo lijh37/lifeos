@@ -16,6 +16,8 @@ import {
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog'
 import { exportBackupData, importBackupData } from '@/lib/services/backup'
+import { saveFileToDevice } from '@/lib/services/file-share'
+import { isNativeCapacitor } from '@/lib/services/env'
 
 export default function SettingsPage() {
   const [backingUp, setBackingUp] = useState(false)
@@ -33,15 +35,17 @@ export default function SettingsPage() {
     setBackingUp(true)
     try {
       const data = await exportBackupData()
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `lifeos-backup-${new Date().toISOString().slice(0, 10)}.json`
-      a.click()
-      URL.revokeObjectURL(url)
-      showMsg('success', '备份已下载')
-    } catch {
+      await saveFileToDevice({
+        filename: `lifeos-backup-${new Date().toISOString().slice(0, 10)}.json`,
+        content: JSON.stringify(data, null, 2),
+        mime: 'application/json',
+      })
+      showMsg(
+        'success',
+        isNativeCapacitor() ? '备份已生成，请在分享面板中选择保存位置' : '备份已下载'
+      )
+    } catch (e) {
+      console.error('Export failed:', e)
       showMsg('error', '备份失败')
     }
     setBackingUp(false)

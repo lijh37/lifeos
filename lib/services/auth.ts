@@ -6,12 +6,7 @@
  */
 
 import { isNativeCapacitor } from './env'
-
-/** 读取响应体 error 并抛出统一错误（web 分支共用） */
-async function throwHttpError(res: Response): Promise<never> {
-  const body = await res.json().catch(() => null)
-  throw new Error(body?.error || `HTTP ${res.status}`)
-}
+import { throwHttpError } from './http'
 
 export async function login(password: string): Promise<{ ok: boolean }> {
   if (isNativeCapacitor()) {

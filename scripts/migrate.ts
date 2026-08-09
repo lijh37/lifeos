@@ -1,10 +1,9 @@
 /**
- * 数据库迁移 CLI
+ * 数据库迁移 CLI（幂等 schema 初始化）
  *
  * 用法：
- *   npx tsx scripts/migrate.ts              # 执行所有待处理迁移
- *   npx tsx scripts/migrate.ts --dry-run    # 仅列出待执行迁移，不实际运行
- *   npx tsx scripts/migrate.ts --reset      # 清空所有表再重新迁移（开发用）
+ *   npx tsx scripts/migrate.ts              # 执行幂等 schema 初始化（可安全重复运行）
+ *   npx tsx scripts/migrate.ts --reset      # 清空所有表再重新初始化（开发用）
  *
  * 环境变量：（与运行时 getClient() 规则一致）
  *   TURSO_DATABASE_URL (+ TURSO_AUTH_TOKEN) — 生产环境 Turso 远程库
@@ -33,7 +32,6 @@ function loadEnvFile(file: string) {
 loadEnvFile('.env.local')
 loadEnvFile('.env')
 
-const DRY_RUN = process.argv.includes('--dry-run')
 const RESET = process.argv.includes('--reset')
 
 // FK 安全的删表顺序：子表（有外键指向父表的）先删
@@ -46,7 +44,6 @@ const DROP_TABLES = [
   'DROP TABLE IF EXISTS budgets;',
   'DROP TABLE IF EXISTS notes;',
   'DROP TABLE IF EXISTS weight_logs;',
-  'DROP TABLE IF EXISTS _migrations;',
 ]
 
 async function main() {
@@ -75,42 +72,6 @@ async function main() {
     : createClient({ url })
 
   try {
-    if (DRY_RUN) {
-      // 列出待执行迁移
-      try {
-        await db.execute(`
-          CREATE TABLE IF NOT EXISTS _migrations (
-            version INTEGER PRIMARY KEY,
-            name TEXT NOT NULL,
-            applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-          )
-        `)
-      } catch { /* first run may fail, ignore */ }
-
-      const applied = await db.execute('SELECT version FROM _migrations ORDER BY version')
-      const appliedVersions = new Set(applied.rows.map(r => Number(r.version)))
-
-      const dir = path.join(process.cwd(), 'migrations')
-      if (!fs.existsSync(dir)) {
-        console.log('📂 migrations/ 目录不存在')
-        return
-      }
-
-      const files = fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort()
-      const pending = files.filter(f => {
-        const v = parseInt(f.split('_')[0], 10)
-        return !isNaN(v) && !appliedVersions.has(v)
-      })
-
-      if (pending.length === 0) {
-        console.log('✅ 所有迁移已执行')
-      } else {
-        console.log(`📋 待执行迁移 (${pending.length}):`)
-        for (const f of pending) console.log(`   ${f}`)
-      }
-      return
-    }
-
     if (RESET) {
       console.log('⚠️  清空所有表，所有数据将丢失...')
       const isRemote = !!process.env.TURSO_DATABASE_URL

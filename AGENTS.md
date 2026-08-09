@@ -4,14 +4,14 @@
 
 ## 项目概述
 
-LifeOS 是个人生活助手，支持笔记管理、预算规划、习惯养成。运行形态三态：**Android 手机（主力）**——Capacitor APK + 原生 SQLite 完全离线；**桌面 web（保留）**——`npm run start` 本地运行；**测试**——jsdom 单测 + Playwright E2E。
+LifeOS 是个人生活助手，支持笔记管理、预算规划、习惯养成。运行形态三态：**Android 手机**——Capacitor APK + 原生 SQLite 完全离线；**桌面 web**——`npm run start` 本地运行；**测试**——jsdom 单测 + Playwright E2E。
 
 - **定位**: 单用户、自托管优先、无外部服务依赖
 - **架构**: Next.js 16 App Router 单体（SSR + API Routes 同仓）
 - **认证**: 无状态 HMAC（`crypto.subtle.sign`），无 session store
 - **数据库**: `@libsql/client`（本地 SQLite / 远程 Turso）+ Capacitor 原生 `@capacitor-community/sqlite`（移动端）双适配器，`getClient()` 单例按运行环境惰性切换
 - **存储**: 无附件场景，存储层（`lib/storage.ts`）已剔除（阶段 3）；备份走 JSON 导出/导入
-- **部署**: 可选形态——默认手机 APK 完全离线；服务器 Docker（阿里云 ECS）与 Vercel 部署代码保留但**暂不启用**（数据独立，见 DEPLOY.md「部署形态现状」）
+- **部署**: 四种运行方式——手机 APK 完全离线、桌面 web 本地运行、Docker（阿里云 ECS）、Vercel + Turso（与 Docker 数据独立，见 README.md「运行形态」；部署步骤见 README.md 对应章节）
 
 ## 目录结构
 
@@ -109,7 +109,6 @@ lifeos/
 │   │   ├── columns.test.ts
 │   │   ├── db.test.ts
 │   │   ├── markdown.test.tsx
-│   │   ├── migrations-inline.test.ts
 │   │   ├── streaks.test.ts
 │   │   └── utils.test.ts
 │   ├── db/
@@ -145,9 +144,6 @@ lifeos/
 │   ├── strip-markdown.ts
 │   ├── types.ts
 │   └── utils.ts
-├── migrations/
-│   ├── 001_create_tables.sql
-│   └── 002_weight_logs.sql
 ├── nginx/
 │   └── lifeos.conf
 ├── scripts/
@@ -163,7 +159,6 @@ lifeos/
 ├── .env.prod.example
 ├── .gitignore
 ├── AGENTS.md
-├── DEPLOY.md
 ├── Dockerfile
 ├── README.md
 ├── capacitor.config.json
@@ -199,9 +194,9 @@ lifeos/
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| GET | `/api/notes` | `id?`, `q?`, `tag?`, `type?`, `limit?`(1-500, 默认200), `offset?`, `startDate?`, `endDate?` | 200 `{ notes: Note[] }` / 带 `id` 时 200 `{ note: Note }` / 404 `{ error }` | 列表/搜索/分页。`offset` 仅 `startDate+endDate` 路径生效；搜索（`q`）固定返回最多 50 条；`tag` 仅与 `q` 组合时生效（单独 `tag` 无过滤效果）；`type` 参数已解析但当前无过滤效果。带 `id` 时返回单条，未找到 404（原动态段 `/api/notes/[id]` 已合并至此）。GET 响应头 `Cache-Control: private, no-store` |
+| GET | `/api/notes` | `id?`, `q?`, `tag?`, `type?`, `limit?`(1-500, 默认200), `offset?`, `startDate?`, `endDate?` | 200 `{ notes: Note[] }` / 带 `id` 时 200 `{ note: Note }` / 404 `{ error }` | 列表/搜索/分页。`offset` 仅 `startDate+endDate` 路径生效；搜索（`q`）固定返回最多 50 条；`tag` 仅与 `q` 组合时生效（单独 `tag` 无过滤效果）；`type` 参数已解析但当前无过滤效果。带 `id` 时返回单条，未找到 404（原动态段 `/api/notes/[id]` 已合并至此）。列表/搜索/日期范围响应头 `Cache-Control: private, no-store`（带 `id` 的单条查询不含该头） |
 | POST | `/api/notes` | `{ title?, content?, type?, tags?, dueDate? }` | 200 `{ note: Note }` | 创建笔记（type 仅允许 'note'） |
-| PATCH | `/api/notes` | `{ id, title?, content?, tags?, dueDate?, done?, pinned? }` | 200 `{ note: Note }` | 更新笔记 |
+| PATCH | `/api/notes` | `{ id, title?, content?, type?, tags?, dueDate?, done?, pinned? }` | 200 `{ note: Note }` | 更新笔记（type 实际仅允许 'note'） |
 | DELETE | `/api/notes?id=<id>` | — | 200 `{ success: true }` | 删除单条 |
 
 ### /api/notes/batch
@@ -286,7 +281,7 @@ interface WeightLog {
 
 ## 数据库 Schema
 
-8 表，DDL 见 `migrations/001_create_tables.sql` 与 `migrations/002_weight_logs.sql`。`getClient()`（`lib/db/client.ts:46`）惰性双模：Web/Node 走 `lib/db/adapters/libsql.ts`（`@libsql/client`，本地/远程 Turso），Capacitor 原生走 `lib/db/adapters/capacitor.ts`（`@capacitor-community/sqlite`，动态 import，不进 web bundle）；`PRAGMA foreign_keys = ON` 由各适配器开启（仅本地 SQLite）。
+8 表，DDL 见 `lib/db/migrations.ts`（内联 `SCHEMA_STATEMENTS`，唯一真相）。`getClient()`（`lib/db/client.ts:50`）惰性双模：Web/Node 走 `lib/db/adapters/libsql.ts`（`@libsql/client`，本地/远程 Turso），Capacitor 原生走 `lib/db/adapters/capacitor.ts`（`@capacitor-community/sqlite`，动态 import，不进 web bundle）；`PRAGMA foreign_keys = ON` 由各适配器开启（仅本地 SQLite）。
 
 | 表 | 列 | 主键 | 外键 | 索引 |
 |----|----|------|------|------|
@@ -299,17 +294,17 @@ interface WeightLog {
 | **note_tags** | note_id TEXT NOT NULL, tag_id TEXT NOT NULL | (note_id, tag_id) 复合 PK | note_id → notes(id) ON DELETE CASCADE, tag_id → tags(id) ON DELETE CASCADE | `idx_note_tags_tag(tag_id)` |
 | **weight_logs** | id TEXT PK, person TEXT NOT NULL, date TEXT NOT NULL, weight REAL NOT NULL, note TEXT DEFAULT '', created_at TEXT NOT NULL | id | — | UNIQUE(person, date)（表级约束，无命名索引） |
 
-迁移机制：SQL 内联于 `lib/db/migrations.ts` 的 `MIGRATIONS`（与 `migrations/*.sql` 文件逐字一致，漂移由测试拦截）→ `_migrations` 追踪表 → `lib/db/migrate.ts` 的 `migrate(db: DbClient)` 执行器（Capacitor 首启自动执行，幂等）。命令：`npm run migrate` / `npm run migrate:dry` / `npm run migrate -- --reset`（仅 Node 环境 CLI）。
+迁移机制：终态幂等 DDL 内联于 `lib/db/migrations.ts`（`SCHEMA_STATEMENTS` 语句数组 + `COLUMN_MIGRATIONS` 列迁移注册表，唯一真相，web/移动端/CLI/测试均消费）→ `lib/db/migrate.ts` 的 `migrate(db: DbClient)` 执行器：`ensureSchema` 逐条重放终态 DDL（IF NOT EXISTS 幂等），`ensureColumn` 守卫式 ALTER（PRAGMA table_info 探测列，缺失才 ADD COLUMN）。**无版本簿记、无 `_migrations` 追踪表、无 checksum**——每次启动自愈收敛，正确性不依赖纪律。挂载点：`lib/db/client.ts` 惰性门面首次连接自动执行（任何环境，含 `npm run start`）+ Capacitor 首启显式调用。**加列一律追加 `COLUMN_MIGRATIONS`，禁止把新列塞进旧 CREATE TABLE**（既有库不重放建表语句）。命令：`npm run migrate` / `npm run migrate -- --reset`（仅 Node 环境 CLI）。
 
 ## 环境变量
 
 单点源：所有文档交叉引用此表。
 
-| 变量 | 必需？ | 用途 | 开发 (`.env.local`) | 主生产 Docker (`.env`) | 备用 Vercel |
+| 变量 | 必需？ | 用途 | 开发 (`.env.local`) | Docker (`.env`) | Vercel |
 |------|--------|------|---------|---------|---------|
-| `DATABASE_URL` | 开发/主生产必需 | 本地 SQLite 路径 | `file:./data/lifeos.db` | `file:./data/db/lifeos.db` | — |
-| `TURSO_DATABASE_URL` | 备用必需 | Turso 远程库地址 | **不得设置**（dev 护栏） | docker-compose.yml 置空 | `libsql://...` |
-| `TURSO_AUTH_TOKEN` | 备用必需 | Turso 认证 Token | **不得设置** | docker-compose.yml 置空 | Turso token |
+| `DATABASE_URL` | 开发/Docker 必需 | 本地 SQLite 路径 | `file:./data/lifeos.db` | `file:./data/db/lifeos.db` | — |
+| `TURSO_DATABASE_URL` | Vercel 必需 | Turso 远程库地址 | **不得设置**（dev 护栏） | docker-compose.yml 置空 | `libsql://...` |
+| `TURSO_AUTH_TOKEN` | Vercel 必需 | Turso 认证 Token | **不得设置** | docker-compose.yml 置空 | Turso token |
 | `APP_PASSWORD` | 否 | 登录密码 | 不设 或 `demo` | 自定义 | 自定义 |
 | `COOKIE_SECURE` | 否 | cookie Secure 标志 | 不设 | `true`（HTTPS 阶段） | `true` |
 | `NEXT_PUBLIC_ICP_BEIAN` | 否 | 备案号页脚文案（仅公网域名部署时设置；不设则不渲染页脚，APK/桌面本地无需） | 不设 | `豫ICP备2026036606号-1` | 不设 |
@@ -369,7 +364,7 @@ interface WeightLog {
 
 ### 数据库约定
 
-迁移 SQL 内联于 `lib/db/migrations.ts`（与 `migrations/*.sql` 保持同步，漂移由 `lib/__tests__/migrations-inline.test.ts` 拦截）。`getClient()` 单例（惰性门面），不在测试间共享；Capacitor 适配器测试用唯一临时库文件（libsql 同路径连接删库后进入只读坏态）。本地 SQLite 用 `PRAGMA foreign_keys = ON`。
+迁移 SQL 内联于 `lib/db/migrations.ts`（唯一真相）。`getClient()` 单例（惰性门面），不在测试间共享；Capacitor 适配器测试用唯一临时库文件（libsql 同路径连接删库后进入只读坏态）。本地 SQLite 用 `PRAGMA foreign_keys = ON`。
 
 ### 离线/移动端构建约束（export 静态导出，spike/阶段 5 实测沉淀）
 
@@ -387,7 +382,7 @@ interface WeightLog {
 
 | 层 | 工具 | 文件数 | 测试数 | 数据库 |
 |----|------|--------|--------|--------|
-| 单元测试 | vitest (jsdom) | 16 | 152 | `file:./.db-test.sqlite`（临时文件，非 `:memory:`） |
+| 单元测试 | vitest (jsdom) | 15 | 148 | `file:./.db-test.sqlite`（临时文件，非 `:memory:`） |
 | E2E | Playwright | 4 套件 | 12 | `file:./.e2e-test.db`（自动清理） |
 
 ### 单元测试清单
@@ -395,24 +390,23 @@ interface WeightLog {
 <!-- docgen:tests -->
 > 本清单由 npm run docs:gen 自动生成，计数为静态扫描近似值；精确数字以 npm test 实际输出为准。
 
-| 文件                                              | 测试数（约） | 覆盖范围                                                              |
-| ------------------------------------------------- | ------------ | --------------------------------------------------------------------- |
-| `app/api/__tests__/routes.test.ts`                | 20           | API 路由                                                              |
-| `components/__tests__/batch-actions-bar.test.tsx` | 5            | BatchActionsBar                                                       |
-| `components/__tests__/budget-habit.test.tsx`      | 8            | ProgressBar + BudgetCard + HabitRow                                   |
-| `components/__tests__/markdown-editor.test.tsx`   | 7            | MarkdownEditor                                                        |
-| `components/__tests__/note-list.test.tsx`         | 4            | NoteList                                                              |
-| `components/__tests__/tag-manager-sheet.test.tsx` | 7            | TagManagerSheet                                                       |
-| `lib/__tests__/capacitor-adapter.test.ts`         | 9            | capacitor 适配器（libsql 后端 Fake 高保真）                           |
-| `lib/__tests__/columns.test.ts`                   | 11           | splitTopLevel + exprName + analyzeSelect                              |
-| `lib/__tests__/db.test.ts`                        | 28           | 笔记 + 习惯 + 预算 + 搜索与标签 + Weight + Migrations (legacy schema) |
-| `lib/__tests__/markdown.test.tsx`                 | 5            | MarkdownRenderer XSS 净化                                             |
-| `lib/__tests__/migrations-inline.test.ts`         | 3            | 内联迁移定义与 migrations/*.sql 无漂移                                |
-| `lib/__tests__/streaks.test.ts`                   | 13           | computeCurrentStreak + computeBestStreak                              |
-| `lib/__tests__/utils.test.ts`                     | 5            | cn                                                                    |
-| `lib/services/__tests__/backup.test.ts`           | 6            | backup cap 分支（Capacitor 原生直查 SQLite）                          |
-| `proxy.test.ts`                                   | 10           | 中间件认证                                                            |
-| `store/__tests__/index.test.ts`                   | 11           | Zustand store                                                         |
+| 文件                                              | 测试数（约） | 覆盖范围                                     |
+| ------------------------------------------------- | ------------ | -------------------------------------------- |
+| `app/api/__tests__/routes.test.ts`                | 20           | API 路由                                     |
+| `components/__tests__/batch-actions-bar.test.tsx` | 5            | BatchActionsBar                              |
+| `components/__tests__/budget-habit.test.tsx`      | 8            | ProgressBar + BudgetCard + HabitRow          |
+| `components/__tests__/markdown-editor.test.tsx`   | 7            | MarkdownEditor                               |
+| `components/__tests__/note-list.test.tsx`         | 4            | NoteList                                     |
+| `components/__tests__/tag-manager-sheet.test.tsx` | 7            | TagManagerSheet                              |
+| `lib/__tests__/capacitor-adapter.test.ts`         | 9            | capacitor 适配器（libsql 后端 Fake 高保真）  |
+| `lib/__tests__/columns.test.ts`                   | 11           | splitTopLevel + exprName + analyzeSelect     |
+| `lib/__tests__/db.test.ts`                        | 27           | 笔记 + 习惯 + 预算 + 搜索与标签 + Weight     |
+| `lib/__tests__/markdown.test.tsx`                 | 5            | MarkdownRenderer XSS 净化                    |
+| `lib/__tests__/streaks.test.ts`                   | 13           | computeCurrentStreak + computeBestStreak     |
+| `lib/__tests__/utils.test.ts`                     | 5            | cn                                           |
+| `lib/services/__tests__/backup.test.ts`           | 6            | backup cap 分支（Capacitor 原生直查 SQLite） |
+| `proxy.test.ts`                                   | 10           | 中间件认证                                   |
+| `store/__tests__/index.test.ts`                   | 11           | Zustand store                                |
 <!-- /docgen:tests -->
 
 ### E2E 套件
@@ -433,19 +427,18 @@ npm run test:e2e         # Playwright E2E（自动启动 dev server + 自动清�
 
 | 命令 | 说明 |
 |------|------|
-| `npm run dev` | 自动建表 + 启动开发服务器 |
+| `npm run dev` | 自动建表 + 启动开发服务器（`--webpack` 强制 webpack 编译，非 Turbopack） |
 | `npm run build` | 生产构建 |
 | `npm run build:mobile` | 移动端静态导出（`BUILD_TARGET=export next build`，输出 `.next-export`） |
 | `npm run cap:add` | 添加 Capacitor Android 平台（首次构建时执行一次） |
 | `npm run cap:sync` | 同步 web 产物到 Android 原生工程（APK 构建核心步骤） |
 | `npm run start` | 生产启动 |
 | `npm run lint` | ESLint |
-| `npm test` | vitest 单元测试（约 152 个，见 `__tests__/`） |
+| `npm test` | vitest 单元测试（约 148 个，见 `__tests__/`） |
 | `npm run test:watch` | 测试 watch 模式 |
 | `npm run test:e2e` | Playwright E2E（4 套件, 12 测试；pretest 自动清理 .e2e-test.db，自动启动 dev server） |
-| `npm run migrate` | 执行待处理数据库迁移 |
-| `npm run migrate:dry` | 仅列出待执行迁移 |
-| `npm run migrate -- --reset` | 清空所有表后重新迁移 |
+| `npm run migrate` | 幂等初始化数据库 schema（终态 DDL 重放，可安全重复运行） |
+| `npm run migrate -- --reset` | 清空所有表后重新初始化（开发用） |
 | `npm run analyze` | 构建产物体积分析（`@next/bundle-analyzer`） |
 | `npm run docs:check` | 校验 AGENTS.md 与代码/示例文件一致性（CI quality job 执行，27 项断言） |
 | `npm run docs:gen` | 重新生成 AGENTS.md 目录树与测试清单区块（CI 先跑 docgen 再用 `git diff --exit-code` 校验无漂移） |

@@ -111,7 +111,7 @@ describe('capacitor 适配器（libsql 后端 Fake 高保真）', () => {
     }
   })
 
-  it('首启自动迁移：8 表 + _migrations 建立，version 1/2 已应用', async () => {
+  it('首启自动迁移：8 表建立', async () => {
     const tables = await db.execute(
       "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
     )
@@ -125,12 +125,12 @@ describe('capacitor 适配器（libsql 后端 Fake 高保真）', () => {
       'tags',
       'note_tags',
       'weight_logs',
-      '_migrations',
     ]) {
       expect(names).toContain(t)
     }
-    const mig = await db.execute('SELECT version FROM _migrations ORDER BY version')
-    expect(mig.rows.map((r) => r.version)).toEqual([1, 2])
+    // 追踪表已移除：_migrations 不应存在（PRAGMA table_info 返回空行）
+    const mig = await db.execute('PRAGMA table_info(_migrations)')
+    expect(mig.rows).toHaveLength(0)
   })
 
   it('迁移幂等：同一连接重复 createCapacitorDb（内部 migrate）不抛错', async () => {

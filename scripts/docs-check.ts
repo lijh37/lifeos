@@ -185,9 +185,10 @@ for (const v of pkgVersionStrings) {
   }
 }
 
-// V_readme：README 全文所有三段版本号（"Node >= 20" 不含三段版本，不会误匹配）
+// V_readme：README 全文所有三段版本号（"Node >= 20" 不含三段版本，不会误匹配；
+// 前后负向断言排除四段点分数字——如 Docker daemon 的 DNS IP 223.5.5.5，防止匹配到 5.5.5）
 const readme = readFile('README.md')
-const V_README = [...new Set([...readme.matchAll(/\b\d+\.\d+\.\d+\b/g)].map(m => m[0]))]
+const V_README = [...new Set([...readme.matchAll(/(?<![.\d])\d+\.\d+\.\d+\b(?!\.\d)/g)].map(m => m[0]))]
 
 const readmeOnly = V_README.filter(v => !V_PKG.has(v))
 if (readmeOnly.length === 0) {

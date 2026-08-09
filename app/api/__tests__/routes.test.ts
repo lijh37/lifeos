@@ -33,7 +33,7 @@ describe('API routes', () => {
   })
 
   beforeEach(async () => {
-    // migrate() is idempotent (checks _migrations), so re-running is cheap and safe.
+    // migrate() is idempotent (replays IF NOT EXISTS DDL), so re-running is cheap and safe.
     await migrate(getClient())
     await getClient().execute('DELETE FROM note_tags')
     await getClient().execute('DELETE FROM tags')

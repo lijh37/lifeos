@@ -10,10 +10,11 @@
  * 「动态 import 保证未选中适配器不进 bundle」的职责在入口桶的工厂闭包中完成——
  * 工厂为惰性动态 import，首次 getClient() 才真正加载所选适配器。
  *
- * schema 初始化请调用 migrate()（@/lib/db/migrate）——Android 首启时在应用
- * bootstrap 阶段调用，Web/桌面由 `npm run dev` / `npm run migrate` 触发。
+ * schema 初始化：任何环境首次连接时自动执行幂等 schema 初始化（migrate()，
+ * @/lib/db/migrate），无需手动调用。
  */
 import type { DbClient } from './db-client'
+import { migrate } from './migrate'
 
 let singleton: DbClient | null = null
 let adapterFactory: (() => Promise<DbClient>) | null = null
@@ -25,7 +26,10 @@ function lazyFacade(factory: () => Promise<DbClient>): DbClient {
   let init: Promise<DbClient> | null = null
   const ensure = () => {
     if (!init) {
-      init = factory()
+      init = factory().then(async (db) => {
+        await migrate(db)
+        return db
+      })
       init.catch(() => {
         init = null
       })

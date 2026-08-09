@@ -7,7 +7,6 @@ delete process.env.TURSO_DATABASE_URL
 process.env.DATABASE_URL = 'file:./.db-test.sqlite'
 
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
-import { createClient } from '@libsql/client'
 import fs from 'node:fs'
 import { createNote, getNotes, getNote, updateNote, deleteNote, getClient, createHabit, getHabits, toggleCompletion, getTodayCompletions, deleteHabit, upsertBudget, getBudget, getBudgets, searchNotes, getAllTags, renameTag, deleteTag, migrate, listWeightLogs, upsertWeightLog, deleteWeightLog } from '@/lib/db'
 import type { Note } from '@/lib/types'
@@ -401,37 +400,5 @@ describe('Database - Weight', () => {
     await deleteWeightLog(log.id)
     const logs = await listWeightLogs()
     expect(logs).toHaveLength(0)
-  })
-})
-
-describe('Database - Migrations (legacy schema)', () => {
-  it('should repair a legacy _migrations table that still has a checksum column', async () => {
-    const file = './.db-legacy-test.sqlite'
-    fs.rmSync(file, { force: true })
-    const db = createClient({ url: `file:${file}` })
-
-    // 模拟旧版本代码创建的追踪表（含 checksum NOT NULL 列，且已应用 001）
-    await db.execute(`
-      CREATE TABLE _migrations (
-        version INTEGER PRIMARY KEY,
-        name TEXT NOT NULL,
-        checksum TEXT NOT NULL,
-        applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-      )
-    `)
-    await db.execute(
-      `INSERT INTO _migrations (version, name, checksum) VALUES (1, '001_create_tables.sql', 'abc123')`
-    )
-
-    await expect(migrate(db)).resolves.toBeUndefined()
-
-    const cols = await db.execute('PRAGMA table_info(_migrations)')
-    expect(cols.rows.map((r) => r.name)).not.toContain('checksum')
-
-    const applied = await db.execute('SELECT version FROM _migrations ORDER BY version')
-    expect(applied.rows.map((r) => Number(r.version))).toEqual([1, 2])
-
-    db.close()
-    fs.rmSync(file, { force: true })
   })
 })

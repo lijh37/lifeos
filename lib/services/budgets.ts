@@ -6,12 +6,19 @@
  */
 
 import { isNativeCapacitor } from './env'
+import { throwHttpError } from './http'
 import type { Budget } from '@/lib/types'
 
-/** 读取响应体 error 并抛出统一错误（web 分支共用） */
-async function throwHttpError(res: Response): Promise<never> {
-  const body = await res.json().catch(() => null)
-  throw new Error(body?.error || `HTTP ${res.status}`)
+/** 数值字段转 number（null/undefined 透传，NaN 转 undefined） */
+export function numOrNull(v: unknown): number | null | undefined {
+  if (v === undefined || v === null) return v
+  const n = Number(v)
+  return Number.isFinite(n) ? n : undefined
+}
+/** 布尔字段转 boolean（undefined 透传） */
+export function toBool(v: unknown): boolean | undefined {
+  if (v === undefined) return undefined
+  return v === true || v === 1 || v === 'true' || v === '1'
 }
 
 export async function fetchBudget(month: string): Promise<Budget | null> {
@@ -41,18 +48,6 @@ export async function fetchAllBudgets(): Promise<Budget[]> {
 export async function saveBudget(month: string, data: Record<string, unknown>): Promise<Budget> {
   if (isNativeCapacitor()) {
     const { upsertBudget } = await import('@/lib/db/native')
-
-    // 数值字段转 number（null/undefined 透传）
-    const numOrNull = (v: unknown): number | null | undefined => {
-      if (v === undefined || v === null) return v
-      const n = Number(v)
-      return Number.isFinite(n) ? n : undefined
-    }
-    // 布尔字段转 boolean（undefined 透传）
-    const toBool = (v: unknown): boolean | undefined => {
-      if (v === undefined) return undefined
-      return v === true || v === 1 || v === 'true' || v === '1'
-    }
 
     const clean: Partial<Budget> = {
       fixedBudget: numOrNull(data.fixedBudget) ?? undefined,
@@ -84,11 +79,6 @@ export function validateBudgetInput(body: Record<string, unknown>): string | nul
     return 'month must be in YYYY-MM format'
   }
 
-  const numOrNull = (v: unknown): number | null | undefined => {
-    if (v === undefined || v === null) return v
-    const n = Number(v)
-    return Number.isFinite(n) ? n : undefined
-  }
   if (
     (fixedBudget !== undefined && numOrNull(fixedBudget) === undefined) ||
     (variableBudget !== undefined && numOrNull(variableBudget) === undefined) ||

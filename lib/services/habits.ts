@@ -6,6 +6,7 @@
  */
 
 import { isNativeCapacitor } from './env'
+import { throwHttpError } from './http'
 import type { Habit } from '@/lib/types'
 
 export interface HabitDashboard {
@@ -26,12 +27,6 @@ export interface ToggleResult {
   weekCount: number
   monthCount: number
   totalCompletions: number
-}
-
-/** 读取响应体 error 并抛出统一错误（web 分支共用） */
-async function throwHttpError(res: Response): Promise<never> {
-  const body = await res.json().catch(() => null)
-  throw new Error(body?.error || `HTTP ${res.status}`)
 }
 
 export async function fetchHabitsDashboard(): Promise<HabitDashboard> {
