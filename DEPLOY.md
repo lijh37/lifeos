@@ -1,23 +1,106 @@
 # LifeOS — 部署指南
 
-> 可选部署（**暂不启用**）。当前主力形态为手机 APK 完全离线 + 桌面 web 本机；以下 ECS / Vercel 部署代码保留在仓库，需要浏览器远程访问或集中备份时再按本指南启用。环境变量完整说明以 AGENTS.md 为单点源。
+> 一套代码，四种运行形态。**手机 APK（主力，完全离线）** 与 **桌面 web（辅助，本机运行）** 为日常形态，无需服务器；**阿里云 ECS Docker** 与 **Vercel** 为备用形态（代码保留、暂未启用），需要浏览器远程访问时再按本指南启用。环境变量完整说明以 AGENTS.md 为单点源。
 
 ## 部署形态现状
 
-- **当前主力**：手机 APK（离线）+ 桌面 web（localhost）——不需要本指南的任何步骤
-- **阿里云 ECS Docker**：代码就绪、域名 daimoli.xyz 已备案，**暂未启用**（如需浏览器远程访问或集中备份，按「主生产部署」启用）
-- **Vercel + Turso**：代码与配置保留，**暂未启用**（备用方案，与 ECS 数据独立，无实时同步）
+| 形态 | 状态 | 定位 |
+|------|------|------|
+| 手机 APK（Capacitor + 原生 SQLite） | **主力，已启用** | 日常使用：随手记、打卡、记账 |
+| 桌面 web（Next.js SSR + 本地 SQLite） | **辅助，已启用** | 大屏整理、长文编辑、导出备份 |
+| 阿里云 ECS Docker | 暂未启用（代码就绪，域名 daimoli.xyz 已备案） | 浏览器远程访问 / 集中备份 |
+| Vercel + Turso | 暂未启用（备用方案） | 与 ECS 数据独立，无实时同步 |
 
-## 双环境概览
+> 各形态数据完全独立，通过「设置 → 备份/恢复」JSON 导出/导入互通（**同一时间只允许一端写库**，不要共享同一个 .db 文件）。
 
-| 角色 | 环境 | 数据库 | 存储 | 入口 | 状态 |
-|------|------|--------|------|------|------|
-| **主生产** | 阿里云 ECS Docker | 本地 SQLite (`lifeos.db`) | 本地磁盘 | `https://daimoli.xyz` | 暂未启用 |
-| **备用** | Vercel (hkg1) | Turso 远程 | — | `https://lifeos-daimo.vercel.app` | 暂未启用 |
+## 移动端（Android APK）—— 主力形态
 
-数据完全独立，通过「设置 → 备份/恢复」JSON 手动同步。
+手机端为**主力形态**：Next 静态导出 + Capacitor 原生 SQLite，**完全离线**（无任何网络依赖，卸载即数据清除）。与服务器/桌面数据相互独立，通过「设置 → 备份/恢复」JSON 手动同步。
+
+### 构建
+
+前置：Node 20.x + Android SDK + JDK 17；`android/local.properties` 含 `sdk.dir`（.gitignore 已忽略，不随仓库分发）。
+
+```bash
+npm run build:mobile          # BUILD_TARGET=export 静态导出 → .next-export/
+npx cap sync android          # 同步 .next-export/ → android/app/src/main/assets/public
+cd android && ./gradlew assembleDebug
+```
+
+- 产物：`android/app/build/outputs/apk/debug/app-debug.apk`
+- 只改 JS/静态资源无需重新 `cap add`，重跑上面三步即可；修改 Capacitor 配置/插件才需重新 sync
+- `capacitor.config.json` 的 `webDir` 为 `.next-export`（与 `next.config.ts` 的 `distDir` 一致）
+
+### 安装
+
+```bash
+adb install -r <apk路径>      # -r 覆盖安装保留数据；debug 签名不变则数据保留
+```
+
+### 注意事项
+
+- **写库单端**：手机 / 桌面 / 服务器三端各自独立，不要共享同一个 .db 文件（WAL/文件锁风险）；互通只走 JSON 导出/导入
+- **备份**：手机数据存 App 私有 SQLite，卸载即清除 → 养成「设置 → 导出备份」定期存档习惯
+- **免登录**：原生离线模式登录恒放行（`lib/services/auth.ts` 原生分支恒 `{ok:true}`），`APP_PASSWORD` 不影响移动端
+- 真机已知无害噪音：控制台一条 `favicon.ico 404`（Capacitor WebViewLocalServer 不 serve .ico，不影响任何功能）
+
+## 桌面部署（Windows 原生）
+
+本机 Windows 直跑桌面版（web 形态，数据本地 SQLite），与 Docker / 手机端数据相互独立，通过「设置 → 备份/恢复」JSON 手动同步。
+
+### 前置条件
+
+- Windows 10/11（64 位）
+- Node.js LTS（Node 20/22/24 均可；本机实测 Node 24 + npm 11 正常）：<https://nodejs.org>
+- 将项目拷贝/解压到本地目录，例如 `D:\LifeOS\`
+
+### 首次安装
+
+```bat
+cd /d D:\LifeOS
+npm install
+copy .env.example .env.local
+```
+
+编辑 `.env.local`：
+
+| 变量 | 值 | 说明 |
+|------|----|------|
+| `DATABASE_URL` | `file:./data/lifeos.db` | 本地 SQLite（相对仓库根目录；`.env.example` 已默认此值，一般无需修改） |
+| `APP_PASSWORD` | 留空 或 自定义 | 留空=免登录（不推荐）；设置=启用登录 |
+
+> `.env*` 与 `data/` 均已在 .gitignore，不会误提交。
+
+### 日常启动
+
+命令行启动（已构建过直接起，无需每次重构建）：
+
+```bash
+npm run start                                # 已构建：直接启动
+# 或完整流程（首次 / 升级依赖后）：
+npm run migrate && npm run build && npm run start
+```
+
+- **Windows 原生**：在 `D:\LifeOS` 下打开 cmd 或 PowerShell 执行上述命令
+- **WSL**：在项目目录的 WSL 终端执行同样命令即可（项目位于 WSL 文件系统内时无文件锁问题，见下注意事项）
+
+浏览器访问 <http://localhost:3000>，`Ctrl+C` 停止服务。
+
+### 数据与备份
+
+- 数据库文件：`D:\LifeOS\data\lifeos.db`
+- 备份/恢复：应用内「设置 → 备份/恢复」导出/导入 JSON（与服务器端格式一致，可双向迁移）
+
+### 注意事项
+
+- ⚠️ **WSL 文件锁**：若项目放在 WSL 的 `/mnt/c/...`（drvfs 挂载）下，SQLite WAL 写入可能与 Windows 文件锁冲突。建议放 Windows 原生盘（`D:\`），或数据库文件留在 WSL 文件系统内。
+- **单端写库**：同一 `.db` 文件同一时间只允许一个实例读写。桌面 / 服务器 / 手机三端数据各自独立，用 JSON 备份手动同步，不要直接共享同一个数据库文件。
+- 端口占用：`.env.local` 设 `PORT=3001` 后重启。
+- `npm install` 偶发 `Exit handler never called!`（npm 在 Node 22/24 的已知 bug）：升级 npm 重试：`npm i -g npm@latest`。
 
 ## 主生产部署（阿里云 ECS + Docker）
+
+> **暂未启用**。需要浏览器远程访问或集中备份时按此启用；本地形态（手机/桌面）无需本节任何步骤。
 
 ### 前置条件
 
@@ -74,16 +157,17 @@ cd /root/lifeos && ./deploy.sh
 
 | 变量 | 值 | 说明 |
 |------|----|------|
-| `DATABASE_URL` | `file:./data/db/lifeos.db` | 本地 SQLite |
-| `STORAGE_DRIVER` | `local` | 本地磁盘存储 |
-| `UPLOAD_DIR` | `/app/data/uploads` | 附件目录 |
+| `DATABASE_URL` | `file:./data/db/lifeos.db` | 本地 SQLite（容器内路径，对应 volume 的 `/app/data`） |
 | `COOKIE_SECURE` | `true`（HTTPS 阶段） | cookie Secure 标志 |
+| `APP_PASSWORD` | 自定义 | 登录密码 |
+| `NEXT_PUBLIC_ICP_BEIAN` | `豫ICP备2026036606号-1` | 备案号页脚（工信部要求公网域名首页展示） |
+
+> compose 已显式清空 `TURSO_*`，确保 `getClient()` 走本地 SQLite。
 
 ### 数据持久化
 
 - Volume: `lifeos-data` → `/app/data`
 - SQLite: `/app/data/db/lifeos.db`
-- 附件: `/app/data/uploads/`
 
 备份 volume：
 
@@ -192,109 +276,24 @@ crontab -e
 
 ## 备用部署（Vercel）
 
+> **暂未启用**（备用方案，与 ECS 数据独立）。
+
 ```bash
 git push origin main    # Vercel 自动部署
 ```
 
-环境变量在 Vercel Dashboard 配置：
-
-> 完整变量说明与取值对照见 AGENTS.md「环境变量」表（单点源）；此处仅列部署相关取值。
+**必须配置** Turso 远程库（`vercel.json` 的构建命令会在构建期执行 `scripts/migrate.ts` 建表，未配置 Turso 构建将失败）：
 
 | 变量 | 说明 |
 |------|------|
-| `TURSO_DATABASE_URL` | Turso 远程库地址 |
-| `TURSO_AUTH_TOKEN` | Turso 认证 Token |
-| `BLOB_READ_WRITE_TOKEN` | Vercel Blob Token（附件功能） |
+| `TURSO_DATABASE_URL` | Turso 远程库地址（必需） |
+| `TURSO_AUTH_TOKEN` | Turso 认证 Token（必需） |
 
-`STORAGE_DRIVER` 默认 `vercel`，Vercel 环境无需显式设置。
-
-## 桌面部署（Windows 原生）
-
-本机 Windows 直跑桌面版（web 形态，数据本地 SQLite），与 Docker / 手机端数据相互独立，通过「设置 → 备份/恢复」JSON 手动同步。
-
-### 前置条件
-
-- Windows 10/11（64 位）
-- Node.js LTS（建议 22 或 24；本机实测 Node 24 + npm 11 正常）：<https://nodejs.org>
-- 将项目拷贝/解压到本地目录，例如 `D:\LifeOS\`
-
-### 首次安装
-
-```bat
-cd /d D:\LifeOS
-npm install
-copy .env.example .env.local
-```
-
-编辑 `.env.local`：
-
-| 变量 | 值 | 说明 |
-|------|----|------|
-| `DATABASE_URL` | `file:./data/lifeos.db` | 本地 SQLite（相对仓库根目录；`.env.example` 中默认注释，需取消注释） |
-| `APP_PASSWORD` | 留空 或 自定义 | 留空=免登录（不推荐）；设置=启用登录 |
-
-> `.env*` 与 `data/` 均已在 .gitignore，不会误提交。
-
-### 日常启动
-
-双击仓库根目录 `启动.bat`，自动依次执行：
-
-1. （首次）`npm install`
-2. `npm run migrate` —— 建表/迁移
-3. `npm run build` —— 生产构建
-4. `npm run start` —— 启动服务
-
-浏览器访问 <http://localhost:3000>。关闭启动窗口即停止服务。
-
-### 数据与备份
-
-- 数据库文件：`D:\LifeOS\data\lifeos.db`
-- 备份/恢复：应用内「设置 → 备份/恢复」导出/导入 JSON（与服务器端格式一致，可双向迁移）
-
-### 注意事项
-
-- ⚠️ **WSL 文件锁**：若项目放在 WSL 的 `/mnt/c/...`（drvfs 挂载）下，SQLite WAL 写入可能与 Windows 文件锁冲突。建议放 Windows 原生盘（`D:\`），或数据库文件留在 WSL 文件系统内。
-- **单端写库**：同一 `.db` 文件同一时间只允许一个实例读写。桌面 / 服务器 / 手机三端数据各自独立，用 JSON 备份手动同步，不要直接共享同一个数据库文件。
-- 端口占用：`.env.local` 设 `PORT=3001` 后重启。
-- `npm install` 偶发 `Exit handler never called!`（npm 在 Node 22/24 的已知 bug）：升级 npm 重试：`npm i -g npm@latest`。
-
-## 移动端（Android APK）
-
-手机端为**主力形态**：Next 静态导出 + Capacitor 原生 SQLite，**完全离线**（无任何网络依赖，卸载即数据清除）。与服务器/桌面数据相互独立，通过「设置 → 备份/恢复」JSON 手动同步。
-
-### 构建
-
-前置：Node 20.x + Android SDK + JDK 17；`android/local.properties` 含 `sdk.dir=/home/demo/android-sdk`（.gitignore 已忽略，不随仓库分发）。
-
-```bash
-npm run build:mobile          # BUILD_TARGET=export 静态导出 → out/
-npx cap sync android          # 同步 out/ → android/app/src/main/assets/public
-cd android && ./gradlew assembleDebug
-```
-
-- 产物：`android/app/build/outputs/apk/debug/app-debug.apk`
-- 只改 JS/静态资源无需重新 `cap add`，重跑上面三步即可；修改 Capacitor 配置/插件才需重新 sync
-
-### 安装
-
-```bash
-adb install -r <apk路径>      # -r 覆盖安装保留数据；debug 签名不变则数据保留
-```
-
-### 注意事项
-
-- **写库单端**：手机 / 桌面 / 服务器三端各自独立，不要共享同一个 .db 文件（WAL/文件锁风险）；互通只走 JSON 导出/导入
-- **备份**：手机数据存 App 私有 SQLite，卸载即清除 → 养成「设置 → 导出备份」定期存档习惯
-- **免登录**：原生离线模式登录恒放行（`lib/services/auth.ts` 原生分支恒 `{ok:true}`），`APP_PASSWORD` 不影响移动端
-- 真机已知无害噪音：控制台一条 `favicon.ico 404`（Capacitor WebViewLocalServer 不 serve .ico，不影响任何功能）
+其余变量（`APP_PASSWORD`/`COOKIE_SECURE` 等）按需在 Vercel Dashboard 配置，完整说明见 AGENTS.md「环境变量」表（单点源）。
 
 ## 环境切换（主 → 备）
 
 主生产「设置 → 备份」导出 JSON → 备用实例「设置 → 恢复」导入。
-
-## 回滚到 Vercel
-
-代码 `STORAGE_DRIVER` 默认 `vercel`，Vercel 环境变量不变则行为不变。自托管仅通过 `.env` / compose 注入 `STORAGE_DRIVER=local` 切换，不影响 Vercel。
 
 ## 常用运维命令
 

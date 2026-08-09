@@ -158,7 +158,6 @@ lifeos/
 │   ├── __tests__/
 │   │   └── index.test.ts
 │   └── index.ts
-├── "\345\220\257\345\212\250.bat"
 ├── .dockerignore
 ├── .env.example
 ├── .env.prod.example
@@ -200,7 +199,7 @@ lifeos/
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| GET | `/api/notes` | `id?`, `q?`, `tag?`, `type?`, `limit?`(1-500, 默认200), `offset?`, `startDate?`, `endDate?` | 200 `{ notes: Note[] }` / 带 `id` 时 200 `{ note: Note }` / 404 `{ error }` | 列表/搜索/分页。`offset` 仅 `startDate+endDate` 路径生效；搜索（`q`）固定返回最多 50 条；`type` 参数已解析但当前无过滤效果。带 `id` 时返回单条，未找到 404（原动态段 `/api/notes/[id]` 已合并至此） |
+| GET | `/api/notes` | `id?`, `q?`, `tag?`, `type?`, `limit?`(1-500, 默认200), `offset?`, `startDate?`, `endDate?` | 200 `{ notes: Note[] }` / 带 `id` 时 200 `{ note: Note }` / 404 `{ error }` | 列表/搜索/分页。`offset` 仅 `startDate+endDate` 路径生效；搜索（`q`）固定返回最多 50 条；`tag` 仅与 `q` 组合时生效（单独 `tag` 无过滤效果）；`type` 参数已解析但当前无过滤效果。带 `id` 时返回单条，未找到 404（原动态段 `/api/notes/[id]` 已合并至此）。GET 响应头 `Cache-Control: private, no-store` |
 | POST | `/api/notes` | `{ title?, content?, type?, tags?, dueDate? }` | 200 `{ note: Note }` | 创建笔记（type 仅允许 'note'） |
 | PATCH | `/api/notes` | `{ id, title?, content?, tags?, dueDate?, done?, pinned? }` | 200 `{ note: Note }` | 更新笔记 |
 | DELETE | `/api/notes?id=<id>` | — | 200 `{ success: true }` | 删除单条 |
@@ -215,7 +214,7 @@ lifeos/
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| GET | `/api/budgets` | — | 200 `{ budgets: Budget[] }` | 全部预算 |
+| GET | `/api/budgets` | — | 200 `{ budgets: Budget[] }` | 全部预算（`Cache-Control: private, max-age=30, stale-while-revalidate=120`） |
 | GET | `/api/budgets` | `month=YYYY-MM` | 200 `{ budget: Budget | null }` | 单月预算（未设置时返回 null） |
 | POST | `/api/budgets` | `{ month, fixedBudget, variableBudget, fixedActual?, variableActual?, notes?, isCompleted?, savingsCompleted? }` | 200 `{ budget: Budget }` | Upsert（非法数值返回 400） |
 
@@ -223,7 +222,7 @@ lifeos/
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| GET | `/api/habits` | — | 200 `{ habits, todayCompletions, streaks, bestStreaks, perHabitRates, perHabitTotals, perHabitWeek, perHabitMonth }` | 习惯列表 + 打卡 + streaks + 统计（单次返回全部 dashboard 数据，无参数分支） |
+| GET | `/api/habits` | — | 200 `{ habits, todayCompletions, streaks, bestStreaks, perHabitRates, perHabitTotals, perHabitWeek, perHabitMonth }` | 习惯列表 + 打卡 + streaks + 统计（单次返回全部 dashboard 数据，无参数分支；`Cache-Control: private, max-age=20, stale-while-revalidate=90`） |
 | POST | `/api/habits` | `{ name, description?, frequency?("daily"|"weekly") }` | 200 `{ habit: Habit }` | 创建习惯 |
 | POST | `/api/habits` | `{ _action: "toggle", habitId, date }` | 200 `{ completed, streak, bestStreak, weekCount, monthCount, totalCompletions }` | 打卡切换（UNIQUE 防重复） |
 | PATCH | `/api/habits` | `{ id, name, description }` | 200 `{ success: true }` | 更新习惯（不支持 frequency 更新） |
@@ -269,9 +268,7 @@ interface Budget {
 interface Habit {
   id: string; name: string; description: string; frequency: 'daily' | 'weekly'; createdAt: string
 }
-interface Attachment {
-  id: string; noteId: string; filename: string; url: string; mimeType: string; fileSize: number; createdAt: string
-}
+// 附件类型随阶段 3 已删除（无附件场景）；attachments 表保留（迁移 SQL 零改动）
 type WeightPersonKey = 'me' | 'her'
 interface WeightLog {
   id: string; person: WeightPersonKey; date: string; weight: number; note: string; createdAt: string
@@ -283,16 +280,17 @@ interface WeightLog {
 - **Header**: `app_auth` cookie 或 `Authorization: Bearer <token>`
 - **未认证**: API 返回 401 `{ error: "Unauthorized" }`，页面 307 → `/login?from=<path>`
 - **跳过**: `APP_PASSWORD` 空值时认证完全跳过
-- **公开路径**: `/login`, `/api/auth`, `/uploads/`
-- **底层**: `lib/auth-token.ts` 用 `crypto.subtle.sign('HMAC', key, password)` 派生，`verifyToken()` 常量时间比较
+- **公开路径**: `/login`, `/api/auth`（`proxy.ts` 用 **startsWith 前缀匹配**，`/login/*`、`/api/auth/*` 也公开）；路径含 `.` 的请求一律放行
+- **执行位置**: 认证在根目录 `proxy.ts`（Next 16 Proxy/Middleware）实现，校验 cookie 与 Bearer 两种方式
+- **底层**: `lib/auth-token.ts` 用 `crypto.subtle.sign('HMAC', key, password)` 派生，`verifyToken()` 长度检查 + 异或常量时间比较；`app/api/auth/route.ts` 密码比对用 `timingSafeEqual`，cookie 参数：maxAge 30 天、httpOnly、SameSite=lax、`path:'/'`，`secure` 由 `COOKIE_SECURE==='true'` 或生产环境且非 `'false'` 决定
 
 ## 数据库 Schema
 
-8 表，DDL 见 `migrations/001_create_tables.sql` 与 `migrations/002_weight_logs.sql`。`getClient()`（`lib/db/client.ts:40`）惰性双模：Web/Node 走 `lib/db/adapters/libsql.ts`（`@libsql/client`，本地/远程 Turso），Capacitor 原生走 `lib/db/adapters/capacitor.ts`（`@capacitor-community/sqlite`，动态 import，不进 web bundle）；`PRAGMA foreign_keys = ON` 由各适配器开启（仅本地 SQLite）。
+8 表，DDL 见 `migrations/001_create_tables.sql` 与 `migrations/002_weight_logs.sql`。`getClient()`（`lib/db/client.ts:46`）惰性双模：Web/Node 走 `lib/db/adapters/libsql.ts`（`@libsql/client`，本地/远程 Turso），Capacitor 原生走 `lib/db/adapters/capacitor.ts`（`@capacitor-community/sqlite`，动态 import，不进 web bundle）；`PRAGMA foreign_keys = ON` 由各适配器开启（仅本地 SQLite）。
 
 | 表 | 列 | 主键 | 外键 | 索引 |
 |----|----|------|------|------|
-| **notes** | id TEXT PK, content TEXT NOT NULL, title TEXT, type TEXT NOT NULL DEFAULT 'note', due_date TEXT, done INTEGER DEFAULT 0, pinned INTEGER DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL | id | — | `idx_notes_type`, `idx_notes_created`, `idx_notes_due_date`, `idx_notes_search(content,title)`, `idx_notes_pinned_created`, `idx_notes_type_due`, `idx_notes_done` |
+| **notes** | id TEXT PK, content TEXT NOT NULL, title TEXT, type TEXT NOT NULL DEFAULT 'note', due_date TEXT, done INTEGER DEFAULT 0, pinned INTEGER DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL | id | — | `idx_notes_type`, `idx_notes_created`, `idx_notes_due_date`, `idx_notes_search(content,title)`, `idx_notes_pinned_created`, `idx_notes_type_due`, `idx_notes_done(type, done)` |
 | **budgets** | id TEXT PK, month TEXT NOT NULL UNIQUE, fixed_budget REAL NOT NULL DEFAULT 0, variable_budget REAL NOT NULL DEFAULT 0, fixed_actual REAL, variable_actual REAL, notes TEXT DEFAULT '', is_completed INTEGER DEFAULT 0, savings_completed INTEGER DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL | id | — | — |
 | **attachments** | id TEXT PK, note_id TEXT NOT NULL, filename TEXT NOT NULL, url TEXT NOT NULL, mime_type TEXT NOT NULL DEFAULT '', file_size INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL | id | note_id → notes(id) ON DELETE CASCADE | `idx_attachments_note(note_id)` |
 | **habits** | id TEXT PK, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', frequency TEXT NOT NULL DEFAULT 'daily', created_at TEXT NOT NULL | id | — | — |
@@ -309,23 +307,21 @@ interface WeightLog {
 
 | 变量 | 必需？ | 用途 | 开发 (`.env.local`) | 主生产 Docker (`.env`) | 备用 Vercel |
 |------|--------|------|---------|---------|---------|
-| `DATABASE_URL` | 开发/主生产必需 | 本地 SQLite 路径 | `file:./data/dev.db` | `file:./data/db/lifeos.db` | — |
+| `DATABASE_URL` | 开发/主生产必需 | 本地 SQLite 路径 | `file:./data/lifeos.db` | `file:./data/db/lifeos.db` | — |
 | `TURSO_DATABASE_URL` | 备用必需 | Turso 远程库地址 | **不得设置**（dev 护栏） | docker-compose.yml 置空 | `libsql://...` |
 | `TURSO_AUTH_TOKEN` | 备用必需 | Turso 认证 Token | **不得设置** | docker-compose.yml 置空 | Turso token |
 | `APP_PASSWORD` | 否 | 登录密码 | 不设 或 `demo` | 自定义 | 自定义 |
-| `BLOB_READ_WRITE_TOKEN` | 否（已废弃） | Vercel Blob 存储（附件已剔除，阶段 3；仅旧部署残留） | — | — | Vercel token |
-| `STORAGE_DRIVER` | 否（已废弃） | 存储后端（附件已剔除，代码无引用） | `vercel` | `local` | `vercel` |
 | `COOKIE_SECURE` | 否 | cookie Secure 标志 | 不设 | `true`（HTTPS 阶段） | `true` |
 | `NEXT_PUBLIC_ICP_BEIAN` | 否 | 备案号页脚文案（仅公网域名部署时设置；不设则不渲染页脚，APK/桌面本地无需） | 不设 | `豫ICP备2026036606号-1` | 不设 |
-| `UPLOAD_DIR` | 否（已废弃） | 本地上传目录（附件已剔除，代码无引用） | — | `/app/data/uploads` | — |
-| `UPLOAD_URL_PREFIX` | 否（已废弃） | 本地附件 URL 前缀（附件已剔除，代码无引用） | — | `/uploads` | — |
 | `ANALYZE` | 否 | bundle-analyzer 构建开关 | 不设 | 不设 | 不设 |
 | `BUILD_TARGET` | 否（移动端构建） | 移动端静态导出开关：`export` 时启用 `output: 'export'`（`npm run build:mobile` 内部设置） | 不设 | 不设 | 不设 |
 | `BASE_URL` | 否（E2E） | Playwright 目标地址 | 不设 | 不设 | 不设 |
 
 > 注：`NODE_ENV`/`CI`/`PORT`/`HOSTNAME`/`NEXT_TELEMETRY_DISABLED`/`NODE_OPTIONS` 等平台内置变量由运行时注入，不列入上表。
 
-数据库选择逻辑：`url = TURSO_DATABASE_URL \|\| DATABASE_URL`（`lib/db/client.ts:25`）。dev 护栏：非生产 + `TURSO_DATABASE_URL` 匹配 `/turso\.(io\|tech)/i` → 抛错。E2E 隔离：`playwright.config.ts` 显式清空 `TURSO_*`。
+> 注：历史废弃变量 `STORAGE_DRIVER`/`UPLOAD_DIR`/`UPLOAD_URL_PREFIX`/`BLOB_READ_WRITE_TOKEN` 已随附件功能（阶段 3）彻底移除——代码、`.env` 模板、compose 均无引用，`@vercel/blob` 依赖已删除；旧部署残留不影响运行。
+
+数据库选择逻辑：`url = TURSO_DATABASE_URL \|\| DATABASE_URL`（`lib/db/adapters/libsql.ts:24-26`）。dev 护栏：非生产 + `TURSO_DATABASE_URL` 匹配 `/turso\.(io\|tech)/i` → 抛错。E2E 隔离：`playwright.config.ts` 显式清空 `TURSO_*`。
 
 ## 关键约定
 
@@ -337,7 +333,7 @@ interface WeightLog {
 
 - 列表项：`React.memo` + `displayName`（NoteCard, BudgetCard, HabitRow, ProgressBar）
 - 回调：`useCallback`
-- 懒加载：`next/dynamic`（TagManagerSheet, BatchActionsBar, AttachmentSection, MarkdownEditor）
+- 懒加载：`next/dynamic`（TagManagerSheet, BatchActionsBar, MarkdownEditor）
 - Zustand 缓存上限：`MAX_CACHED_NOTES = 500`
 - 功能性函数 → 模块级函数；有状态 → 独立函数组件
 
@@ -356,7 +352,11 @@ interface WeightLog {
 
 ### UI 动效
 
-`PageAnimation` 组件包裹 `animate-fade-in` class。CSS 动画定义于 `app/globals.css:199-216`：`fadeIn` keyframe（淡入 + 上移 8px, 0.35s ease-out），`pulse-soft` keyframe（透明度脉动）。笔记详情页有独立骨架屏（`app/notes/[id]/loading.tsx`），其余页面加载态内联 `skeleton-pulse` class div。
+`PageAnimation` 组件包裹 `animate-fade-in` class。CSS 动画定义于 `app/globals.css:199-216`：`fadeIn` keyframe（淡入 + 上移 8px, 0.35s ease-out），`pulse-soft` keyframe（透明度脉动）。笔记详情页骨架屏在 `app/notes/detail/page.tsx`（Suspense 兜底），其余页面加载态内联 `skeleton-pulse` class div。
+
+### PWA 残留清理
+
+旧 PWA 已移除（commit 91ab2f42 删 sw.js/manifest/icons），但浏览器已注册的 Service Worker 不会因 `/sw.js` 404 自动注销，会持续拉取并缓存旧静态资源。`app/layout.tsx` 内联脚本每次加载注销全部 Service Worker 并清空 caches 自愈——此脚本是 PWA 移除的配套清理，勿删。注意：SW 只注销不拦截导航（旧 sw.js 仅缓存 `/_next/static/`），新 HTML 始终可达，故内联脚本每次必然执行。
 
 ### 命名规范
 
@@ -388,7 +388,7 @@ interface WeightLog {
 | 层 | 工具 | 文件数 | 测试数 | 数据库 |
 |----|------|--------|--------|--------|
 | 单元测试 | vitest (jsdom) | 16 | 152 | `file:./.db-test.sqlite`（临时文件，非 `:memory:`） |
-| E2E | Playwright | 4 套件 | ~13 | `file:./.e2e-test.db`（自动清理） |
+| E2E | Playwright | 4 套件 | 12 | `file:./.e2e-test.db`（自动清理） |
 
 ### 单元测试清单
 
@@ -435,17 +435,22 @@ npm run test:e2e         # Playwright E2E（自动启动 dev server + 自动清�
 |------|------|
 | `npm run dev` | 自动建表 + 启动开发服务器 |
 | `npm run build` | 生产构建 |
+| `npm run build:mobile` | 移动端静态导出（`BUILD_TARGET=export next build`，输出 `.next-export`） |
+| `npm run cap:add` | 添加 Capacitor Android 平台（首次构建时执行一次） |
+| `npm run cap:sync` | 同步 web 产物到 Android 原生工程（APK 构建核心步骤） |
 | `npm run start` | 生产启动 |
 | `npm run lint` | ESLint |
-| `npm test` | vitest 单元测试（约 120 个，见 `__tests__/`） |
+| `npm test` | vitest 单元测试（约 152 个，见 `__tests__/`） |
 | `npm run test:watch` | 测试 watch 模式 |
-| `npm run test:e2e` | Playwright E2E（4 套件, 13 测试） |
+| `npm run test:e2e` | Playwright E2E（4 套件, 12 测试；pretest 自动清理 .e2e-test.db，自动启动 dev server） |
 | `npm run migrate` | 执行待处理数据库迁移 |
 | `npm run migrate:dry` | 仅列出待执行迁移 |
 | `npm run migrate -- --reset` | 清空所有表后重新迁移 |
 | `npm run analyze` | 构建产物体积分析（`@next/bundle-analyzer`） |
-| `npm run docs:check` | 校验 AGENTS.md 与代码/示例文件一致性（CI 执行） |
-| `npm run docs:gen` | 重新生成 AGENTS.md 目录树与测试清单区块 |
+| `npm run docs:check` | 校验 AGENTS.md 与代码/示例文件一致性（CI quality job 执行，27 项断言） |
+| `npm run docs:gen` | 重新生成 AGENTS.md 目录树与测试清单区块（CI 先跑 docgen 再用 `git diff --exit-code` 校验无漂移） |
+
+> 环境要求：Node >= 20（`package.json` engines）。
 
 ## AI 协作流程
 

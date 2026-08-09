@@ -33,7 +33,7 @@ export function createLibsqlDb(): DbClient {
   if (tursoUrl && process.env.NODE_ENV !== 'production' && REMOTE_TURSO_RE.test(tursoUrl)) {
     throw new Error(
       `[db] 拒绝连接远程生产数据库（${tursoUrl}）。\n` +
-        `本地开发应使用本地 SQLite：在 .env.local 设置 DATABASE_URL=file:./data/dev.db，\n` +
+        `本地开发应使用本地 SQLite：在 .env.local 设置 DATABASE_URL=file:./data/lifeos.db，\n` +
         `并移除 TURSO_DATABASE_URL / TURSO_AUTH_TOKEN。`
     )
   }

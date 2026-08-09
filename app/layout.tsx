@@ -33,6 +33,13 @@ export default function RootLayout({
       className="h-full antialiased"
     >
       <body className="h-full overflow-x-hidden">
+        {/* 旧 PWA 清理：sw.js 已移除，但浏览器已注册的 Service Worker 不会因 404 自动注销，
+            会持续拉取 /sw.js 并缓存旧静态资源。每次加载显式注销并清空缓存自愈。 */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{if('serviceWorker'in navigator){navigator.serviceWorker.getRegistrations().then(function(rs){for(var i=0;i<rs.length;i++){rs[i].unregister()}})}if('caches'in window){caches.keys().then(function(ks){for(var i=0;i<ks.length;i++){caches.delete(ks[i])}})}}catch(e){}})();`,
+          }}
+        />
         <Toaster
           position="top-center"
           toastOptions={{

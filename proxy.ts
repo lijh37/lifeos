@@ -7,7 +7,6 @@ const PASSWORD_COOKIE = 'app_auth'
 const publicPaths = [
   '/login',
   '/api/auth',
-  '/uploads/',
 ]
 
 export async function proxy(request: NextRequest) {

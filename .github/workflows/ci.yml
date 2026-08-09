@@ -75,7 +75,6 @@ jobs:
       - name: Verify export output
         run: |
           test -f .next-export/index.html
-          test -f .next-export/sw.js
 
       - name: Generate native project
         run: npx cap add android  # 无需 Android SDK，仅生成原生工程骨架
@@ -93,3 +92,13 @@ jobs:
           name: mobile-export
           path: .next-export/
           retention-days: 1
+
+  docker-build:
+    runs-on: ubuntu-latest
+    # 备用形态（阿里云 ECS Docker）的保险丝：每次 PR 验证 Dockerfile 可完整构建，
+    # 防止部署配置随代码演化悄悄腐烂（镜像不推送，仅本地构建验证）
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t lifeos-next --build-arg NPM_REGISTRY=https://registry.npmjs.org/ .

@@ -137,9 +137,8 @@ for (const m of agents.matchAll(/^\|\s*`([A-Z0-9_]+)`\s*\|/gm)) {
   docEnv.add(m[1])
 }
 
-// 白名单：代码无直接引用但文档有记录的合理差异（BLOB_READ_WRITE_TOKEN 由
-// @vercel/blob 隐式读取；BASE_URL 仅 E2E 使用，文档保留记录）
-const WHITELIST = new Set(['BLOB_READ_WRITE_TOKEN', 'BASE_URL'])
+// 白名单：代码无直接引用但文档有记录的合理差异（BASE_URL 仅 E2E 使用，文档保留记录）
+const WHITELIST = new Set(['BASE_URL'])
 // 平台/CI 注入的内置变量，非应用配置，无需在文档表中记录
 const PLATFORM_ENV = new Set(['NODE_ENV', 'CI'])
 

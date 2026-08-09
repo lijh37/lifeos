@@ -40,8 +40,7 @@ ENV HOSTNAME=0.0.0.0
 # 非 root 用户运行
 RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs -s /bin/sh nextjs
 
-# 复制构建产物
-COPY --from=builder /app/public ./public
+# 复制构建产物（public/ 已随 PWA 移除，无静态资源目录）
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
@@ -50,9 +49,9 @@ COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/next.config.ts ./next.config.ts
 
-# 数据目录（SQLite + 上传附件），由 volume 挂载
+# 数据目录（SQLite），由 volume 挂载
 # 必须预建 db/ 子目录，否则 libsql 打开 file:./data/db/lifeos.db 时父目录不存在报 SQLITE_CANTOPEN(14)
-RUN mkdir -p /app/data/uploads /app/data/db && chown -R nextjs:nodejs /app/data
+RUN mkdir -p /app/data/db && chown -R nextjs:nodejs /app/data
 USER nextjs
 
 EXPOSE 3000

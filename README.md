@@ -7,7 +7,7 @@
 | 形态 | 定位 | 数据 | 启动方式 |
 |------|------|------|----------|
 | **Android APK** | 主力——日常随手记录/打卡 | 手机内置 SQLite，**完全离线** | 直接安装（构建步骤见下） |
-| 桌面 web | 辅助——偶尔用电脑整理 | 本地 `data/lifeos.db` | 双击 `启动.bat`（Windows）/ `npm run start` |
+| 桌面 web | 辅助——偶尔用电脑整理 | 本地 `data/lifeos.db` | `npm run start` |
 | 服务器 | 远程访问/备份（可选，暂未启用） | SQLite / Turso | 见 [DEPLOY.md](DEPLOY.md) |
 
 三端数据独立存储，通过「设置 → 备份/恢复」JSON 导出/导入互通（**同一时间只允许一端写库**）。
@@ -33,8 +33,8 @@
 ### 偶尔：电脑
 
 - 适合长文编辑、批量整理、导出 Markdown 阅读
-- Windows 双击仓库根目录 `启动.bat` 即可运行（首次自动安装依赖+建表+构建+启动）
-- 浏览器访问 <http://localhost:3000>，关闭窗口即停止
+- 命令行启动：`npm run dev`（开发）或 `npm run migrate && npm run build && npm run start`（生产），详见 [DEPLOY.md](DEPLOY.md)
+- 浏览器访问 <http://localhost:3000>，`Ctrl+C` 停止
 
 ### 数据同步（重要规则）
 
@@ -60,7 +60,7 @@
 前置：Node 20.x + Android SDK（`android/local.properties` 配置 `sdk.dir`）。
 
 ```bash
-npm run build:mobile          # ① 静态导出（BUILD_TARGET=export → out/）
+npm run build:mobile          # ① 静态导出（BUILD_TARGET=export → .next-export/）
 npx cap sync android          # ② 同步到 Android 工程
 cd android && ./gradlew assembleDebug   # ③ 构建 debug APK
 ```
@@ -77,7 +77,7 @@ adb install -r app-debug.apk
 ```bash
 git clone <repo> && cd lifeos
 npm install
-cp .env.example .env.local    # 编辑 DATABASE_URL=file:./data/dev.db
+cp .env.example .env.local    # DATABASE_URL=file:./data/lifeos.db 已默认
 npm run dev                   # 开发模式，http://localhost:3000
 # 或生产模式：npm run build && npm run start
 ```
@@ -104,4 +104,4 @@ Windows 原生运行（Node 22/24 亦可）见 [DEPLOY.md → 桌面部署](DEPL
 
 ## 项目状态
 
-**版本**: 0.2.1 | **Node**: 20.x（勿用 22+：npm "Exit handler never called" bug，见 DEPLOY.md FAQ） | **License**: 私有
+**版本**: 1.0.0 | **Node**: 20.x（移动端构建与 Docker 固定用 20，规避 npm bug；桌面运行 20/22/24 均可，见 DEPLOY.md） | **License**: 私有
