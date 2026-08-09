@@ -4,7 +4,7 @@
 
 ## 项目概述
 
-LifeOS 是个人生活助手，支持笔记管理、预算规划、习惯养成。运行形态三态：**Android 手机**——Capacitor APK + 原生 SQLite 完全离线；**桌面 web**——`npm run start` 本地运行；**测试**——jsdom 单测 + Playwright E2E。
+LifeOS 是个人生活助手，支持笔记管理、预算规划、习惯养成。运行形态四态：**Android 手机**——Capacitor APK + 原生 SQLite 完全离线；**桌面 web**——`npm run start` 本地运行；**Docker**（阿里云 ECS）——volume SQLite；**Vercel + Turso**——Turso 远程库（与 Docker 数据独立）。测试在 jsdom 单测 + Playwright E2E 环境运行。
 
 - **定位**: 单用户、自托管优先、无外部服务依赖
 - **架构**: Next.js 16 App Router 单体（SSR + API Routes 同仓）
@@ -134,7 +134,9 @@ lifeos/
 │   │   ├── backup.ts
 │   │   ├── budgets.ts
 │   │   ├── env.ts
+│   │   ├── file-share.ts
 │   │   ├── habits.ts
+│   │   ├── http.ts
 │   │   ├── notes.ts
 │   │   ├── tags.ts
 │   │   └── weight.ts
@@ -196,21 +198,21 @@ lifeos/
 |------|------|------|------|------|
 | GET | `/api/notes` | `id?`, `q?`, `tag?`, `type?`, `limit?`(1-500, 默认200), `offset?`, `startDate?`, `endDate?` | 200 `{ notes: Note[] }` / 带 `id` 时 200 `{ note: Note }` / 404 `{ error }` | 列表/搜索/分页。`offset` 仅 `startDate+endDate` 路径生效；搜索（`q`）固定返回最多 50 条；`tag` 仅与 `q` 组合时生效（单独 `tag` 无过滤效果）；`type` 参数已解析但当前无过滤效果。带 `id` 时返回单条，未找到 404（原动态段 `/api/notes/[id]` 已合并至此）。列表/搜索/日期范围响应头 `Cache-Control: private, no-store`（带 `id` 的单条查询不含该头） |
 | POST | `/api/notes` | `{ title?, content?, type?, tags?, dueDate? }` | 200 `{ note: Note }` | 创建笔记（type 仅允许 'note'） |
-| PATCH | `/api/notes` | `{ id, title?, content?, type?, tags?, dueDate?, done?, pinned? }` | 200 `{ note: Note }` | 更新笔记（type 实际仅允许 'note'） |
-| DELETE | `/api/notes?id=<id>` | — | 200 `{ success: true }` | 删除单条 |
+| PATCH | `/api/notes` | `{ id, title?, content?, type?, tags?, dueDate?, done?, pinned? }` | 200 `{ note: Note }` | 更新笔记（PATCH 不校验 type：任意值原样入库，读取时统一归一为 'note'） |
+| DELETE | `/api/notes?id=<id>` | — | 200 `{ success: true }` / 缺 `id` 400 `{ error: 'Missing id' }` | 删除单条 |
 
 ### /api/notes/batch
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| POST | `/api/notes/batch` | `{ ids: string[], action: "delete"|"tag", tag? }` | 200 `{ success: true }` | 事务性批量操作（注：当前代码不校验 action 值，未知值静默返回 {success:true}） |
+| POST | `/api/notes/batch` | `{ ids: string[], action: "delete"|"tag", tag? }` | 200 `{ success: true }` / `ids` 非数组或为空 400 `{ error: 'No ids provided' }` / 事务失败 500 | 事务性批量操作（注：当前代码不校验 action 值，未知值静默返回 {success:true}） |
 
 ### /api/budgets
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
 | GET | `/api/budgets` | — | 200 `{ budgets: Budget[] }` | 全部预算（`Cache-Control: private, max-age=30, stale-while-revalidate=120`） |
-| GET | `/api/budgets` | `month=YYYY-MM` | 200 `{ budget: Budget | null }` | 单月预算（未设置时返回 null） |
+| GET | `/api/budgets` | `month=YYYY-MM` | 200 `{ budget: Budget | null }` | 单月预算（未设置时返回 null；与全部预算共用 `Cache-Control: private, max-age=30, stale-while-revalidate=120`） |
 | POST | `/api/budgets` | `{ month, fixedBudget, variableBudget, fixedActual?, variableActual?, notes?, isCompleted?, savingsCompleted? }` | 200 `{ budget: Budget }` | Upsert（非法数值返回 400） |
 
 ### /api/habits
@@ -218,7 +220,7 @@ lifeos/
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
 | GET | `/api/habits` | — | 200 `{ habits, todayCompletions, streaks, bestStreaks, perHabitRates, perHabitTotals, perHabitWeek, perHabitMonth }` | 习惯列表 + 打卡 + streaks + 统计（单次返回全部 dashboard 数据，无参数分支；`Cache-Control: private, max-age=20, stale-while-revalidate=90`） |
-| POST | `/api/habits` | `{ name, description?, frequency?("daily"|"weekly") }` | 200 `{ habit: Habit }` | 创建习惯 |
+| POST | `/api/habits` | `{ name, description?, frequency?("daily"|"weekly") }` | 200 `{ habit: Habit }` | 创建习惯（frequency 非法值静默归一为 'daily'，不返回 400） |
 | POST | `/api/habits` | `{ _action: "toggle", habitId, date }` | 200 `{ completed, streak, bestStreak, weekCount, monthCount, totalCompletions }` | 打卡切换（UNIQUE 防重复） |
 | PATCH | `/api/habits` | `{ id, name, description }` | 200 `{ success: true }` | 更新习惯（不支持 frequency 更新） |
 | DELETE | `/api/habits?id=<id>` | — | 200 `{ success: true }` | 删除（代码手动级联删除 habit_completions） |
@@ -228,7 +230,7 @@ lifeos/
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
 | GET | `/api/weight` | — | 200 `{ me: WeightLog[], her: WeightLog[] }` | 按 person 分组、date 升序，空数组兜底；`Cache-Control: private, max-age=20, stale-while-revalidate=90` |
-| POST | `/api/weight` | `{ person, date, weight, note? }` | 200 `{ weightLog: WeightLog }` | 校验：person∈`WEIGHT_PERSONS` 键、date 匹配 `YYYY-MM-DD` 且真实日期、weight 有限且 >0 且 ≤500，否则 400；同人同日 upsert 覆盖 |
+| POST | `/api/weight` | `{ person, date, weight, note? }` | 200 `{ weightLog: WeightLog }` | 校验：body JSON 解析失败 400 `{ error: 'invalid body' }`；person∈`WEIGHT_PERSONS` 键、date 匹配 `YYYY-MM-DD` 且真实日期、weight 有限且 >0 且 ≤500，否则 400；同人同日 upsert 覆盖 |
 | DELETE | `/api/weight?id=<id>` | — | 200 `{ success: true }` | 删除单条，缺 id 返回 400 |
 
 ### /api/tags
@@ -243,7 +245,7 @@ lifeos/
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| GET | `/api/backup` | — | 200 `{ ...backupData }` | 导出全部数据 JSON |
+| GET | `/api/backup` | — | 200 `{ ...backupData }` | 导出全部数据 JSON（响应带 `Content-Disposition: attachment`，强制下载） |
 | POST | `/api/backup` | `{ ...backupData }` | 200 `{ success, imported }` / 400 `{ error }`（事务失败 500） | 恢复 JSON（validateBackup 校验） |
 | GET | `/api/export` | — | 200 `text/markdown` | 导出全部笔记为 Markdown 文件 |
 
@@ -376,6 +378,22 @@ interface WeightLog {
 - **写库单端**：手机与桌面不同时写同一库（WAL/文件锁风险）；数据经设置页 JSON 导出/导入互通，不直接拷贝 .db。
 - **原生连接跨上下文残留**（真机实测）：`isConnection()` 只查 JS 侧 `_connectionDict`，检测不到原生侧连接；整页重载（RSC 404 等触发新 JS 上下文）后新上下文 dict 为空 → `createConnection` 报 `Connection lifeos already exists` → 全接口连环挂。修复：`lib/db/adapters/capacitor.ts` 的 `openNativeConnection` 在 createConnection 抛 already-exists 时主动 `closeConnection()`（真正调原生、按库名关、跨上下文有效）后重试一次，isConnection 守卫仅作 JS 侧快路径。配套：`lib/db/client.ts` lazyFacade 初始化失败不缓存 rejected promise（`init.catch(() => { init = null })`），否则首次失败会永久毒化单例。
 
+### 决策记录（为什么这样设计）
+
+集中记录关键架构决策的动机，防止未来改动凭直觉推翻历史取舍。每条 = 决策 + 动机 + 代价。
+
+| 决策 | 动机 | 代价 |
+|------|------|------|
+| 单用户、自托管优先、无外部服务依赖 | 数据主权；手机完全离线可用 | 无多用户/权限体系 |
+| 双数据库适配器（libsql + Capacitor 原生） | `@libsql/client` 无法在 WebView 持久化；原生 SQLite 保离线 | 双模测试面，需 Fake 高保真 |
+| 无状态 HMAC 认证，无 session store | 零服务端状态，多端免同步 | 改密码即旧 cookie 全失效，无集中登出 |
+| 写库单端（JSON 备份互通） | WAL/文件锁风险，避免分布式一致性复杂度 | 两端不能同时编辑同一库 |
+| 终态幂等迁移 + `COLUMN_MIGRATIONS`，无版本簿记 | 每次启动自愈收敛，正确性不依赖纪律 | 加列必须走注册表，禁止改旧 CREATE TABLE |
+| typescript 锁 `^5` | tsgo（TS 7）与 Next 16 build worker 不兼容 | 无法使用 TS 7 新特性 |
+| Node 基线 20（Docker `node:20-slim`，勿改回 22+） | npm 在 Node 22/24 有 `Exit handler never called!` bug（npm/cli#7639/#8974），构建/安装偶发失败 | 无法利用 Node 22+ 新特性 |
+| export 静态化约束（动态段合并、条件 GET、查询参数路由） | 移动端静态导出可用性（E301、动态段缺失、Suspense 要求） | 路由形态受限，见「离线/移动端构建约束」 |
+| 附件/存储层剔除（阶段 3），attachments 表保留 | 无附件场景，减面减依赖 | 迁移 SQL 零改动，表结构残留 |
+
 ## 测试策略
 
 > 计数为近似值，随迭代变化；以 `npm test` / `npm run test:e2e` 实际输出为准。
@@ -431,7 +449,7 @@ npm run test:e2e         # Playwright E2E（自动启动 dev server + 自动清�
 | `npm run build` | 生产构建 |
 | `npm run build:mobile` | 移动端静态导出（`BUILD_TARGET=export next build`，输出 `.next-export`） |
 | `npm run cap:add` | 添加 Capacitor Android 平台（首次构建时执行一次） |
-| `npm run cap:sync` | 同步 web 产物到 Android 原生工程（APK 构建核心步骤） |
+| `npm run cap:sync` | 先执行 `build:mobile` 再同步 web 产物到 Android 原生工程（APK 构建核心步骤） |
 | `npm run start` | 生产启动 |
 | `npm run lint` | ESLint |
 | `npm test` | vitest 单元测试（约 148 个，见 `__tests__/`） |
@@ -440,7 +458,7 @@ npm run test:e2e         # Playwright E2E（自动启动 dev server + 自动清�
 | `npm run migrate` | 幂等初始化数据库 schema（终态 DDL 重放，可安全重复运行） |
 | `npm run migrate -- --reset` | 清空所有表后重新初始化（开发用） |
 | `npm run analyze` | 构建产物体积分析（`@next/bundle-analyzer`） |
-| `npm run docs:check` | 校验 AGENTS.md 与代码/示例文件一致性（CI quality job 执行，27 项断言） |
+| `npm run docs:check` | 校验 AGENTS.md 与代码/示例文件一致性（CI quality job 执行；断言组见 scripts/docs-check.ts，覆盖 API 路径、环境变量、README 版本、Schema 表名、命令表） |
 | `npm run docs:gen` | 重新生成 AGENTS.md 目录树与测试清单区块（CI 先跑 docgen 再用 `git diff --exit-code` 校验无漂移） |
 
 > 环境要求：Node >= 20（`package.json` engines）。
@@ -462,6 +480,34 @@ npm run test:e2e         # Playwright E2E（自动启动 dev server + 自动清�
 > 委托边界：小改动直接做；多文件任务按目录拆多个 fixer 并行；同类任务复用会话省上下文。
 
 > **文档维护纪律**：任何变更涉及 AGENTS.md 中记录的事实（目录结构/测试数/API 契约/环境变量），完成时必须同步更新 AGENTS.md——文档漂移由 AI 在任务完成时顺手消除，不依赖人工记忆。AGENTS.md 中的精确计数（如测试数）为近似值，以 `npm test` 等实际输出为准。
+
+### Definition of Done（改动完成前必须同步的文档）
+
+| 改动类型 | 必须同步 | 验证 |
+|----------|----------|------|
+| 改 API 路由/参数/响应/错误语义 | AGENTS.md API 端点参考；新增路径/方法时同步 `docs-check.ts` 契约清单 | `npm run docs:check` |
+| 新增/改名环境变量 | AGENTS.md 环境变量表 + `.env.example` / `.env.prod.example` | `npm run docs:check` |
+| 改 Schema（加表/加列） | AGENTS.md 数据库 Schema 表 + `COLUMN_MIGRATIONS` 注册 | `npm run docs:check` |
+| 增删文件/增删测试 | 重跑 `npm run docs:gen`（自动重写目录树与测试清单区块） | `git diff --exit-code -- AGENTS.md` |
+| 升级依赖 | 核对 README.md 中出现的三段版本号 | `npm run docs:check` |
+| 引入新命令 | AGENTS.md 运行命令表 + `package.json` scripts | `npm run docs:check` |
+| 部署方式/运维流程变化 | README.md 对应章节 | 人工核对 |
+
+## 文档保鲜机制（防漂移）
+
+文档不靠自觉保鲜，靠机器验证。三层机制，改任何文档/代码后必须全部通过：
+
+| 层 | 机制 | 守护内容 |
+|----|------|----------|
+| 生成 | `npm run docs:gen`（scripts/docgen.ts） | 自动重写 AGENTS.md 的 `<!-- docgen:tree -->` 目录树与 `<!-- docgen:tests -->` 测试清单区块；**生成区块禁止手工编辑** |
+| 断言 | `npm run docs:check`（scripts/docs-check.ts） | 7 组断言：API 路径与方法（不多不少）、废弃表述防回潮、环境变量双向一致（代码↔文档表↔.env 示例）、README 版本 ⊆ package.json、Schema 表名齐全、命令表 ⊆ scripts |
+| 强制 | CI（.github/workflows/ci.yml quality job） | 先跑 docgen 再用 `git diff --exit-code` 校验无漂移，再跑 docs:check |
+
+规则：
+
+- AGENTS.md 环境变量表是单点源；README/.env 示例只做部署上下文引用，不复制全表
+- 新增可验证声明时，优先扩展 docs-check 断言组，而不是写进文档靠自觉
+- 新增废弃表述时，同步扩充 `docs-check.ts` 的 `DEPRECATED_PHRASES` 词库
 
 ## 添加新模块流程
 

@@ -15,6 +15,10 @@
  *   断言组 5：AGENTS.md 环境变量表 vs .env 示例文件
  *             - 文档表变量 ⊆ .env.example / .env.prod.example（新增变量须同步示例文件）
  *             - 示例文件有但表无 → 仅 info 提示
+ *   断言组 6：AGENTS.md Schema 表完整性
+ *             - 8 张表必须全部出现在 Schema 表（`| **name** |` 行），防 Schema 章节丢表
+ *   断言组 7：AGENTS.md 命令 vs package.json scripts
+ *             - AGENTS.md 中所有 `npm run <name>` 必须真实存在（新增命令须同步 scripts）
  *
  * 任一断言失败 → 退出码 1。无第三方依赖（node:fs / node:child_process / node:path）。
  *
@@ -167,11 +171,12 @@ const pkg = JSON.parse(readFile('package.json')) as {
   version?: string
   dependencies?: Record<string, string>
   devDependencies?: Record<string, string>
+  scripts?: Record<string, string>
 }
 
 // V_pkg：dependencies + devDependencies 中的三段版本号（"^16.2.9" → "16.2.9"，
 // "^5" / "^4" 等纯 major 版本无三段版本，不提取）。
-// 另纳入根 version 字段：README「版本: 0.2.1」与 package.json 的 version 对应，
+// 另纳入根 version 字段：README「版本: 1.0.0」与 package.json 的 version 对应，
 // 同属版本漂移守护范围（项目版本升级同样需要同步 README）。
 const pkgVersionStrings = [
   ...Object.values(pkg.dependencies ?? {}),
@@ -224,6 +229,40 @@ if (envMissing.length === 0) {
 const envOnly = [...V_ENV].filter(v => !docEnv.has(v)).sort()
 for (const v of envOnly) {
   info(`示例文件有但环境变量表无记录（合理冗余/注释指引，不报错）：${v}`)
+}
+
+// ─── 断言组 6：AGENTS.md Schema 表完整性 ─────────────────────────────────────
+console.log('\n[断言组 6] AGENTS.md Schema 表完整性')
+
+// 8 张表必须全部出现在 Schema 章节的表行（`| **name** |`），防止 Schema 章节丢表
+const SCHEMA_TABLES = [
+  'notes',
+  'budgets',
+  'attachments',
+  'habits',
+  'habit_completions',
+  'tags',
+  'note_tags',
+  'weight_logs',
+]
+for (const t of SCHEMA_TABLES) {
+  assert(agents.includes(`| **${t}** |`), `AGENTS.md Schema 表包含 ${t}`)
+}
+
+// ─── 断言组 7：AGENTS.md 命令 vs package.json scripts ────────────────────────
+console.log('\n[断言组 7] AGENTS.md 命令 vs package.json scripts')
+
+// AGENTS.md 中所有 `npm run <name>` 必须真实存在于 package.json scripts（防文档写死命令）
+const scripts = new Set(Object.keys(pkg.scripts ?? {}))
+const docCommands = [...new Set([...agents.matchAll(/`npm run ([a-z0-9:-]+)/g)].map(m => m[1]))]
+const missingCmds = docCommands.filter(c => !scripts.has(c)).sort()
+if (missingCmds.length === 0) {
+  ok(`AGENTS.md 的 npm run 命令 [${docCommands.join(', ')}] ⊆ package.json scripts`)
+} else {
+  fail(
+    `AGENTS.md 出现但 package.json scripts 中不存在：${missingCmds.join(', ')}` +
+    '（新命令需同时加入 package.json scripts）'
+  )
 }
 
 // ─── 汇总与退出码 ───────────────────────────────────────────────────────────

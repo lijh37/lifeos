@@ -13,7 +13,27 @@
 
 各端数据独立存储，通过「设置 → 备份/恢复」JSON 导出/导入互通（**同一时间只允许一端写库**）。
 
+## 架构一览
+
+单体应用：Next.js 16 App Router（SSR + API Routes 同仓），数据层按运行环境自动切换适配器，无外部服务依赖。
+
+```
+┌──────────────┐  ┌──────────────┐  ┌───────────────┐  ┌──────────────────┐
+│  Android APK │  │    桌面 web   │  │ Docker 服务器  │  │  Vercel + Turso  │
+│  原生 SQLite  │  │  本地 SQLite  │  │ volume SQLite  │  │  Turso 远程库    │
+└──────┬───────┘  └──────┬───────┘  └───────┬───────┘  └────────┬─────────┘
+       │                 │                  │                   │
+       └───「设置 → 备份/恢复」JSON 导出/导入互通（同一时间只允许一端写库）───┘
+```
+
+- **数据层**：客户端统一经 `lib/services/` 访问——Capacitor 原生直查本地 SQLite；web/桌面走同仓 API 透传。底层双适配器：`@libsql/client`（本地/远程 Turso）与 `@capacitor-community/sqlite`（移动端）
+- **认证**：无状态 HMAC（`app_auth` cookie，30 天）。`APP_PASSWORD` 留空则免登录；手机端原生离线恒免登录
+- **数据库**：8 张表，终态幂等迁移自愈（`lib/db/migrations.ts` 唯一真相），无版本簿记，启动自动建表
+- **互通**：各端数据独立存储，经 JSON 备份导出/导入迁移，不直接拷贝 .db 文件
+
 ## 桌面快速开始
+
+前置：Node >= 20（推荐 20 LTS，理由见下「注意事项」）。
 
 ```bash
 git clone <repo> && cd lifeos
@@ -49,7 +69,7 @@ cd android && ./gradlew assembleDebug
 
 ## 桌面部署（Windows 原生）
 
-前置：Windows 10/11 + Node.js LTS（20/22/24 均可）：<https://nodejs.org>；项目拷贝到本地目录（如 `D:\LifeOS\`）。
+前置：Windows 10/11 + Node.js 20 LTS（推荐；22/24 可用，但 `npm install` 有已知 bug，见下「注意事项」）：<https://nodejs.org>；项目拷贝到本地目录（如 `D:\LifeOS\`）。
 
 ```bat
 cd /d D:\LifeOS
@@ -108,7 +128,13 @@ git clone <你的仓库地址> && cd lifeos
 cp .env.prod.example .env
 sed -i 's/^APP_PASSWORD=demo/APP_PASSWORD=你的密码/' .env
 
-# 3. 构建 + 启动 + 验证
+# 3. TLS 证书（HTTPS 必需，否则步骤 4 的 curl 验证会失败）
+mkdir -p certs
+#   用 certbot 或宝塔面板申请证书，将 fullchain.pem / privkey.pem 放入 ./certs/
+#   （docker-compose.yml 已把 ./certs 挂载到容器 /etc/nginx/certs，lifeos.conf 引用该路径）
+ls certs/                     # 确认 fullchain.pem privkey.pem 已就位
+
+# 4. 构建 + 启动 + 验证
 docker build -t lifeos-next -f Dockerfile .
 docker compose up -d
 curl -I https://daimoli.xyz
@@ -221,6 +247,34 @@ df -h /                                # 确认磁盘恢复
 ```
 
 之后重新 `./deploy.sh` 拉起全新实例。
+
+## 本地故障排查（桌面/开发）
+
+1. 端口被占用 → `.env.local` 设 `PORT=3001` 后重启
+2. 启动报「dev 护栏拒绝连接」→ `.env.local` 误设了 `TURSO_DATABASE_URL`（本地开发禁止设置，完整说明见 AGENTS.md「环境变量」表）
+3. SQLite 报 `database is locked` / 写入失败 → 同一 .db 被多个实例同时写：关闭其他运行中的实例（桌面/服务器）
+4. WSL 下项目放 `/mnt/c/...` 写入报错 → 文件锁冲突：放 Windows 原生盘，或数据库文件留在 WSL 文件系统内（见「桌面部署」）
+5. `npm install` 偶发 `Exit handler never called!` → `npm i -g npm@latest` 重试（见「桌面部署」）
+6. 访问到旧版页面内容 → 强刷（Ctrl+Shift+R）一次：PWA 残留清理脚本会在加载时自动注销 Service Worker 并清缓存，属一次性自愈
+7. 本地登录后刷新跳回登录页 → `.env.local` 里 `COOKIE_SECURE` 必须留空（设为 `true` 时 cookie 带 Secure 标志，HTTP 下浏览器不传）
+
+## 开发与贡献
+
+```bash
+npm install
+npm run dev          # 开发模式（自动建表，--webpack 编译）
+npm test             # 单元测试（vitest，约 148 个）
+npm run test:e2e     # Playwright E2E（自动起 dev server + 自动清理测试库）
+npm run lint         # ESLint
+```
+
+文档纪律（`AGENTS.md` 是唯一技术真相，README 只讲使用与部署）：
+
+- 改 API 契约 / 环境变量 / Schema → 同步 `AGENTS.md` 对应章节
+- 新增环境变量 → 同步 `AGENTS.md` 环境变量表 + `.env.example` / `.env.prod.example`
+- 增删文件/测试 → 重跑 `npm run docs:gen`（自动重写目录树与测试清单区块）
+- 升级依赖 → 核对 `README.md` 中出现的版本号
+- 提交前验证：`npm run docs:check`，且 `npm run docs:gen` 后 `git diff --exit-code -- AGENTS.md` 无输出（CI 同样强制）
 
 ## 技术参考
 
