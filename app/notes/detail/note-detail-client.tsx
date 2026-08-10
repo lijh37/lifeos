@@ -217,7 +217,7 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
       {/* Tags bar */}
       <div className="flex flex-wrap items-center gap-1.5 border-t px-4 py-2 shrink-0">
         {note.tags.map((tag) => (
-          <Badge key={tag} variant="secondary" className="gap-1 pl-2 pr-1 text-[11px]">
+          <Badge key={tag} variant="secondary" className="gap-1 pl-2 pr-1 text-xs">
             {tag}
             <button
               onClick={() => handleRemoveTag(tag)}
@@ -239,7 +239,7 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
             }
           }}
           placeholder={note.tags.length === 0 ? '添加标签...' : ''}
-          className="h-7 min-w-[80px] flex-1 bg-transparent text-xs focus:outline-none placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring/20 focus:rounded-sm"
+          className="h-8 min-w-[80px] flex-1 bg-transparent text-sm focus:outline-none placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring/20 focus:rounded-sm"
         />
       </div>
     </div>

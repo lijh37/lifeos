@@ -217,7 +217,7 @@ function WeightPageInner() {
                 aria-selected={person === p.key}
                 onClick={() => setPerson(p.key)}
                 className={cn(
-                  'rounded-md px-4 py-1 text-sm transition-all',
+                  'rounded-md px-4 py-1.5 text-sm transition-all',
                   person === p.key
                     ? 'bg-background font-medium text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground'
@@ -311,7 +311,7 @@ function WeightPageInner() {
                             aria-selected={range === r.key}
                             onClick={() => setRange(r.key)}
                             className={cn(
-                              'rounded-md px-2.5 py-0.5 text-xs transition-all',
+                              'rounded-md px-2.5 py-1.5 text-xs transition-all',
                               range === r.key
                                 ? 'bg-background font-medium text-foreground shadow-sm'
                                 : 'text-muted-foreground hover:text-foreground'
@@ -393,7 +393,7 @@ function WeightPageInner() {
                   <p className="text-xs text-muted-foreground">
                     选择过去的日期可以补录历史记录；同一天再次保存会覆盖当天数据。
                   </p>
-                  <Button className="w-full" onClick={handleSubmit} disabled={saving}>
+                  <Button className="w-full max-md:h-8" onClick={handleSubmit} disabled={saving}>
                     {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Scale className="h-4 w-4" />}
                     {saving ? '保存中…' : '保存'}
                   </Button>
@@ -435,7 +435,7 @@ function WeightPageInner() {
                           <button
                             onClick={() => setDeleteTarget(log)}
                             aria-label={`删除 ${dateLabel(log.date)} 的记录`}
-                            className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            className="shrink-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>

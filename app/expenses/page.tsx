@@ -218,7 +218,7 @@ export default function BudgetPage() {
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">¥</span>
                     </div>
                   </div>
-                  <Button size="sm" className="w-full" onClick={handleSaveActual} disabled={savingActual}>
+                  <Button size="sm" className="w-full max-md:h-8" onClick={handleSaveActual} disabled={savingActual}>
                     {savingActual ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                     {savingActual ? '录入中...' : '录入实际'}
                   </Button>

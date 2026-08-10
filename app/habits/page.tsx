@@ -119,6 +119,7 @@ function HabitsPageInner() {
       setPerHabitTotals((prev) => ({ ...prev, [habitId]: result.totalCompletions }))
       setPerHabitWeek((prev) => ({ ...prev, [habitId]: result.weekCount }))
       setPerHabitMonth((prev) => ({ ...prev, [habitId]: result.monthCount }))
+      setPerHabitRates((prev) => ({ ...prev, [habitId]: result.rate }))
     } catch (e) {
       // Revert optimistic update on error
       if (isToday) {
@@ -198,7 +199,7 @@ function HabitsPageInner() {
             <Trophy className="h-5 w-5 text-primary" />
             <h1 className="text-lg font-semibold">习惯</h1>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setShowInput(!showInput)} className="gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowInput(!showInput)} className="gap-2 max-md:h-8">
             <Plus className="h-4 w-4" />
             新建
           </Button>
@@ -214,7 +215,7 @@ function HabitsPageInner() {
               placeholder="习惯名称…"
               className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm outline-ring"
             />
-            <Button size="sm" onClick={handleCreate} disabled={!newName.trim()}>添加</Button>
+            <Button size="sm" onClick={handleCreate} disabled={!newName.trim()} className="max-md:h-8">添加</Button>
           </div>
         )}
       </div>

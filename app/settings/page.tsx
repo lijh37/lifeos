@@ -114,7 +114,7 @@ export default function SettingsPage() {
                 <Button
                   variant="default"
                   size="sm"
-                  className="flex-1"
+                  className="grow h-9"
                   onClick={handleBackup}
                   disabled={backingUp}
                 >
@@ -128,7 +128,7 @@ export default function SettingsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex-1"
+                  className="grow h-9"
                   onClick={() => setRestoreOpen(true)}
                   disabled={restoring}
                 >

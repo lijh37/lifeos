@@ -68,7 +68,7 @@ export function MobileNav() {
         {MORE_MOBILE_NAV.length > 0 && (
           <button
             onClick={() => setMoreOpen(true)}
-            className="flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[10px] min-h-[56px] text-muted-foreground"
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[11px] min-h-[56px] text-muted-foreground"
           >
             <MoreHorizontal className="h-5 w-5" />
             <span>更多</span>
@@ -96,7 +96,7 @@ export function MobileNav() {
                   )}
                 >
                   <item.icon className={cn('h-5 w-5', isActive ? 'text-primary' : 'text-muted-foreground')} />
-                  <span className="text-[10px]">{item.label}</span>
+                  <span className="text-xs">{item.label}</span>
                 </Link>
               )
             })}

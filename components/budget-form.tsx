@@ -39,7 +39,7 @@ const BudgetForm = memo(function BudgetForm({ budget, onSave }: { budget: Budget
         <div className="space-y-3">
           <div>
             <label className="mb-1 block text-xs text-muted-foreground">
-              固定支出预算 <span className="text-[10px]">（住房/房贷/租房/电话费等）</span>
+              固定支出预算 <span className="text-[11px]">（住房/房贷/租房/电话费等）</span>
             </label>
             <div className="relative">
               <Input
@@ -54,7 +54,7 @@ const BudgetForm = memo(function BudgetForm({ budget, onSave }: { budget: Budget
           </div>
           <div>
             <label className="mb-1 block text-xs text-muted-foreground">
-              浮动支出预算 <span className="text-[10px]">（交通/饮食/衣服/聚餐等）</span>
+              浮动支出预算 <span className="text-[11px]">（交通/饮食/衣服/聚餐等）</span>
             </label>
             <div className="relative">
               <Input
@@ -73,7 +73,7 @@ const BudgetForm = memo(function BudgetForm({ budget, onSave }: { budget: Budget
                 ¥{((fixedBudgetInput ? parseFloat(fixedBudgetInput) : 0) + (variableBudgetInput ? parseFloat(variableBudgetInput) : 0)).toFixed(0)}
               </span>
             </span>
-            <Button size="sm" onClick={handleSave} disabled={saving}>
+            <Button size="sm" onClick={handleSave} disabled={saving} className="max-md:h-8">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {saving ? '保存中...' : '保存预算'}
             </Button>

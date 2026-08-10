@@ -169,7 +169,7 @@ const MarkdownEditor = memo(function MarkdownEditor({ content: initialContent, o
 
     return (
       <div className="flex min-h-0 flex-1 flex-col min-w-0">
-        <div className="flex items-center gap-1 bg-muted/30 px-2 py-2">
+        <div className="flex items-center gap-1.5 bg-muted/30 px-2 py-2">
           {TOOLBAR_ITEMS.map(({ action, icon: Icon, title }) => (
             <button
               key={action}
@@ -181,7 +181,7 @@ const MarkdownEditor = memo(function MarkdownEditor({ content: initialContent, o
               <Icon className="h-4 w-4" />
             </button>
           ))}
-          <div className="ml-auto flex items-center gap-0.5">
+          <div className="ml-auto flex items-center gap-1.5">
             {viewModes.map(({ mode, icon: Icon, title }) => (
               <button
                 key={mode}
@@ -208,7 +208,7 @@ const MarkdownEditor = memo(function MarkdownEditor({ content: initialContent, o
             onChange={handleChange}
             placeholder={placeholder}
             className={cn(
-              'flex-1 resize-none bg-background px-4 py-3 font-mono text-sm leading-relaxed focus:outline-none min-w-0',
+              'flex-1 resize-none bg-background px-4 py-3 font-mono text-base leading-relaxed md:text-sm focus:outline-none min-w-0',
               viewMode === 'split' && 'border-r',
               viewMode === 'preview' && 'hidden',
             )}
@@ -234,7 +234,7 @@ const MarkdownEditor = memo(function MarkdownEditor({ content: initialContent, o
   // Mobile: tab toggle
   return (
     <div className="flex min-h-0 flex-1 flex-col min-w-0">
-      <div className="flex items-center gap-1 bg-muted/30 px-2 py-2">
+      <div className="flex items-center gap-1.5 bg-muted/30 px-2 py-2">
         {TOOLBAR_ITEMS.map(({ action, icon: Icon, title }) => (
           <button
             key={action}
@@ -246,7 +246,7 @@ const MarkdownEditor = memo(function MarkdownEditor({ content: initialContent, o
             <Icon className="h-4 w-4" />
           </button>
         ))}
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => setShowingPreview(false)}
@@ -286,7 +286,7 @@ const MarkdownEditor = memo(function MarkdownEditor({ content: initialContent, o
             value={content}
             onChange={handleChange}
             placeholder={placeholder}
-            className="flex-1 resize-none bg-background px-4 py-3 font-mono text-sm leading-relaxed focus:outline-none min-w-0"
+            className="flex-1 resize-none bg-background px-4 py-3 font-mono text-base leading-relaxed md:text-sm focus:outline-none min-w-0"
             spellCheck={false}
           />
         )}

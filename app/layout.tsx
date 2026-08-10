@@ -51,7 +51,7 @@ export default function RootLayout({
         <div className="flex h-full">
           <Sidebar />
           <PageAnimation>
-            <main className="pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">
+            <main className="pt-[env(safe-area-inset-top)] pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">
               {children}
               {ICP_BEIAN ? (
                 <footer className="flex justify-center px-4 py-5 md:justify-start">

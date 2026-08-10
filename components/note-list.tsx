@@ -11,6 +11,7 @@ import {
   Square,
   Loader2,
   Download,
+  FileText,
   Settings2,
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
@@ -315,7 +316,28 @@ export function NoteList() {
   return (
     <div className="flex h-full flex-col">
       <div className="border-b px-4 py-3">
-        <div className="relative">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" />
+            <h1 className="text-lg font-semibold">笔记</h1>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="default" size="sm" onClick={handleCreateNote} className="gap-1 text-xs max-md:h-8">
+              <Plus className="h-3.5 w-3.5" />
+              新建
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+              className="gap-1 text-xs max-md:h-8"
+            >
+              <Download className="h-3.5 w-3.5" />
+              导出
+            </Button>
+          </div>
+        </div>
+        <div className="relative mt-2">
           {searchLoading && searchQuery.trim() ? (
             <Loader2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground animate-spin" />
           ) : (
@@ -329,30 +351,13 @@ export function NoteList() {
             aria-label="搜索笔记"
           />
         </div>
-        <div className="mt-2 flex items-center justify-end">
-          <div className="flex items-center gap-1">
-            <Button variant="default" size="sm" onClick={handleCreateNote} className="gap-1 text-xs">
-              <Plus className="h-3.5 w-3.5" />
-              新建
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExport}
-              className="gap-1 text-xs"
-            >
-              <Download className="h-3.5 w-3.5" />
-              导出
-            </Button>
-          </div>
-        </div>
       </div>
 
       {/* Tag filter bar — always visible, chips appear as tags load */}
       <div className="flex items-center gap-1.5 overflow-x-auto border-b px-4 py-2 scrollbar-hide">
         <Badge
           variant={!activeTag ? 'default' : 'outline'}
-          className="cursor-pointer shrink-0 text-xs"
+          className="cursor-pointer shrink-0 text-[13px] h-6"
           onClick={() => handleTagSelect(null)}
         >
           全部
@@ -361,11 +366,11 @@ export function NoteList() {
           <Badge
             key={t.name}
             variant={activeTag === t.name ? 'default' : 'secondary'}
-            className="cursor-pointer shrink-0 text-xs gap-1"
+            className="cursor-pointer shrink-0 text-[13px] h-6 gap-1"
             onClick={() => handleTagSelect(t.name)}
           >
             {t.name === UNTAGGED ? '未分类' : t.name}
-            <span className="text-[10px] opacity-70">({t.count})</span>
+            <span className="text-xs opacity-70">({t.count})</span>
           </Badge>
         ))}
         <button

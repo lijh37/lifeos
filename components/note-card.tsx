@@ -77,7 +77,7 @@ const NoteCard = memo(function NoteCard({
                 <Badge
                   key={tag}
                   variant="secondary"
-                  className="cursor-pointer text-[10px] hover:bg-primary/20 transition-colors"
+                  className="cursor-pointer text-xs h-6 hover:bg-primary/20 transition-colors"
                   onClick={(e) => { e.stopPropagation(); onSelectTag?.(tag) }}
                 >
                   {tag}

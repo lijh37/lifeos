@@ -87,7 +87,7 @@ export const HabitRow = memo(function HabitRow({
           <button
             type="button"
             onClick={() => onToggle(habit.id, today)}
-            className="shrink-0"
+            className="shrink-0 p-2"
             aria-label={done ? '取消今日打卡' : '今日打卡'}
           >
             {done ? (
@@ -109,10 +109,10 @@ export const HabitRow = memo(function HabitRow({
                   className="h-8 text-sm"
                   autoFocus
                 />
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" onClick={onEditConfirm}>
+                <Button size="icon" variant="ghost" className="text-green-600" onClick={onEditConfirm}>
                   <Check className="h-4 w-4" />
                 </Button>
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEditCancel}>
+                <Button size="icon" variant="ghost" onClick={onEditCancel}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
@@ -166,7 +166,7 @@ export const HabitRow = memo(function HabitRow({
                 {habit.description && (
                   <p className="text-xs text-muted-foreground">{habit.description}</p>
                 )}
-                <div className="mt-1 flex items-center gap-3 text-[10px] text-muted-foreground">
+                <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
                   <span>本周 {weekCount} 次</span>
                   <span>本月 {monthCount} 次</span>
                   <span>累计 {totalCompletions} 次</span>
@@ -179,7 +179,7 @@ export const HabitRow = memo(function HabitRow({
                         style={{ width: `${Math.min(100, Math.max(0, rate))}%` }}
                       />
                     </div>
-                    <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                    <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
                       完成率 {Math.round(rate)}%
                     </span>
                   </div>
@@ -191,7 +191,6 @@ export const HabitRow = memo(function HabitRow({
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7"
               onClick={() => onEdit(habit)}
             >
               <Pencil className="h-3.5 w-3.5" />
@@ -200,7 +199,7 @@ export const HabitRow = memo(function HabitRow({
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-destructive"
+            className="text-destructive ml-1"
             onClick={() => onDelete(habit.id)}
           >
             <Trash2 className="h-3 w-3" />
