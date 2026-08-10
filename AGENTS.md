@@ -219,9 +219,9 @@ lifeos/
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| GET | `/api/habits` | — | 200 `{ habits, todayCompletions, streaks, bestStreaks, perHabitRates, perHabitTotals, perHabitWeek, perHabitMonth }` | 习惯列表 + 打卡 + streaks + 统计（单次返回全部 dashboard 数据，无参数分支；`Cache-Control: private, max-age=20, stale-while-revalidate=90`） |
+| GET | `/api/habits` | — | 200 `{ habits, todayCompletions, streaks, bestStreaks, perHabitRates, perHabitTotals, perHabitWeek, perHabitMonth, recentDays }` | 习惯列表 + 打卡 + streaks + 统计 + 最近3天补记视图（单次返回全部 dashboard 数据，无参数分支；streaks/bestStreaks 为宽容语义：段内允许 1 个漏记日不计数不中断，连续漏 2 天才断，锚点日（今天）未打卡不判漏；`recentDays` 为 `Record<habitId, {date, completed, isBackfilled}[]>`，每习惯最近 3 天（今天/昨天/前天）新在前，含无打卡习惯，`isBackfilled = localDateStr(created_at) > date`；`Cache-Control: private, max-age=20, stale-while-revalidate=90`） |
 | POST | `/api/habits` | `{ name, description?, frequency?("daily"|"weekly") }` | 200 `{ habit: Habit }` | 创建习惯（frequency 非法值静默归一为 'daily'，不返回 400） |
-| POST | `/api/habits` | `{ _action: "toggle", habitId, date }` | 200 `{ completed, streak, bestStreak, weekCount, monthCount, totalCompletions }` | 打卡切换（UNIQUE 防重复） |
+| POST | `/api/habits` | `{ _action: "toggle", habitId, date }` | 200 `{ completed, streak, bestStreak, weekCount, monthCount, totalCompletions, isBackfilled }` | 打卡切换（UNIQUE 防重复）；`date` 经 `validateToggleDate` 校验：非法格式或未来日期 → 400 `{ error: 'Cannot check in future dates' }`，早于前天（补记窗口 `BACKFILL_WINDOW_DAYS=3`，仅今天/昨天/前天可写）→ 400 `{ error: 'Can only backfill the last 3 days' }`；响应 `isBackfilled = completed && date !== 本地今天` |
 | PATCH | `/api/habits` | `{ id, name, description }` | 200 `{ success: true }` | 更新习惯（不支持 frequency 更新） |
 | DELETE | `/api/habits?id=<id>` | — | 200 `{ success: true }` | 删除（代码手动级联删除 habit_completions） |
 
@@ -393,6 +393,7 @@ interface WeightLog {
 | Node 基线 20（Docker `node:20-slim`，勿改回 22+） | npm 在 Node 22/24 有 `Exit handler never called!` bug（npm/cli#7639/#8974），构建/安装偶发失败 | 无法利用 Node 22+ 新特性 |
 | export 静态化约束（动态段合并、条件 GET、查询参数路由） | 移动端静态导出可用性（E301、动态段缺失、Suspense 要求） | 路由形态受限，见「离线/移动端构建约束」 |
 | 附件/存储层剔除（阶段 3），attachments 表保留 | 无附件场景，减面减依赖 | 迁移 SQL 零改动，表结构残留 |
+| 宽容式打卡：never miss twice + 3 天补记窗口 + 诚实标记（isBackfilled 派生，零 Schema 变更） | "忘记打卡"≠"没完成"，惩罚式 streak 致前功尽弃感、弃用；单用户自托管无作弊动机，宽容追踪器更维持习惯（Atomic Habits）；`isBackfilled = localDateStr(created_at) > date` 直接派生，toggle 本就是 upsert | streak/bestStreak 数字变大（正向）；补记靠窗口（3 天）+ 视觉弱化标记保诚实；perHabitRates 补记自然累加 |
 
 ## 测试策略
 
@@ -408,23 +409,23 @@ interface WeightLog {
 <!-- docgen:tests -->
 > 本清单由 npm run docs:gen 自动生成，计数为静态扫描近似值；精确数字以 npm test 实际输出为准。
 
-| 文件                                              | 测试数（约） | 覆盖范围                                     |
-| ------------------------------------------------- | ------------ | -------------------------------------------- |
-| `app/api/__tests__/routes.test.ts`                | 20           | API 路由                                     |
-| `components/__tests__/batch-actions-bar.test.tsx` | 5            | BatchActionsBar                              |
-| `components/__tests__/budget-habit.test.tsx`      | 8            | ProgressBar + BudgetCard + HabitRow          |
-| `components/__tests__/markdown-editor.test.tsx`   | 7            | MarkdownEditor                               |
-| `components/__tests__/note-list.test.tsx`         | 4            | NoteList                                     |
-| `components/__tests__/tag-manager-sheet.test.tsx` | 7            | TagManagerSheet                              |
-| `lib/__tests__/capacitor-adapter.test.ts`         | 9            | capacitor 适配器（libsql 后端 Fake 高保真）  |
-| `lib/__tests__/columns.test.ts`                   | 11           | splitTopLevel + exprName + analyzeSelect     |
-| `lib/__tests__/db.test.ts`                        | 27           | 笔记 + 习惯 + 预算 + 搜索与标签 + Weight     |
-| `lib/__tests__/markdown.test.tsx`                 | 5            | MarkdownRenderer XSS 净化                    |
-| `lib/__tests__/streaks.test.ts`                   | 13           | computeCurrentStreak + computeBestStreak     |
-| `lib/__tests__/utils.test.ts`                     | 5            | cn                                           |
-| `lib/services/__tests__/backup.test.ts`           | 6            | backup cap 分支（Capacitor 原生直查 SQLite） |
-| `proxy.test.ts`                                   | 10           | 中间件认证                                   |
-| `store/__tests__/index.test.ts`                   | 11           | Zustand store                                |
+| 文件                                              | 测试数（约） | 覆盖范围                                       |
+| ------------------------------------------------- | ------------ | ---------------------------------------------- |
+| `app/api/__tests__/routes.test.ts`                | 24           | API 路由                                       |
+| `components/__tests__/batch-actions-bar.test.tsx` | 5            | BatchActionsBar                                |
+| `components/__tests__/budget-habit.test.tsx`      | 12           | ProgressBar                                    |
+| `components/__tests__/markdown-editor.test.tsx`   | 7            | MarkdownEditor                                 |
+| `components/__tests__/note-list.test.tsx`         | 4            | NoteList                                       |
+| `components/__tests__/tag-manager-sheet.test.tsx` | 7            | TagManagerSheet                                |
+| `lib/__tests__/capacitor-adapter.test.ts`         | 9            | capacitor 适配器（libsql 后端 Fake 高保真）    |
+| `lib/__tests__/columns.test.ts`                   | 11           | splitTopLevel + exprName + analyzeSelect       |
+| `lib/__tests__/db.test.ts`                        | 30           | 笔记 + 习惯 + 预算 + 搜索与标签 + Weight       |
+| `lib/__tests__/markdown.test.tsx`                 | 5            | MarkdownRenderer XSS 净化                      |
+| `lib/__tests__/streaks.test.ts`                   | 17           | computeCurrentStreak (宽容式 never-miss-twice) |
+| `lib/__tests__/utils.test.ts`                     | 5            | cn                                             |
+| `lib/services/__tests__/backup.test.ts`           | 6            | backup cap 分支（Capacitor 原生直查 SQLite）   |
+| `proxy.test.ts`                                   | 10           | 中间件认证                                     |
+| `store/__tests__/index.test.ts`                   | 11           | Zustand store                                  |
 <!-- /docgen:tests -->
 
 ### E2E 套件

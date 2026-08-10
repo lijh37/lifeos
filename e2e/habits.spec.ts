@@ -112,4 +112,39 @@ test.describe('Habits E2E', () => {
 
     // No API cleanup needed since we deleted via UI
   })
+
+  test('backfill yesterday via panel', async ({ page }) => {
+    const uniqueName = `E2E-Backfill-${Date.now()}`
+
+    // Setup: create habit via API
+    const habitId = await createHabitViaApi(uniqueName)
+    expect(habitId).toBeTruthy()
+
+    await page.goto('/habits')
+
+    // Wait for the habit to appear
+    await expect(page.getByText(uniqueName)).toBeVisible()
+
+    const row = page.locator('[data-slot="card"]', { hasText: uniqueName })
+
+    // 1. Check in today (first button in the row - Circle/CheckCircle)
+    await row.getByRole('button').first().click()
+
+    // 2. Wait for the weekly count to reflect today's check-in
+    await expect(row.getByText('本周 1 次')).toBeVisible()
+
+    // 3. Wait for the flame (streak 1) and expand the backfill panel
+    await expect(row.locator('[title="当前连续 1 天"]')).toBeVisible()
+    await row.locator('[title="当前连续 1 天"]').click()
+
+    // 4. Check in yesterday via the panel → honest backfill marker appears
+    await row.getByRole('button', { name: /昨天/ }).click()
+    await expect(row.locator('[title="补记"]')).toBeVisible()
+
+    // 5. Grace semantics: today + yesterday with no gap → streak 2
+    await expect(row.locator('[title="当前连续 2 天"]')).toBeVisible()
+
+    // Cleanup
+    await deleteHabitViaApi(habitId)
+  })
 })

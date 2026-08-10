@@ -7,7 +7,11 @@
 
 import { isNativeCapacitor } from './env'
 import { throwHttpError } from './http'
+import { localDateStr } from '@/lib/utils'
 import type { Habit } from '@/lib/types'
+
+/** 补记窗口天数：允许补记今天、昨天、前天（窗口内最早是前天）。 */
+export const BACKFILL_WINDOW_DAYS = 3
 
 export interface HabitDashboard {
   habits: Habit[]
@@ -18,6 +22,7 @@ export interface HabitDashboard {
   perHabitTotals: Record<string, number>
   perHabitWeek: Record<string, number>
   perHabitMonth: Record<string, number>
+  recentDays: Record<string, { date: string; completed: boolean; isBackfilled: boolean }[]>
 }
 
 export interface ToggleResult {
@@ -27,6 +32,36 @@ export interface ToggleResult {
   weekCount: number
   monthCount: number
   totalCompletions: number
+  isBackfilled: boolean
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/** 校验 date 为合法真实日期（YYYY-MM-DD）。 */
+function isValidDate(date: string): boolean {
+  if (!DATE_RE.test(date)) return false
+  const [y, m, d] = date.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d
+}
+
+/**
+ * 校验打卡/补记日期（纯函数，route 与 Capacitor 原生分支共用）。
+ *
+ * 边界行为：
+ * - 非法 YYYY-MM-DD（格式错/不存在的日期）→ 'invalid date'
+ * - date > 今天（本地）→ 'Cannot check in future dates'
+ * - date < 前天（本地，BACKFILL_WINDOW_DAYS=3）→ 'Can only backfill the last 3 days'
+ * - 其余（今天、昨天、前天）→ null
+ */
+export function validateToggleDate(date: string, today: Date = new Date()): string | null {
+  if (typeof date !== 'string' || !isValidDate(date)) return 'invalid date'
+  const todayStr = localDateStr(today)
+  if (date > todayStr) return 'Cannot check in future dates'
+  const earliest = new Date(today)
+  earliest.setDate(today.getDate() - (BACKFILL_WINDOW_DAYS - 1))
+  if (date < localDateStr(earliest)) return 'Can only backfill the last 3 days'
+  return null
 }
 
 export async function fetchHabitsDashboard(): Promise<HabitDashboard> {
@@ -42,6 +77,8 @@ export async function fetchHabitsDashboard(): Promise<HabitDashboard> {
 
 export async function toggleHabit(habitId: string, date: string): Promise<ToggleResult> {
   if (isNativeCapacitor()) {
+    const err = validateToggleDate(date)
+    if (err) throw new Error(err)
     const { toggleCompletion, getHabitsDashboard } = await import('@/lib/db/native')
     const completed = await toggleCompletion(habitId, date)
     // 复用 dashboard 查询计算该习惯的统计（仿 API route POST toggle 分支）
@@ -53,6 +90,7 @@ export async function toggleHabit(habitId: string, date: string): Promise<Toggle
       weekCount: dashboard.perHabitWeek[habitId] ?? 0,
       monthCount: dashboard.perHabitMonth[habitId] ?? 0,
       totalCompletions: dashboard.perHabitTotals[habitId] ?? 0,
+      isBackfilled: completed && date !== localDateStr(),
     }
   }
 

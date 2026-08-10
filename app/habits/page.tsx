@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { Plus, Trophy } from 'lucide-react'
 
-import { HabitRow } from '@/components/habit-row'
+import { HabitRow, type RecentDayEntry } from '@/components/habit-row'
 import type { Habit } from '@/lib/types'
 import { localDateStr } from '@/lib/utils'
 import {
@@ -17,6 +17,8 @@ import {
   createHabit,
   updateHabit,
   deleteHabit,
+  type HabitDashboard,
+  type ToggleResult,
 } from '@/lib/services/habits'
 import {
   AlertDialogRoot,
@@ -40,6 +42,8 @@ function HabitsPageInner() {
   const [perHabitTotals, setPerHabitTotals] = useState<Record<string, number>>({})
   const [perHabitWeek, setPerHabitWeek] = useState<Record<string, number>>({})
   const [perHabitMonth, setPerHabitMonth] = useState<Record<string, number>>({})
+  const [perHabitRates, setPerHabitRates] = useState<Record<string, number>>({})
+  const [recentDaysMap, setRecentDaysMap] = useState<Record<string, RecentDayEntry[]>>({})
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
@@ -47,6 +51,10 @@ function HabitsPageInner() {
   useEffect(() => {
     fetchHabitsDashboard()
       .then((data) => {
+        // 后端并行实现中 recentDays 可能尚未返回，用 || {} 兜底兼容旧数据
+        const dashboard = data as HabitDashboard & {
+          recentDays?: Record<string, RecentDayEntry[]>
+        }
         setHabits(data.habits)
         setTodayMap(data.todayCompletions)
         setStreaks(data.streaks || {})
@@ -54,30 +62,81 @@ function HabitsPageInner() {
         setPerHabitTotals(data.perHabitTotals || {})
         setPerHabitWeek(data.perHabitWeek || {})
         setPerHabitMonth(data.perHabitMonth || {})
+        setPerHabitRates(data.perHabitRates || {})
+        setRecentDaysMap(dashboard.recentDays ?? {})
       })
       .catch((e) => console.error('Failed to fetch habits:', e))
       .finally(() => setLoading(false))
   }, [])
 
+  const today = localDateStr()
+
   const handleToggle = useCallback(async (habitId: string, date: string) => {
-    // Optimistic update: flip UI immediately
-    setTodayMap((prev) => ({ ...prev, [habitId]: !(prev[habitId] ?? false) }))
+    const isToday = date === today
+
+    // Optimistic update: flip the affected day's UI immediately
+    if (isToday) {
+      setTodayMap((prev) => ({ ...prev, [habitId]: !(prev[habitId] ?? false) }))
+    }
+    // 补记（非今天）乐观翻转 recentDaysMap 中对应日期条目
+    setRecentDaysMap((prev) => {
+      const entries = prev[habitId]
+      if (!entries) return prev
+      return {
+        ...prev,
+        [habitId]: entries.map((e) =>
+          e.date === date ? { ...e, completed: !e.completed } : e
+        ),
+      }
+    })
 
     try {
       const data = await toggleHabit(habitId, date)
+      const result = data as ToggleResult & { isBackfilled?: boolean }
       // Sync server state (may differ from optimistic guess for edge cases)
-      setTodayMap((prev) => ({ ...prev, [habitId]: data.completed }))
-      setStreaks((prev) => ({ ...prev, [habitId]: data.streak }))
-      setBestStreaks((prev) => ({ ...prev, [habitId]: data.bestStreak }))
-      setPerHabitTotals((prev) => ({ ...prev, [habitId]: data.totalCompletions }))
-      setPerHabitWeek((prev) => ({ ...prev, [habitId]: data.weekCount }))
-      setPerHabitMonth((prev) => ({ ...prev, [habitId]: data.monthCount }))
+      if (isToday) {
+        setTodayMap((prev) => ({ ...prev, [habitId]: result.completed }))
+      }
+      // 用返回值校正该日期的打卡状态与补记标记
+      setRecentDaysMap((prev) => {
+        const entries = prev[habitId]
+        if (!entries) return prev
+        return {
+          ...prev,
+          [habitId]: entries.map((e) =>
+            e.date === date
+              ? {
+                  ...e,
+                  completed: result.completed,
+                  isBackfilled: result.isBackfilled ?? false,
+                }
+              : e
+          ),
+        }
+      })
+      setStreaks((prev) => ({ ...prev, [habitId]: result.streak }))
+      setBestStreaks((prev) => ({ ...prev, [habitId]: result.bestStreak }))
+      setPerHabitTotals((prev) => ({ ...prev, [habitId]: result.totalCompletions }))
+      setPerHabitWeek((prev) => ({ ...prev, [habitId]: result.weekCount }))
+      setPerHabitMonth((prev) => ({ ...prev, [habitId]: result.monthCount }))
     } catch (e) {
       // Revert optimistic update on error
-      setTodayMap((prev) => ({ ...prev, [habitId]: !(prev[habitId] ?? false) }))
+      if (isToday) {
+        setTodayMap((prev) => ({ ...prev, [habitId]: !(prev[habitId] ?? false) }))
+      }
+      setRecentDaysMap((prev) => {
+        const entries = prev[habitId]
+        if (!entries) return prev
+        return {
+          ...prev,
+          [habitId]: entries.map((e) =>
+            e.date === date ? { ...e, completed: !e.completed } : e
+          ),
+        }
+      })
       console.error('Failed to toggle habit:', e)
     }
-  }, [])
+  }, [today])
 
   const handleDelete = useCallback((id: string) => {
     setDeleteTarget(id)
@@ -130,8 +189,6 @@ function HabitsPageInner() {
       console.error('Failed to create habit:', e)
     }
   }, [newName])
-
-  const today = localDateStr()
 
   return (
     <div className="flex h-full flex-col">
@@ -187,7 +244,27 @@ function HabitsPageInner() {
                 const done = todayMap[habit.id] ?? false
                 const isEditing = editingId === habit.id
                 return (
-                  <HabitRow key={habit.id} habit={habit} done={done} streak={streaks[habit.id] ?? 0} bestStreak={bestStreaks[habit.id] ?? 0} weekCount={perHabitWeek[habit.id] ?? 0} monthCount={perHabitMonth[habit.id] ?? 0} totalCompletions={perHabitTotals[habit.id] ?? 0} today={today} onToggle={handleToggle} onDelete={handleDelete} onEdit={handleEdit} isEditing={isEditing} editValue={isEditing ? editValue : undefined} onEditValueChange={isEditing ? setEditValue : undefined} onEditConfirm={handleEditConfirm} onEditCancel={handleEditCancel} />
+                  <HabitRow
+                    key={habit.id}
+                    habit={habit}
+                    done={done}
+                    streak={streaks[habit.id] ?? 0}
+                    bestStreak={bestStreaks[habit.id] ?? 0}
+                    weekCount={perHabitWeek[habit.id] ?? 0}
+                    monthCount={perHabitMonth[habit.id] ?? 0}
+                    totalCompletions={perHabitTotals[habit.id] ?? 0}
+                    rate={perHabitRates[habit.id]}
+                    recentDays={recentDaysMap[habit.id]}
+                    today={today}
+                    onToggle={handleToggle}
+                    onDelete={handleDelete}
+                    onEdit={handleEdit}
+                    isEditing={isEditing}
+                    editValue={isEditing ? editValue : undefined}
+                    onEditValueChange={isEditing ? setEditValue : undefined}
+                    onEditConfirm={handleEditConfirm}
+                    onEditCancel={handleEditCancel}
+                  />
                 )
               })}
             </div>

@@ -3,6 +3,8 @@ import {
   createHabit, deleteHabit, updateHabit,
   getHabitsDashboard, toggleCompletion,
 } from '@/lib/db'
+import { validateToggleDate } from '@/lib/services/habits'
+import { localDateStr } from '@/lib/utils'
 import type { Habit } from '@/lib/types'
 
 const GETHandler = async function GET() {
@@ -18,6 +20,11 @@ export const GET = (process.env.BUILD_TARGET === 'export' ? undefined : GETHandl
 export async function POST(req: NextRequest) {
   const body = await req.json()
   if (body._action === 'toggle') {
+    // 宽容式补记窗口校验（缺失/非法日期同样走此路径返回 400）
+    const toggleErr = validateToggleDate(body.date)
+    if (toggleErr) {
+      return NextResponse.json({ error: toggleErr }, { status: 400 })
+    }
     // Toggle completion state via shared DB helper
     const completed = await toggleCompletion(body.habitId, body.date)
 
@@ -38,6 +45,7 @@ export async function POST(req: NextRequest) {
       weekCount,
       monthCount,
       totalCompletions,
+      isBackfilled: completed && body.date !== localDateStr(),
     })
   }
   const name = typeof body.name === 'string' ? body.name.trim() : ''

@@ -3,47 +3,64 @@ import { getClient } from './client'
 import { genId, localDateStr } from '../utils'
 
 /**
- * 计算当前连续打卡天数（从 today 向前数，遇到断签即停）。
+ * 宽容式（never miss twice）streak 扫描核心：从第一个完成日逐日扫描到锚点日（含）。
+ *
+ * 语义：段内允许 1 个漏记日（run 不变、段不断），连续 2 个漏记日才断（run 归零）。
+ * 锚点日（今天/from）未打卡不判漏——当天还没过完。
+ *
+ * 起止都是真实日期，逐日步进天然有界，无上限；空集直接返回 0。
+ *
  * @param datesSet 已完成日期的 Set（YYYY-MM-DD）
- * @param from 起始日期（默认今天）
+ * @param anchor 锚点日（扫描终点，含）
+ * @returns 扫描结束时的 run 与全程 best
  */
-export function computeCurrentStreak(datesSet: Set<string>, from: Date = new Date()): number {
-  if (datesSet.size === 0) return 0
-  let streak = 0
-  const cursor = new Date(from)
-  for (let j = 0; j < 365; j++) {
+function scanGraceRuns(datesSet: Set<string>, anchor: Date): { run: number; best: number } {
+  const sorted = Array.from(datesSet).sort()
+  if (sorted.length === 0) return { run: 0, best: 0 }
+
+  const anchorStr = localDateStr(anchor)
+  // 本地时区解析起始日，避免 new Date('YYYY-MM-DD') 的 UTC 午夜在负时区错位一天
+  const [fy, fm, fd] = sorted[0].split('-').map(Number)
+  const cursor = new Date(fy, fm - 1, fd)
+
+  let run = 0
+  let missedInRow = 0
+  let best = 0
+
+  while (localDateStr(cursor) <= anchorStr) {
     const dateStr = localDateStr(cursor)
     if (datesSet.has(dateStr)) {
-      streak++
-    } else if (j > 0) {
-      break
+      run++
+      missedInRow = 0
+      if (run > best) best = run
+    } else if (dateStr !== anchorStr) {
+      // 非锚点日的漏记才判；锚点日（今天）未打不判漏
+      missedInRow++
+      if (missedInRow >= 2) run = 0
     }
-    cursor.setDate(cursor.getDate() - 1)
+    cursor.setDate(cursor.getDate() + 1)
   }
-  return streak
+  return { run, best }
 }
 
 /**
- * 计算历史最长连续打卡天数。
+ * 计算当前连续打卡天数（宽容式：段内允许 1 个漏记日，连续 2 个漏记才断）。
+ * @param datesSet 已完成日期的 Set（YYYY-MM-DD）
+ * @param from 锚点日（默认今天；未打卡不判漏）
+ */
+export function computeCurrentStreak(datesSet: Set<string>, from: Date = new Date()): number {
+  return scanGraceRuns(datesSet, from).run
+}
+
+/**
+ * 计算历史最长连续打卡天数（宽容式：段内允许 1 个漏记日，连续 2 个漏记才断）。
  * @param sortedDates 升序排列的去重日期数组（YYYY-MM-DD）
  */
 export function computeBestStreak(sortedDates: string[]): number {
   if (sortedDates.length === 0) return 0
-  let best = 1
-  let current = 1
-  for (let i = 1; i < sortedDates.length; i++) {
-    const diff = Math.round(
-      (new Date(sortedDates[i]).getTime() - new Date(sortedDates[i - 1]).getTime()) /
-        (1000 * 60 * 60 * 24)
-    )
-    if (diff === 1) {
-      current++
-      best = Math.max(best, current)
-    } else {
-      current = 1
-    }
-  }
-  return best
+  const last = sortedDates[sortedDates.length - 1]
+  const [ly, lm, ld] = last.split('-').map(Number)
+  return scanGraceRuns(new Set(sortedDates), new Date(ly, lm - 1, ld)).best
 }
 
 function rowToHabit(row: Record<string, unknown>): Habit {
@@ -199,6 +216,7 @@ export async function getHabitsDashboard(): Promise<{
   perHabitTotals: Record<string, number>,
   perHabitWeek: Record<string, number>,
   perHabitMonth: Record<string, number>,
+  recentDays: Record<string, { date: string; completed: boolean; isBackfilled: boolean }[]>,
 }> {
   const db = getClient()
 
@@ -208,20 +226,24 @@ export async function getHabitsDashboard(): Promise<{
   // 2. 查询今日打卡状态
   const todayCompletions = await getTodayCompletions()
 
-  // 3. 一次加载所有完成记录，用于 streak + bestStreak
+  // 3. 一次加载所有完成记录，用于 streak + bestStreak + recentDays（created_at 用于补记判定）
   const allRows = (await db.execute(
-    `SELECT habit_id, date FROM habit_completions WHERE completed = 1 ORDER BY habit_id, date DESC`
+    `SELECT habit_id, date, created_at FROM habit_completions WHERE completed = 1 ORDER BY habit_id, date DESC`
   )).rows
 
   // 按 habit_id 分组为 Set（O(1) 查找）和数组（排序去重）
   const byHabitSet: Record<string, Set<string>> = {}
   const byHabitArray: Record<string, string[]> = {}
+  // (habit_id, date) → created_at，用于 recentDays 的 isBackfilled 判定
+  const createdByHabitDate: Record<string, Record<string, string>> = {}
   for (const row of allRows) {
     const hid = row.habit_id as string
     if (!byHabitSet[hid]) byHabitSet[hid] = new Set()
     byHabitSet[hid].add(row.date as string)
     if (!byHabitArray[hid]) byHabitArray[hid] = []
     byHabitArray[hid].push(row.date as string)
+    if (!createdByHabitDate[hid]) createdByHabitDate[hid] = {}
+    createdByHabitDate[hid][row.date as string] = row.created_at as string
   }
 
   // 3a. 计算当前 streak（Set 向后遍历）
@@ -234,6 +256,25 @@ export async function getHabitsDashboard(): Promise<{
   const bestStreaks: Record<string, number> = {}
   for (const [hid, dates] of Object.entries(byHabitArray)) {
     bestStreaks[hid] = computeBestStreak(Array.from(new Set(dates)).sort())
+  }
+
+  // 3c. 每个习惯（含无打卡的）最近 3 个本地日期（今天、昨天、前天，新的在前）
+  const recentDays: Record<string, { date: string; completed: boolean; isBackfilled: boolean }[]> = {}
+  for (const habit of habits) {
+    const days: { date: string; completed: boolean; isBackfilled: boolean }[] = []
+    for (let offset = 0; offset < 3; offset++) {
+      const d = new Date()
+      d.setDate(d.getDate() - offset)
+      const dateStr = localDateStr(d)
+      const completed = byHabitSet[habit.id]?.has(dateStr) ?? false
+      const createdAt = createdByHabitDate[habit.id]?.[dateStr]
+      days.push({
+        date: dateStr,
+        completed,
+        isBackfilled: completed && createdAt !== undefined && localDateStr(new Date(createdAt)) > dateStr,
+      })
+    }
+    recentDays[habit.id] = days
   }
 
   // 4. 单次 GROUP BY 查询：合并 total/week/month → perHabitTotals / perHabitWeek / perHabitMonth / perHabitRates
@@ -286,5 +327,6 @@ export async function getHabitsDashboard(): Promise<{
     perHabitTotals,
     perHabitWeek,
     perHabitMonth,
+    recentDays,
   }
 }

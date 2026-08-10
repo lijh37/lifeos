@@ -8,7 +8,7 @@ process.env.DATABASE_URL = 'file:./.db-test.sqlite'
 
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
 import fs from 'node:fs'
-import { createNote, getNotes, getNote, updateNote, deleteNote, getClient, createHabit, getHabits, toggleCompletion, getTodayCompletions, deleteHabit, upsertBudget, getBudget, getBudgets, searchNotes, getAllTags, renameTag, deleteTag, migrate, listWeightLogs, upsertWeightLog, deleteWeightLog } from '@/lib/db'
+import { createNote, getNotes, getNote, updateNote, deleteNote, getClient, createHabit, getHabits, toggleCompletion, getTodayCompletions, deleteHabit, upsertBudget, getBudget, getBudgets, searchNotes, getAllTags, renameTag, deleteTag, migrate, listWeightLogs, upsertWeightLog, deleteWeightLog, getHabitsDashboard } from '@/lib/db'
 import { localDateStr } from '@/lib/utils'
 import type { Note } from '@/lib/types'
 
@@ -181,6 +181,75 @@ describe('Database - Habits', () => {
     // Also verify completions deleted
     const completions = await getTodayCompletions()
     expect(completions[habit.id]).toBeUndefined()
+  })
+
+  it('should include recentDays entry for a today completion (isBackfilled false)', async () => {
+    const habit = {
+      id: crypto.randomUUID(),
+      name: '阅读',
+      description: '',
+      frequency: 'daily' as const,
+      createdAt: new Date().toISOString(),
+    }
+    await createHabit(habit)
+    const today = localDateStr()
+    await toggleCompletion(habit.id, today)
+
+    const dash = await getHabitsDashboard()
+    const recent = dash.recentDays[habit.id]
+    expect(recent).toHaveLength(3)
+    // 新的在前：第一条是今天
+    expect(recent[0]).toEqual({ date: today, completed: true, isBackfilled: false })
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    expect(recent[1].date).toBe(localDateStr(yesterday))
+    expect(recent[1].completed).toBe(false)
+  })
+
+  it('should mark a yesterday completion as backfilled in recentDays', async () => {
+    const habit = {
+      id: crypto.randomUUID(),
+      name: '冥想',
+      description: '',
+      frequency: 'daily' as const,
+      createdAt: new Date().toISOString(),
+    }
+    await createHabit(habit)
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yesterdayStr = localDateStr(yesterday)
+    await toggleCompletion(habit.id, yesterdayStr)
+
+    const dash = await getHabitsDashboard()
+    const recent = dash.recentDays[habit.id]
+    expect(recent).toHaveLength(3)
+    expect(recent[1]).toEqual({ date: yesterdayStr, completed: true, isBackfilled: true })
+  })
+
+  it('should include 3 recentDays entries (newest first) for a habit without completions', async () => {
+    const habit = {
+      id: crypto.randomUUID(),
+      name: '写作',
+      description: '',
+      frequency: 'daily' as const,
+      createdAt: new Date().toISOString(),
+    }
+    await createHabit(habit)
+
+    const dash = await getHabitsDashboard()
+    const recent = dash.recentDays[habit.id]
+    expect(recent).toHaveLength(3)
+    expect(recent.every((e) => !e.completed)).toBe(true)
+    expect(recent.every((e) => !e.isBackfilled)).toBe(true)
+    // 顺序：今天 → 昨天 → 前天
+    const today = localDateStr()
+    expect(recent[0].date).toBe(today)
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    expect(recent[1].date).toBe(localDateStr(yesterday))
+    const before = new Date()
+    before.setDate(before.getDate() - 2)
+    expect(recent[2].date).toBe(localDateStr(before))
   })
 })
 

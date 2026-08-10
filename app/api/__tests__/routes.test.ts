@@ -24,6 +24,13 @@ function postReq(url: string, body: unknown): NextRequest {
   return new NextRequest(url, { method: 'POST', body: JSON.stringify(body) })
 }
 
+// n 天前的本地日期串（与生产 localDateStr 本地比较同语义，各时区一致）
+function daysAgo(n: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  return localDateStr(d)
+}
+
 describe('API routes', () => {
   beforeAll(async () => {
     await migrate(getClient())
@@ -213,10 +220,51 @@ describe('API routes', () => {
       expect(on.status).toBe(200)
       const onData = await on.json()
       expect(onData.completed).toBe(true)
+      // 今天打卡不是补记
+      expect(onData.isBackfilled).toBe(false)
 
       const off = await habitsPOST(postReq('http://localhost/api/habits', { _action: 'toggle', habitId: habit.id, date: today }))
       const offData = await off.json()
       expect(offData.completed).toBe(false)
+    })
+
+    it('22. habits toggle rejects future dates with 400', async () => {
+      const created = await habitsPOST(postReq('http://localhost/api/habits', { name: 'future' }))
+      const { habit } = await created.json()
+
+      const res = await habitsPOST(postReq('http://localhost/api/habits', { _action: 'toggle', habitId: habit.id, date: daysAgo(-1) }))
+      expect(res.status).toBe(400)
+      const data = await res.json()
+      expect(data.error).toContain('Cannot check in future dates')
+    })
+
+    it('23. habits toggle rejects dates outside the backfill window with 400', async () => {
+      const created = await habitsPOST(postReq('http://localhost/api/habits', { name: 'old' }))
+      const { habit } = await created.json()
+
+      const res = await habitsPOST(postReq('http://localhost/api/habits', { _action: 'toggle', habitId: habit.id, date: daysAgo(3) }))
+      expect(res.status).toBe(400)
+      const data = await res.json()
+      expect(data.error).toContain('Can only backfill the last 3 days')
+    })
+
+    it('24. habits toggle rejects a missing date with 400', async () => {
+      const created = await habitsPOST(postReq('http://localhost/api/habits', { name: 'nodate' }))
+      const { habit } = await created.json()
+
+      const res = await habitsPOST(postReq('http://localhost/api/habits', { _action: 'toggle', habitId: habit.id }))
+      expect(res.status).toBe(400)
+    })
+
+    it('25. habits toggle backfills yesterday with isBackfilled true', async () => {
+      const created = await habitsPOST(postReq('http://localhost/api/habits', { name: 'backfill' }))
+      const { habit } = await created.json()
+
+      const res = await habitsPOST(postReq('http://localhost/api/habits', { _action: 'toggle', habitId: habit.id, date: daysAgo(1) }))
+      expect(res.status).toBe(200)
+      const data = await res.json()
+      expect(data.completed).toBe(true)
+      expect(data.isBackfilled).toBe(true)
     })
   })
 
