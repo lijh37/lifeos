@@ -285,30 +285,30 @@ export default function BudgetPage() {
                         <h2 className="text-sm font-medium">月度结算</h2>
                       </div>
                       <p className="mb-3 text-xs text-muted-foreground">恭喜！本月预算未超支，给自己点个赞吧 ✨</p>
-                      <div className="space-y-3">
-                        <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-accent transition-colors">
-                          <Checkbox
-                            checked={budget?.isCompleted ?? false}
-                            onCheckedChange={(checked) => saveBudgetData({ isCompleted: checked })}
-                          />
-                          <div>
-                            <p className="text-sm font-medium">预算达标</p>
-                            <p className="text-xs text-muted-foreground">本月实际支出未超出预算</p>
-                          </div>
-                        </label>
-                        <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-accent transition-colors">
-                          <Checkbox
-                            checked={budget?.savingsCompleted ?? false}
-                            onCheckedChange={(checked) => saveBudgetData({ savingsCompleted: checked })}
-                          />
-                          <div>
-                            <p className="text-sm font-medium">完成强制存储</p>
-                            <p className="text-xs text-muted-foreground">本月完成强制储蓄目标</p>
-                          </div>
-                        </label>
-                      </div>
+                      <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-accent transition-colors">
+                        <Checkbox
+                          checked={budget?.isCompleted ?? false}
+                          onCheckedChange={(checked) => saveBudgetData({ isCompleted: checked })}
+                        />
+                        <div>
+                          <p className="text-sm font-medium">预算达标</p>
+                          <p className="text-xs text-muted-foreground">本月实际支出未超出预算</p>
+                        </div>
+                      </label>
                     </>
                   )}
+                  <div className="mt-3 space-y-3">
+                    <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-accent transition-colors">
+                      <Checkbox
+                        checked={budget?.savingsCompleted ?? false}
+                        onCheckedChange={(checked) => saveBudgetData({ savingsCompleted: checked })}
+                      />
+                      <div>
+                        <p className="text-sm font-medium">完成强制存储</p>
+                        <p className="text-xs text-muted-foreground">本月完成强制储蓄目标</p>
+                      </div>
+                    </label>
+                  </div>
                 </CardContent>
               </Card>
             )}
