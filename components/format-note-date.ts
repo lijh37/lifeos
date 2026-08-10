@@ -3,7 +3,10 @@ import { zhCN } from 'date-fns/locale'
 
 export function formatNoteDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—'
-  const date = new Date(dateStr)
+  // 纯日期串（YYYY-MM-DD）按本地午夜解析，避免 new Date('YYYY-MM-DD') 的 UTC 偏移
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(dateStr)
+    ? new Date(`${dateStr}T00:00:00`)
+    : new Date(dateStr)
   if (isNaN(date.getTime())) return '—'
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()

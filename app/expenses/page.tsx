@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { subMonths, addMonths } from 'date-fns'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,13 +11,14 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { ChevronLeft, ChevronRight, PiggyBank, CheckCircle2, AlertCircle, Sparkles, Loader2 } from 'lucide-react'
 import type { Budget } from '@/lib/types'
 import { fetchBudget, fetchAllBudgets, saveBudget } from '@/lib/services/budgets'
+import { localMonthStr } from '@/lib/utils'
 import { ProgressBar } from '@/components/progress-bar'
 import { BudgetCard } from '@/components/budget-card'
 import { BudgetForm } from '@/components/budget-form'
 
 export default function BudgetPage() {
   const now = new Date()
-  const [currentMonth, setCurrentMonth] = useState(now.toISOString().slice(0, 7))
+  const [currentMonth, setCurrentMonth] = useState(localMonthStr(now))
   const [budget, setBudget] = useState<Budget | null>(null)
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,7 +40,7 @@ export default function BudgetPage() {
   const totalActual = fixedActual !== null && variableActual !== null ? fixedActual + variableActual : 0
   const totalDiff = totalActual - totalBudget
   const isOverBudget = hasActuals && totalDiff > 0
-  const isFutureMonth = currentMonth > now.toISOString().slice(0, 7)
+  const isFutureMonth = currentMonth > localMonthStr(now)
 
   const syncInputs = useCallback((b: Budget | null) => {
     setFixedActualInput(b?.fixedActual !== null && b?.fixedActual !== undefined ? String(b.fixedActual) : '')
@@ -118,14 +118,21 @@ export default function BudgetPage() {
     }
   }
 
+  // 本地时区月份加减（YYYY-MM）。避免 new Date('YYYY-MM-01') 的 UTC 午夜解析
+  // 在 UTC+12~14 时区偏移导致跳月。
+  function shiftMonth(month: string, delta: number): string {
+    const [y, m] = month.split('-').map(Number)
+    return localMonthStr(new Date(y, m - 1 + delta, 1))
+  }
+
   function handlePrev() {
     setLoading(true)
-    setCurrentMonth(subMonths(new Date(currentMonth + '-01'), 1).toISOString().slice(0, 7))
+    setCurrentMonth(shiftMonth(currentMonth, -1))
   }
 
   function handleNext() {
     setLoading(true)
-    setCurrentMonth(addMonths(new Date(currentMonth + '-01'), 1).toISOString().slice(0, 7))
+    setCurrentMonth(shiftMonth(currentMonth, 1))
   }
 
   const [year, month] = currentMonth.split('-')

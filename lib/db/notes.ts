@@ -3,6 +3,7 @@ import type { Note } from '../types'
 import { getClient } from './client'
 import { syncNoteTags } from './tags'
 import { UNTAGGED } from '../types'
+import { localDateStr } from '../utils'
 
 
 function rowToNote(row: Record<string, unknown>, tags: string[] = []): Note {
@@ -128,8 +129,13 @@ export async function getNotes(limit = 200): Promise<Note[]> {
  */
 export async function getNotesByDateRange(startDate: string, endDate: string, limit = 200, offset = 0): Promise<Note[]> {
   const db = getClient()
-  let sql = 'SELECT * FROM notes WHERE created_at >= ? AND created_at <= ?'
-  const args: InValue[] = [startDate, endDate]
+  // endDate 为纯日期（YYYY-MM-DD）时按整天包含：created_at < 次日，避免漏掉当天记录
+  const isPureDate = /^\d{4}-\d{2}-\d{2}$/.test(endDate)
+  const end = isPureDate
+    ? (() => { const d = new Date(`${endDate}T00:00:00`); d.setDate(d.getDate() + 1); return localDateStr(d) })()
+    : endDate
+  let sql = `SELECT * FROM notes WHERE created_at >= ? AND created_at ${isPureDate ? '<' : '<='} ?`
+  const args: InValue[] = [startDate, end]
   sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
   args.push(limit, offset)
   const result = await db.execute({ sql, args })

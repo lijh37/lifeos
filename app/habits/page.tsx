@@ -10,6 +10,7 @@ import { Plus, Trophy } from 'lucide-react'
 
 import { HabitRow } from '@/components/habit-row'
 import type { Habit } from '@/lib/types'
+import { localDateStr } from '@/lib/utils'
 import {
   fetchHabitsDashboard,
   toggleHabit,
@@ -130,7 +131,7 @@ function HabitsPageInner() {
     }
   }, [newName])
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localDateStr()
 
   return (
     <div className="flex h-full flex-col">

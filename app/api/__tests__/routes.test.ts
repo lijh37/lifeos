@@ -9,6 +9,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from
 import { rmSync } from 'node:fs'
 import { NextRequest } from 'next/server'
 import { getClient, migrate } from '@/lib/db'
+import { localDateStr } from '@/lib/utils'
 
 import { GET as notesGET, POST as notesPOST, DELETE as notesDELETE } from '@/app/api/notes/route'
 import { POST as batchPOST } from '@/app/api/notes/batch/route'
@@ -206,7 +207,7 @@ describe('API routes', () => {
     it('14. habits toggle marks completion then unmarks', async () => {
       const created = await habitsPOST(postReq('http://localhost/api/habits', { name: 'read' }))
       const { habit } = await created.json()
-      const today = new Date().toISOString().slice(0, 10)
+      const today = localDateStr()
 
       const on = await habitsPOST(postReq('http://localhost/api/habits', { _action: 'toggle', habitId: habit.id, date: today }))
       expect(on.status).toBe(200)

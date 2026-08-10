@@ -1,6 +1,6 @@
 import type { Habit } from '../types'
 import { getClient } from './client'
-import { genId } from '../utils'
+import { genId, localDateStr } from '../utils'
 
 /**
  * 计算当前连续打卡天数（从 today 向前数，遇到断签即停）。
@@ -12,7 +12,7 @@ export function computeCurrentStreak(datesSet: Set<string>, from: Date = new Dat
   let streak = 0
   const cursor = new Date(from)
   for (let j = 0; j < 365; j++) {
-    const dateStr = cursor.toISOString().slice(0, 10)
+    const dateStr = localDateStr(cursor)
     if (datesSet.has(dateStr)) {
       streak++
     } else if (j > 0) {
@@ -145,7 +145,7 @@ export async function toggleCompletion(habitId: string, date: string): Promise<b
  * @returns 以 habit_id 为键、完成状态为值的映射
  */
 export async function getTodayCompletions(): Promise<Record<string, boolean>> {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localDateStr()
   const db = getClient()
   const result = await db.execute({
     sql: 'SELECT habit_id, completed FROM habit_completions WHERE date = ?',
@@ -167,7 +167,7 @@ export function getWeekStart(): string {
   const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
   const monday = new Date(now)
   monday.setDate(now.getDate() + mondayOffset)
-  return monday.toISOString().slice(0, 10)
+  return localDateStr(monday)
 }
 
 /**
@@ -176,7 +176,7 @@ export function getWeekStart(): string {
 export function getMonthStart(): string {
   const monthStart = new Date()
   monthStart.setDate(1)
-  return monthStart.toISOString().slice(0, 10)
+  return localDateStr(monthStart)
 }
 
 /**

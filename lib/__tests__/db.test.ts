@@ -9,6 +9,7 @@ process.env.DATABASE_URL = 'file:./.db-test.sqlite'
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
 import fs from 'node:fs'
 import { createNote, getNotes, getNote, updateNote, deleteNote, getClient, createHabit, getHabits, toggleCompletion, getTodayCompletions, deleteHabit, upsertBudget, getBudget, getBudgets, searchNotes, getAllTags, renameTag, deleteTag, migrate, listWeightLogs, upsertWeightLog, deleteWeightLog } from '@/lib/db'
+import { localDateStr } from '@/lib/utils'
 import type { Note } from '@/lib/types'
 
 // Clean up the temp file DB after all tests in this file.
@@ -139,7 +140,7 @@ describe('Database - Habits', () => {
     }
     await createHabit(habit)
 
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localDateStr()
     const completed = await toggleCompletion(habit.id, today)
     expect(completed).toBe(true)
 
@@ -157,7 +158,7 @@ describe('Database - Habits', () => {
     }
     await createHabit(habit)
 
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localDateStr()
     await toggleCompletion(habit.id, today) // toggle on
     const completed = await toggleCompletion(habit.id, today) // toggle off
     expect(completed).toBe(false)
@@ -172,7 +173,7 @@ describe('Database - Habits', () => {
       createdAt: new Date().toISOString(),
     }
     await createHabit(habit)
-    await toggleCompletion(habit.id, new Date().toISOString().slice(0, 10))
+    await toggleCompletion(habit.id, localDateStr())
     await deleteHabit(habit.id)
     const habits = await getHabits()
     expect(habits).toHaveLength(0)
