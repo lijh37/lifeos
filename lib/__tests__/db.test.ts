@@ -226,6 +226,37 @@ describe('Database - Habits', () => {
     expect(recent[1]).toEqual({ date: yesterdayStr, completed: true, isBackfilled: true })
   })
 
+  it('re-completing a previously completed past date keeps the backfill marker', async () => {
+    const habit = {
+      id: crypto.randomUUID(),
+      name: '复盘',
+      description: '',
+      frequency: 'daily' as const,
+      createdAt: new Date().toISOString(),
+    }
+    await createHabit(habit)
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yesterdayStr = localDateStr(yesterday)
+    const yesterdayMidday = new Date(yesterday)
+    yesterdayMidday.setHours(12, 0, 0, 0)
+
+    // 模拟"昨天按时打卡"的旧记录（created_at 是昨天，非补记）
+    const db = getClient()
+    await db.execute({
+      sql: 'INSERT INTO habit_completions (id, habit_id, date, completed, created_at) VALUES (?, ?, ?, 1, ?)',
+      args: [crypto.randomUUID(), habit.id, yesterdayStr, yesterdayMidday.toISOString()],
+    })
+    // 用户今天取消（1→0），再从补记面板补回（0→1）：created_at 必须刷新为今天，
+    // 否则刷新后 recentDays 的 isBackfilled 会变 false（回归：补记标记丢失）
+    await toggleCompletion(habit.id, yesterdayStr)
+    await toggleCompletion(habit.id, yesterdayStr)
+
+    const dash = await getHabitsDashboard()
+    const recent = dash.recentDays[habit.id]
+    expect(recent[1]).toEqual({ date: yesterdayStr, completed: true, isBackfilled: true })
+  })
+
   it('should include 3 recentDays entries (newest first) for a habit without completions', async () => {
     const habit = {
       id: crypto.randomUUID(),

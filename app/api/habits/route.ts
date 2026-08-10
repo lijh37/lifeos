@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
       monthCount,
       totalCompletions,
       isBackfilled: completed && body.date !== localDateStr(),
+      rate: dashboard.perHabitRates[id] ?? 0,
     })
   }
   const name = typeof body.name === 'string' ? body.name.trim() : ''

@@ -143,10 +143,20 @@ export async function toggleCompletion(habitId: string, date: string): Promise<b
   if (existing.rows.length > 0) {
     const row = existing.rows[0]
     const newCompleted = (row.completed as number) === 0 ? 1 : 0
-    await db.execute({
-      sql: 'UPDATE habit_completions SET completed = ? WHERE id = ?',
-      args: [newCompleted, row.id],
-    })
+    if (newCompleted === 1) {
+      // 0→1（补回打卡）时刷新 created_at：recentDays 的 isBackfilled 用
+      // created_at > date 派生，若沿用旧 created_at，"打过卡→取消→再补回"
+      // 的补记会在刷新后丢失诚实标记。1→0 保持原值（历史创建时间）。
+      await db.execute({
+        sql: 'UPDATE habit_completions SET completed = ?, created_at = ? WHERE id = ?',
+        args: [1, new Date().toISOString(), row.id],
+      })
+    } else {
+      await db.execute({
+        sql: 'UPDATE habit_completions SET completed = ? WHERE id = ?',
+        args: [0, row.id],
+      })
+    }
     return newCompleted === 1
   } else {
     await db.execute({

@@ -222,10 +222,13 @@ describe('API routes', () => {
       expect(onData.completed).toBe(true)
       // 今天打卡不是补记
       expect(onData.isBackfilled).toBe(false)
+      // 实时完成率：本月 1 次 > 0%，取消后归零
+      expect(onData.rate).toBeGreaterThan(0)
 
       const off = await habitsPOST(postReq('http://localhost/api/habits', { _action: 'toggle', habitId: habit.id, date: today }))
       const offData = await off.json()
       expect(offData.completed).toBe(false)
+      expect(offData.rate).toBe(0)
     })
 
     it('22. habits toggle rejects future dates with 400', async () => {

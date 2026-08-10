@@ -33,6 +33,8 @@ export interface ToggleResult {
   monthCount: number
   totalCompletions: number
   isBackfilled: boolean
+  /** 当月完成率（%），与 dashboard perHabitRates 同公式，用于实时刷新完成率进度条 */
+  rate: number
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -91,6 +93,7 @@ export async function toggleHabit(habitId: string, date: string): Promise<Toggle
       monthCount: dashboard.perHabitMonth[habitId] ?? 0,
       totalCompletions: dashboard.perHabitTotals[habitId] ?? 0,
       isBackfilled: completed && date !== localDateStr(),
+      rate: dashboard.perHabitRates[habitId] ?? 0,
     }
   }
 

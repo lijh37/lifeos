@@ -129,7 +129,8 @@ lifeos/
 │   │   └── weight.ts
 │   ├── services/
 │   │   ├── __tests__/
-│   │   │   └── backup.test.ts
+│   │   │   ├── backup.test.ts
+│   │   │   └── habits.test.ts
 │   │   ├── auth.ts
 │   │   ├── backup.ts
 │   │   ├── budgets.ts
@@ -221,7 +222,7 @@ lifeos/
 |------|------|------|------|------|
 | GET | `/api/habits` | — | 200 `{ habits, todayCompletions, streaks, bestStreaks, perHabitRates, perHabitTotals, perHabitWeek, perHabitMonth, recentDays }` | 习惯列表 + 打卡 + streaks + 统计 + 最近3天补记视图（单次返回全部 dashboard 数据，无参数分支；streaks/bestStreaks 为宽容语义：段内允许 1 个漏记日不计数不中断，连续漏 2 天才断，锚点日（今天）未打卡不判漏；`recentDays` 为 `Record<habitId, {date, completed, isBackfilled}[]>`，每习惯最近 3 天（今天/昨天/前天）新在前，含无打卡习惯，`isBackfilled = localDateStr(created_at) > date`；`Cache-Control: private, max-age=20, stale-while-revalidate=90`） |
 | POST | `/api/habits` | `{ name, description?, frequency?("daily"|"weekly") }` | 200 `{ habit: Habit }` | 创建习惯（frequency 非法值静默归一为 'daily'，不返回 400） |
-| POST | `/api/habits` | `{ _action: "toggle", habitId, date }` | 200 `{ completed, streak, bestStreak, weekCount, monthCount, totalCompletions, isBackfilled }` | 打卡切换（UNIQUE 防重复）；`date` 经 `validateToggleDate` 校验：非法格式或未来日期 → 400 `{ error: 'Cannot check in future dates' }`，早于前天（补记窗口 `BACKFILL_WINDOW_DAYS=3`，仅今天/昨天/前天可写）→ 400 `{ error: 'Can only backfill the last 3 days' }`；响应 `isBackfilled = completed && date !== 本地今天` |
+| POST | `/api/habits` | `{ _action: "toggle", habitId, date }` | 200 `{ completed, streak, bestStreak, weekCount, monthCount, totalCompletions, isBackfilled, rate }` | 打卡切换（UNIQUE 防重复）；`date` 经 `validateToggleDate` 校验：非法格式或未来日期 → 400 `{ error: 'Cannot check in future dates' }`，早于前天（补记窗口 `BACKFILL_WINDOW_DAYS=3`，仅今天/昨天/前天可写）→ 400 `{ error: 'Can only backfill the last 3 days' }`；响应 `isBackfilled = completed && date !== 本地今天`，`rate` = 当月完成率（%，与 dashboard `perHabitRates` 同公式，供页面实时刷新） |
 | PATCH | `/api/habits` | `{ id, name, description }` | 200 `{ success: true }` | 更新习惯（不支持 frequency 更新） |
 | DELETE | `/api/habits?id=<id>` | — | 200 `{ success: true }` | 删除（代码手动级联删除 habit_completions） |
 
@@ -419,11 +420,12 @@ interface WeightLog {
 | `components/__tests__/tag-manager-sheet.test.tsx` | 7            | TagManagerSheet                                |
 | `lib/__tests__/capacitor-adapter.test.ts`         | 9            | capacitor 适配器（libsql 后端 Fake 高保真）    |
 | `lib/__tests__/columns.test.ts`                   | 11           | splitTopLevel + exprName + analyzeSelect       |
-| `lib/__tests__/db.test.ts`                        | 30           | 笔记 + 习惯 + 预算 + 搜索与标签 + Weight       |
+| `lib/__tests__/db.test.ts`                        | 31           | 笔记 + 习惯 + 预算 + 搜索与标签 + Weight       |
 | `lib/__tests__/markdown.test.tsx`                 | 5            | MarkdownRenderer XSS 净化                      |
 | `lib/__tests__/streaks.test.ts`                   | 17           | computeCurrentStreak (宽容式 never-miss-twice) |
 | `lib/__tests__/utils.test.ts`                     | 5            | cn                                             |
 | `lib/services/__tests__/backup.test.ts`           | 6            | backup cap 分支（Capacitor 原生直查 SQLite）   |
+| `lib/services/__tests__/habits.test.ts`           | 6            | validateToggleDate (宽容式补记窗口校验)        |
 | `proxy.test.ts`                                   | 10           | 中间件认证                                     |
 | `store/__tests__/index.test.ts`                   | 11           | Zustand store                                  |
 <!-- /docgen:tests -->
