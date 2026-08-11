@@ -26,13 +26,6 @@ function NoteDetailPageSkeleton() {
           <div className="h-4 w-4/5 rounded skeleton-pulse" />
         </div>
       </div>
-
-      {/* Tags bar */}
-      <div className="flex items-center gap-1.5 border-t px-4 py-2 shrink-0">
-        <div className="h-5 w-14 rounded-full skeleton-pulse" />
-        <div className="h-5 w-20 rounded-full skeleton-pulse" />
-        <div className="h-5 w-16 rounded-full skeleton-pulse" />
-      </div>
     </div>
   )
 }

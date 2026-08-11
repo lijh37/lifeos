@@ -90,10 +90,8 @@ test.describe('Notes E2E', () => {
       const addTagData = await addTagRes.json()
       expect(addTagData.note.tags).toContain(tag)
 
-      // Navigate to note detail page and verify tag appears
-      await page.goto(`/notes/detail?id=${note.id}`)
-      await expect(page.getByPlaceholder('笔记标题')).toBeVisible({ timeout: 5000 })
-
+      // Verify tag appears in the notes list
+      await page.goto('/notes')
       await expect(page.getByText(tag, { exact: false })).toBeVisible({ timeout: 5000 })
     } finally {
       if (noteId) {
