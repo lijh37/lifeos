@@ -58,6 +58,12 @@ npx cap sync android          # 同步 .next-export/ → android/app/src/main/as
 cd android && ./gradlew assembleDebug
 ```
 
+或一条命令完成以上三步：
+
+```bash
+npm run deploy:mobile         # 一键构建：build:mobile → cap sync → gradlew assembleDebug
+```
+
 - 产物：`android/app/build/outputs/apk/debug/app-debug.apk`
 - 只改 JS/静态资源无需重新 `cap add`，重跑上面三步即可；修改 Capacitor 配置/插件才需重新 sync
 - 安装：`adb install -r <apk路径>`（-r 覆盖安装保留数据）

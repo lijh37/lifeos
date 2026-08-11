@@ -265,6 +265,25 @@ if (missingCmds.length === 0) {
   )
 }
 
+// 反向：package.json 中所有用户命令（排除 npm pre/post 钩子）必须出现在 AGENTS.md
+// （新增脚本漏写进文档 → 报错；单向 ⊆ 检查无法发现此盲区）
+const docCmdsAny = new Set([
+  ...[...agents.matchAll(/`npm run ([a-z0-9:-]+)/g)].map(m => m[1]),
+  ...[...agents.matchAll(/`npm ([a-z0-9:-]+)`/g)].map(m => m[1]).filter(c => c !== 'run'),
+])
+const undocumented = [...scripts]
+  .filter(s => !/^(pre|post)/.test(s))
+  .filter(s => !docCmdsAny.has(s))
+  .sort()
+if (undocumented.length === 0) {
+  ok(`package.json scripts（非钩子）均已在 AGENTS.md 出现`)
+} else {
+  fail(
+    `package.json scripts 存在但 AGENTS.md 未记录：${undocumented.join(', ')}` +
+    '（新命令需同步 AGENTS.md 运行命令表）'
+  )
+}
+
 // ─── 汇总与退出码 ───────────────────────────────────────────────────────────
 console.log(`\n—— 结果：${passes} 项通过，${failures} 项失败 ——`)
 if (failures > 0) {

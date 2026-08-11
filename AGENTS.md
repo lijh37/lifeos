@@ -150,6 +150,7 @@ lifeos/
 ├── nginx/
 │   └── lifeos.conf
 ├── scripts/
+│   ├── deploy-mobile.sh
 │   ├── docgen.ts
 │   ├── docs-check.ts
 │   └── migrate.ts
@@ -453,6 +454,8 @@ npm run test:e2e         # Playwright E2E（自动启动 dev server + 自动清�
 | `npm run build:mobile` | 移动端静态导出（`BUILD_TARGET=export next build`，输出 `.next-export`） |
 | `npm run cap:add` | 添加 Capacitor Android 平台（首次构建时执行一次） |
 | `npm run cap:sync` | 先执行 `build:mobile` 再同步 web 产物到 Android 原生工程（APK 构建核心步骤） |
+| `npm run build:apk` | 直接调用 Android Gradle 构建 APK（`cd android && ./gradlew assembleDebug`，需先 cap:sync） |
+| `npm run deploy:mobile` | 一键 APK 构建（`scripts/deploy-mobile.sh`：build:mobile → cap sync → gradlew assembleDebug） |
 | `npm run start` | 生产启动 |
 | `npm run lint` | ESLint |
 | `npm test` | vitest 单元测试（约 148 个，见 `__tests__/`） |
