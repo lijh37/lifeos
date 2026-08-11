@@ -27,7 +27,8 @@ test.describe('Budgets E2E', () => {
     await page.goto('/expenses')
 
     // Wait for the page to load
-    await expect(page.getByRole('heading', { name: '月度预算' })).toBeVisible()
+    // exact:true —— 页面 h1 为「预算」，h2 为「预算设定」，子串匹配会命中两个 heading
+    await expect(page.getByRole('heading', { name: '预算', exact: true })).toBeVisible()
 
     // Fill fixed budget input with placeholder "例: 3200"
     const fixedInput = page.getByPlaceholder('例: 3200')

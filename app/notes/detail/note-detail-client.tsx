@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { ArrowLeft, Trash2, Loader2 } from 'lucide-react'
-
+import { Badge } from '@/components/ui/badge'
 
 const MarkdownEditor = dynamic(() => import('@/components/markdown-editor').then(mod => ({ default: mod.MarkdownEditor })), {
   loading: () => (
@@ -45,6 +45,7 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
   const router = useRouter()
   const [note, setNote] = useState<Note>(initialNote)
   const [title, setTitle] = useState(initialNote.title || '')
+  const [tagInput, setTagInput] = useState('')
 
   const [saving, setSaving] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
@@ -100,6 +101,35 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
       useAppStore.getState().updateNote(note.id, { content })
     } catch {
       toast.error('保存内容失败')
+    }
+  }
+
+  async function handleAddTag(tag: string) {
+    if (note.tags.includes(tag)) return
+    const newTags = [...note.tags, tag]
+    setNote(prev => ({ ...prev, tags: newTags }))
+    setTagInput('')
+    useAppStore.getState().updateNote(note.id, { tags: newTags })
+    try {
+      await updateNote(note.id, { tags: newTags })
+    } catch {
+      toast.error('添加标签失败')
+      // Rollback optimistic update
+      setNote(prev => ({ ...prev, tags: note.tags }))
+      useAppStore.getState().updateNote(note.id, { tags: note.tags })
+    }
+  }
+
+  async function handleRemoveTag(tag: string) {
+    const newTags = note.tags.filter(t => t !== tag)
+    setNote(prev => ({ ...prev, tags: newTags }))
+    useAppStore.getState().updateNote(note.id, { tags: newTags })
+    try {
+      await updateNote(note.id, { tags: newTags })
+    } catch {
+      toast.error('移除标签失败')
+      setNote(prev => ({ ...prev, tags: note.tags }))
+      useAppStore.getState().updateNote(note.id, { tags: note.tags })
     }
   }
 
@@ -174,6 +204,35 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
           </AlertDialogRoot>
         </div>
       </header>
+
+      {/* Tags row - above editor (below header) */}
+      <div className="flex flex-wrap items-center gap-1.5 border-b px-4 py-2 shrink-0">
+        {note.tags.map((tag) => (
+          <Badge key={tag} variant="secondary" className="gap-1 pl-2 pr-1 text-xs">
+            {tag}
+            <button
+              onClick={() => handleRemoveTag(tag)}
+              className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-sm text-muted-foreground/50 hover:bg-destructive/20 hover:text-destructive transition-colors"
+              aria-label={`移除标签 ${tag}`}
+            >
+              ×
+            </button>
+          </Badge>
+        ))}
+        <input
+          type="text"
+          value={tagInput}
+          onChange={(e) => setTagInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && tagInput.trim()) {
+              e.preventDefault()
+              handleAddTag(tagInput.trim())
+            }
+          }}
+          placeholder={note.tags.length === 0 ? '添加标签...' : ''}
+          className="h-8 min-w-[80px] flex-1 bg-transparent text-sm focus:outline-none placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring/20 focus:rounded-sm"
+        />
+      </div>
 
       {/* Editor area - fills remaining space */}
       <div className="flex min-h-0 flex-1">

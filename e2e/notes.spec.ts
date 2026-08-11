@@ -90,8 +90,26 @@ test.describe('Notes E2E', () => {
       const addTagData = await addTagRes.json()
       expect(addTagData.note.tags).toContain(tag)
 
-      // Verify tag appears in the notes list
+      // Verify tag appears in the notes list.
+      // exact:true —— 筛选条上同名标签 chip（「tag (1)」）与卡片 badge 并存，
+      // 子串匹配会命中两个元素触发 strict mode violation。
       await page.goto('/notes')
+      await expect(page.getByText(tag, { exact: true })).toBeVisible({ timeout: 5000 })
+
+      // Navigate to note detail page and verify tag appears.
+      // 详情页 badge 内嵌 × 按钮，textContent 为「tag×」，不能 exact:true；
+      // 页面无筛选条，子串匹配唯一命中 badge。
+      await page.goto(`/notes/detail?id=${note.id}`)
+      await expect(page.getByPlaceholder('笔记标题')).toBeVisible({ timeout: 5000 })
+      await expect(page.getByText(tag, { exact: false })).toBeVisible({ timeout: 5000 })
+
+      // Remove the tag via the × button
+      await page.getByRole('button', { name: `移除标签 ${tag}` }).click()
+      await expect(page.getByText(tag, { exact: false })).not.toBeVisible({ timeout: 5000 })
+
+      // Add the tag back via the input (Enter key)
+      await page.getByPlaceholder('添加标签...').fill(tag)
+      await page.getByPlaceholder('添加标签...').press('Enter')
       await expect(page.getByText(tag, { exact: false })).toBeVisible({ timeout: 5000 })
     } finally {
       if (noteId) {
