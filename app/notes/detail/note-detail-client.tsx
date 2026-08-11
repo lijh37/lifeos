@@ -221,13 +221,20 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
         ))}
         <input
           type="text"
+          // enterKeyHint="enter"：Android 键盘否则会推断为「下一项」
+          // （textarea 是下一个可聚焦元素），回车变成焦点穿越直接跳进编辑区，
+          // 且该动作在部分键盘上发 keyCode 229/Unidentified，onKeyDown 拦不住。
+          // 显式声明后键盘显示「回车」并发送标准 Enter 事件
+          enterKeyHint="enter"
           value={tagInput}
           onChange={(e) => setTagInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && tagInput.trim()) {
-              e.preventDefault()
-              handleAddTag(tagInput.trim())
-            }
+            // 中文输入法组合中回车是确认候选词，交给 IME 处理（否则打断组合、
+            // 候选词丢失）；组合结束后再按一次回车才提交标签
+            if (e.key !== 'Enter' || e.nativeEvent.isComposing) return
+            e.preventDefault()
+            const tag = tagInput.trim()
+            if (tag) handleAddTag(tag)
           }}
           placeholder={note.tags.length === 0 ? '添加标签...' : ''}
           className="h-8 min-w-[80px] flex-1 bg-transparent text-sm focus:outline-none placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring/20 focus:rounded-sm"
