@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,7 +13,10 @@ import {
   Download,
   FileText,
   Settings2,
+  LayoutGrid,
+  List,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import dynamic from 'next/dynamic'
 import { Input } from '@/components/ui/input'
 import type { Note } from '@/lib/types'
@@ -42,6 +45,35 @@ const BatchActionsBar = dynamic(() => import('@/components/batch-actions-bar').t
 })
 
 const SCROLL_POSITION_KEY = 'note_list_scroll'
+const VIEW_PREFERENCE_KEY = 'note_list_view'
+type NoteListView = 'card' | 'compact'
+
+// View preference is a localStorage-backed external store: read once on load,
+// written on toggle. useSyncExternalStore keeps the client snapshot in sync
+// without setState-in-effect and hydrates from the server default ('card')
+// to avoid SSR/client mismatches.
+const VIEW_LISTENERS = new Set<() => void>()
+
+function subscribeView(callback: () => void) {
+  VIEW_LISTENERS.add(callback)
+  window.addEventListener('storage', callback)
+  return () => {
+    VIEW_LISTENERS.delete(callback)
+    window.removeEventListener('storage', callback)
+  }
+}
+
+function readView(): NoteListView {
+  try {
+    return window.localStorage.getItem(VIEW_PREFERENCE_KEY) === 'compact' ? 'compact' : 'card'
+  } catch {
+    return 'card'
+  }
+}
+
+function readViewServer(): NoteListView {
+  return 'card'
+}
 
 export function NoteList() {
   const router = useRouter()
@@ -63,6 +95,15 @@ export function NoteList() {
   const [activeTag, setActiveTag] = useState<string | null>(null)
   const [availableTags, setAvailableTags] = useState<{ name: string; count: number }[]>([])
   const [tagManagerOpen, setTagManagerOpen] = useState(false)
+  const view = useSyncExternalStore(subscribeView, readView, readViewServer)
+
+  const handleViewChange = useCallback((next: NoteListView) => {
+    try {
+      window.localStorage.setItem(VIEW_PREFERENCE_KEY, next)
+    } catch { /* storage unavailable, keep in-memory only */ }
+    // Notify same-tab subscribers (the `storage` event only fires cross-tab)
+    VIEW_LISTENERS.forEach(listener => listener())
+  }, [])
 
   const fetchNotes = useCallback(async () => {
     setInitialLoading(true)
@@ -382,7 +423,7 @@ export function NoteList() {
         </button>
       </div>
 
-      <div className="flex-1 p-4 pb-20">
+      <div className="flex-1 px-3 py-2 pb-20">
         {initialLoading && notes.length === 0 ? (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -414,11 +455,47 @@ export function NoteList() {
                 {isSelectedAll ? <CheckSquare className="h-3.5 w-3.5" /> : <Square className="h-3.5 w-3.5" />}
                 {isSelectedAll ? '取消全选' : '全选'}
               </Button>
-              <span className="text-xs text-muted-foreground">
-                {selectedIds.size > 0 ? `已选 ${selectedIds.size} 项` : `${displayNotes.length} 项`}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {selectedIds.size > 0 ? `已选 ${selectedIds.size} 项` : `${displayNotes.length} 项`}
+                </span>
+                <div className="flex items-center rounded-lg border p-0.5" role="group" aria-label="列表视图切换">
+                  <button
+                    type="button"
+                    onClick={() => handleViewChange('card')}
+                    className={cn(
+                      'flex h-6 items-center gap-1 rounded-md px-1.5 text-xs transition-colors',
+                      view === 'card'
+                        ? 'bg-accent text-accent-foreground'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                    title="卡片视图"
+                    aria-label="卡片视图"
+                    aria-pressed={view === 'card'}
+                  >
+                    <LayoutGrid className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">卡片</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleViewChange('compact')}
+                    className={cn(
+                      'flex h-6 items-center gap-1 rounded-md px-1.5 text-xs transition-colors',
+                      view === 'compact'
+                        ? 'bg-accent text-accent-foreground'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                    title="紧凑列表"
+                    aria-label="紧凑列表"
+                    aria-pressed={view === 'compact'}
+                  >
+                    <List className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">紧凑</span>
+                  </button>
+                </div>
+              </div>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               {displayNotes.map((note) => <NoteCard
                 key={note.id}
                 note={note}
@@ -428,6 +505,7 @@ export function NoteList() {
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
                 onSelectTag={handleTagSelect}
+                dense={view === 'compact'}
               />)}
             </div>
 

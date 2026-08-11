@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { NoteList } from '@/components/note-list'
 import { useAppStore } from '@/store'
 import type { Note } from '@/lib/types'
@@ -38,6 +38,8 @@ describe('NoteList', () => {
       initialLoading: false,
     })
     mockFetch.mockReset()
+    // Reset the persisted view preference so tests start in the default card view
+    window.localStorage.clear()
     // Default: return empty results for notes + tags to prevent crashes
     mockFetch.mockResolvedValue({
       ok: true,
@@ -105,5 +107,65 @@ describe('NoteList', () => {
     await waitFor(() => {
       expect(screen.getByPlaceholderText('搜索笔记…')).toBeInTheDocument()
     })
+  })
+
+  it('switches to compact view and persists the preference', async () => {
+    const notes = [
+      createNote({
+        content: 'Summary text',
+        type: 'note',
+        title: 'Dense Note',
+        tags: ['工作'],
+      }),
+    ]
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ notes }),
+    })
+
+    render(<NoteList />)
+
+    // Default card view shows the summary and tags
+    await waitFor(() => {
+      expect(screen.getByText('Dense Note')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Summary text')).toBeInTheDocument()
+    expect(screen.getByText('工作')).toBeInTheDocument()
+
+    // Switch to compact view
+    fireEvent.click(screen.getByRole('button', { name: '紧凑列表' }))
+
+    // Compact rows: title kept, summary and tags hidden
+    await waitFor(() => {
+      expect(screen.queryByText('Summary text')).not.toBeInTheDocument()
+    })
+    expect(screen.queryByText('工作')).not.toBeInTheDocument()
+    expect(screen.getByText('Dense Note')).toBeInTheDocument()
+    expect(window.localStorage.getItem('note_list_view')).toBe('compact')
+  })
+
+  it('keeps the selection when switching views', async () => {
+    const notes = [
+      createNote({ type: 'note', title: 'Note A' }),
+      createNote({ type: 'note', title: 'Note B' }),
+    ]
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ notes }),
+    })
+
+    render(<NoteList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Note A')).toBeInTheDocument()
+    })
+
+    // Select all in card view
+    fireEvent.click(screen.getByText('全选'))
+    expect(screen.getByText('已选 2 项')).toBeInTheDocument()
+
+    // Switch to compact — selection survives the view change
+    fireEvent.click(screen.getByRole('button', { name: '紧凑列表' }))
+    expect(screen.getByText('已选 2 项')).toBeInTheDocument()
   })
 })
