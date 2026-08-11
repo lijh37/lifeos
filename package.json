@@ -11,6 +11,8 @@
     "build:mobile": "BUILD_TARGET=export next build",
     "cap:add": "npx cap add android",
     "cap:sync": "npm run build:mobile && npx cap sync android",
+    "build:apk": "cd android && ./gradlew assembleDebug",
+    "deploy:mobile": "bash scripts/deploy-mobile.sh",
     "start": "next start",
     "lint": "eslint",
     "migrate": "tsx scripts/migrate.ts",
