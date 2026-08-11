@@ -5,9 +5,12 @@ import { useAppStore } from '@/store'
 import type { Note } from '@/lib/types'
 
 // Mock next/navigation
+const mockRouter = { push: vi.fn(), replace: vi.fn() }
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => mockRouter,
+  useSearchParams: vi.fn(() => new URLSearchParams()),
 }))
+import { useSearchParams } from 'next/navigation'
 
 // Mock global fetch
 const mockFetch = vi.fn()
@@ -30,6 +33,14 @@ function createNote(overrides: Partial<Note> = {}): Note {
   }
 }
 
+// Helper to control the mocked useSearchParams value per test
+function mockSearchParams(query: string = '') {
+  vi.mocked(useSearchParams).mockReset()
+  vi.mocked(useSearchParams).mockReturnValue(
+    new URLSearchParams(query) as unknown as ReturnType<typeof useSearchParams>,
+  )
+}
+
 describe('NoteList', () => {
   beforeEach(() => {
     // Reset store to initial state
@@ -38,6 +49,8 @@ describe('NoteList', () => {
       initialLoading: false,
     })
     mockFetch.mockReset()
+    mockRouter.replace.mockReset()
+    mockSearchParams()
     // Reset the persisted view preference so tests start in the default card view
     window.localStorage.clear()
     // Default: return empty results for notes + tags to prevent crashes
@@ -167,5 +180,59 @@ describe('NoteList', () => {
     // Switch to compact — selection survives the view change
     fireEvent.click(screen.getByRole('button', { name: '紧凑列表' }))
     expect(screen.getByText('已选 2 项')).toBeInTheDocument()
+  })
+
+  it('restores the tag filter from the URL after returning from detail', async () => {
+    const tagged = createNote({ title: 'Tagged Note', tags: ['工作'] })
+    const other = createNote({ title: 'Other Note', tags: ['生活'] })
+    // Notes already cached in the store (as if returning from the detail page)
+    useAppStore.setState({ notes: [tagged, other], initialLoading: false })
+    // URL carries the active tag filter
+    mockSearchParams('tag=工作')
+
+    render(<NoteList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Tagged Note')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Other Note')).not.toBeInTheDocument()
+  })
+
+  it('writes the selected tag to the URL so back-navigation restores the filter', async () => {
+    useAppStore.setState({
+      notes: [createNote({ title: 'N1' })],
+      initialLoading: false,
+    })
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ notes: [], tags: [{ name: '工作', count: 1 }] }),
+    })
+
+    render(<NoteList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('工作')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByText('工作'))
+
+    // URLSearchParams.toString() 对中文做百分号编码（与浏览器 URL 一致）
+    expect(mockRouter.replace).toHaveBeenCalledWith('/notes?tag=%E5%B7%A5%E4%BD%9C', { scroll: false })
+  })
+
+  it('clears the tag from the URL when selecting 全部', async () => {
+    mockSearchParams('tag=工作')
+    useAppStore.setState({
+      notes: [createNote({ title: 'N1', tags: ['工作'] })],
+      initialLoading: false,
+    })
+
+    render(<NoteList />)
+
+    await waitFor(() => {
+      expect(screen.getByText('全部')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByText('全部'))
+
+    expect(mockRouter.replace).toHaveBeenCalledWith('/notes', { scroll: false })
   })
 })

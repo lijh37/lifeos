@@ -416,7 +416,7 @@ interface WeightLog {
 | `components/__tests__/batch-actions-bar.test.tsx` | 5            | BatchActionsBar                                |
 | `components/__tests__/budget-habit.test.tsx`      | 12           | ProgressBar                                    |
 | `components/__tests__/markdown-editor.test.tsx`   | 7            | MarkdownEditor                                 |
-| `components/__tests__/note-list.test.tsx`         | 6            | NoteList                                       |
+| `components/__tests__/note-list.test.tsx`         | 9            | NoteList                                       |
 | `components/__tests__/tag-manager-sheet.test.tsx` | 7            | TagManagerSheet                                |
 | `lib/__tests__/capacitor-adapter.test.ts`         | 9            | capacitor 适配器（libsql 后端 Fake 高保真）    |
 | `lib/__tests__/columns.test.ts`                   | 11           | splitTopLevel + exprName + analyzeSelect       |

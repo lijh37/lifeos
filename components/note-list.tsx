@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback, useMemo, useSyncExternalStore } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -77,6 +77,7 @@ function readViewServer(): NoteListView {
 
 export function NoteList() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   // Select each slice individually so the component only re-renders when the
   // specific piece it uses changes (e.g. editing a note's title no longer
   // re-renders the whole list parent). Action refs are stable across renders.
@@ -92,7 +93,9 @@ export function NoteList() {
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const searchController = useRef<AbortController | undefined>(undefined)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [activeTag, setActiveTag] = useState<string | null>(null)
+  // 标签筛选条件存于 URL（?tag=xxx）：进入详情页后返回列表时，筛选状态随 URL 恢复
+  // （组件本地 state 会在路由切换时丢失，导致返回后回到「全部」）
+  const activeTag = searchParams.get('tag')
   const [availableTags, setAvailableTags] = useState<{ name: string; count: number }[]>([])
   const [tagManagerOpen, setTagManagerOpen] = useState(false)
   const view = useSyncExternalStore(subscribeView, readView, readViewServer)
@@ -233,10 +236,18 @@ export function NoteList() {
     // Cancel pending search when switching tag
     clearTimeout(searchTimer.current)
     searchController.current?.abort()
-    setActiveTag(tag)
     setSearchQuery('')
     setSearchResults(null)
-  }, [activeTag])
+    // 同步到 URL（scroll:false 避免跳转顶部），返回列表页时筛选条件随 URL 恢复
+    const params = new URLSearchParams(searchParams.toString())
+    if (tag) {
+      params.set('tag', tag)
+    } else {
+      params.delete('tag')
+    }
+    const qs = params.toString()
+    router.replace(qs ? `/notes?${qs}` : '/notes', { scroll: false })
+  }, [activeTag, router, searchParams])
 
   const displayNotes = useMemo(() => (
     searchResults ?? (
