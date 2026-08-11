@@ -141,27 +141,27 @@ export default function BudgetPage() {
   return (
     <div className="flex h-full flex-col">
       <div className="border-b px-4 py-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <PiggyBank className="h-5 w-5 text-primary" />
-            <h1 className="text-lg font-semibold">月度预算</h1>
+            <h1 className="text-lg font-semibold">预算</h1>
           </div>
-        </div>
 
-        <div className="mt-3 flex items-center justify-center gap-4">
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={handlePrev}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="min-w-[120px] text-center text-base font-medium">{monthLabel}</span>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            onClick={handleNext}
-            disabled={isFutureMonth}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={handlePrev}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="min-w-[100px] text-center text-base font-medium">{monthLabel}</span>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleNext}
+              disabled={isFutureMonth}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {isFutureMonth && (

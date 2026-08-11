@@ -108,7 +108,7 @@ export default function SettingsPage() {
             <CardContent className="p-5">
               <h2 className="mb-1 text-sm font-medium">一键备份与恢复</h2>
               <p className="mb-4 text-xs text-muted-foreground">
-                备份将导出全部笔记、预算、习惯及打卡记录为 JSON 文件。恢复将清空现有数据并导入备份文件。
+                备份将导出全部笔记、预算、习惯及打卡记录、体重记录为 JSON 文件。恢复将清空现有数据并导入备份文件。
               </p>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
@@ -162,7 +162,7 @@ export default function SettingsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>确定恢复备份？</AlertDialogTitle>
             <AlertDialogDescription>
-              恢复将清空现有所有数据（笔记、预算、习惯），并替换为备份文件中的内容。此操作不可撤销。
+              恢复将清空现有所有数据（笔记、预算、习惯、体重），并替换为备份文件中的内容。此操作不可撤销。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
