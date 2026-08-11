@@ -93,7 +93,14 @@ const MarkdownEditor = memo(function MarkdownEditor({ content: initialContent, o
     onSaveRef.current(newText)
     clearTimeout(saveTimer.current)
     requestAnimationFrame(() => {
-      textarea.focus()
+      // 工具栏按钮已通过 onMouseDown preventDefault 保持 textarea 焦点；
+      // 仅当真正失焦（如键盘触发）才重新 focus——无条件 focus() 会让浏览器
+      // 把超高 textarea 顶部滚入视口，导致长笔记跳回开头。
+      // preventScroll 兜底：即使失焦需要重聚焦，也不触发滚动（iOS 上
+      // mousedown preventDefault 不一定能阻止焦点漂移，focus 时同样不能滚动页面）。
+      if (document.activeElement !== textarea) {
+        textarea.focus({ preventScroll: true })
+      }
       const cursorPos = start + prefix.length + before.length
       if (selected) {
         textarea.setSelectionRange(cursorPos, cursorPos + selected.length)
@@ -174,6 +181,7 @@ const MarkdownEditor = memo(function MarkdownEditor({ content: initialContent, o
             <button
               key={action}
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleToolbar(action)}
               title={title}
               className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground active:bg-accent/70 transition-colors"
@@ -239,6 +247,7 @@ const MarkdownEditor = memo(function MarkdownEditor({ content: initialContent, o
           <button
             key={action}
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => handleToolbar(action)}
             title={title}
             className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground active:bg-accent/70 transition-colors"
