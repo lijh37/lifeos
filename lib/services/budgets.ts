@@ -27,7 +27,8 @@ export async function fetchBudget(month: string): Promise<Budget | null> {
     return getBudget(month)
   }
 
-  const res = await fetch(`/api/budgets?month=${month}`)
+  // cache: 'no-store' —— 预算由用户主动修改，POST 保存后 GET 缓存不失效会返回旧值（切月横跳 bug）
+  const res = await fetch(`/api/budgets?month=${month}`, { cache: 'no-store' })
   if (!res.ok) await throwHttpError(res)
   const data = await res.json()
   return data.budget
@@ -39,7 +40,8 @@ export async function fetchAllBudgets(): Promise<Budget[]> {
     return getBudgets()
   }
 
-  const res = await fetch('/api/budgets')
+  // cache: 'no-store' —— 同 fetchBudget：避免保存后命中旧 HTTP 缓存
+  const res = await fetch('/api/budgets', { cache: 'no-store' })
   if (!res.ok) await throwHttpError(res)
   const data = await res.json()
   return data.budgets
