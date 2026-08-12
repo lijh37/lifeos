@@ -31,7 +31,8 @@ const BudgetCard = memo(function BudgetCard({ budget, currentMonth }: { budget: 
             {over ? '超支' : '达标'}
           </span>
         )}
-        {budget.isCompleted && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+        {/* 超支时不再显示绿色对勾，避免与「超支」字样自相矛盾（勾选后补录实际导致超支的场景） */}
+        {budget.isCompleted && !over && <CheckCircle2 className="h-4 w-4 text-green-500" />}
         {budget.savingsCompleted && (
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-[10px] text-green-700 dark:bg-green-900 dark:text-green-300">
             ¥

@@ -296,7 +296,7 @@ export default function BudgetPage() {
                           onCheckedChange={(checked) => saveBudgetData({ isCompleted: checked })}
                         />
                         <div>
-                          <p className="text-sm font-medium">预算达标</p>
+                          <p className="text-sm font-medium">确认本月结算</p>
                           <p className="text-xs text-muted-foreground">本月实际支出未超出预算</p>
                         </div>
                       </label>
