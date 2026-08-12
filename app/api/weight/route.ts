@@ -6,7 +6,7 @@ import type { WeightPersonKey } from '@/lib/types'
 const GETHandler = async function GET() {
   const logs = await listWeightLogs()
   return NextResponse.json(groupByPerson(logs), {
-    headers: { 'Cache-Control': 'private, max-age=20, stale-while-revalidate=90' },
+    headers: { 'Cache-Control': 'private, no-store' },
   })
 }
 

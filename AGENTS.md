@@ -213,15 +213,15 @@ lifeos/
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| GET | `/api/budgets` | — | 200 `{ budgets: Budget[] }` | 全部预算（`Cache-Control: private, max-age=30, stale-while-revalidate=120`） |
-| GET | `/api/budgets` | `month=YYYY-MM` | 200 `{ budget: Budget | null }` | 单月预算（未设置时返回 null；与全部预算共用 `Cache-Control: private, max-age=30, stale-while-revalidate=120`） |
+| GET | `/api/budgets` | — | 200 `{ budgets: Budget[] }` | 全部预算（`Cache-Control: private, no-store`） |
+| GET | `/api/budgets` | `month=YYYY-MM` | 200 `{ budget: Budget | null }` | 单月预算（未设置时返回 null；与全部预算共用 `Cache-Control: private, no-store`） |
 | POST | `/api/budgets` | `{ month, fixedBudget, variableBudget, fixedActual?, variableActual?, notes?, isCompleted?, savingsCompleted? }` | 200 `{ budget: Budget }` | Upsert（非法数值返回 400） |
 
 ### /api/habits
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| GET | `/api/habits` | — | 200 `{ habits, todayCompletions, streaks, bestStreaks, perHabitRates, perHabitTotals, perHabitWeek, perHabitMonth, recentDays }` | 习惯列表 + 打卡 + streaks + 统计 + 最近3天补记视图（单次返回全部 dashboard 数据，无参数分支；streaks/bestStreaks 为宽容语义：段内允许 1 个漏记日不计数不中断，连续漏 2 天才断，锚点日（今天）未打卡不判漏；`recentDays` 为 `Record<habitId, {date, completed, isBackfilled}[]>`，每习惯最近 3 天（今天/昨天/前天）新在前，含无打卡习惯，`isBackfilled = localDateStr(created_at) > date`；`Cache-Control: private, max-age=20, stale-while-revalidate=90`） |
+| GET | `/api/habits` | — | 200 `{ habits, todayCompletions, streaks, bestStreaks, perHabitRates, perHabitTotals, perHabitWeek, perHabitMonth, recentDays }` | 习惯列表 + 打卡 + streaks + 统计 + 最近3天补记视图（单次返回全部 dashboard 数据，无参数分支；streaks/bestStreaks 为宽容语义：段内允许 1 个漏记日不计数不中断，连续漏 2 天才断，锚点日（今天）未打卡不判漏；`recentDays` 为 `Record<habitId, {date, completed, isBackfilled}[]>`，每习惯最近 3 天（今天/昨天/前天）新在前，含无打卡习惯，`isBackfilled = localDateStr(created_at) > date`；`Cache-Control: private, no-store`） |
 | POST | `/api/habits` | `{ name, description?, frequency?("daily"|"weekly") }` | 200 `{ habit: Habit }` | 创建习惯（frequency 非法值静默归一为 'daily'，不返回 400） |
 | POST | `/api/habits` | `{ _action: "toggle", habitId, date }` | 200 `{ completed, streak, bestStreak, weekCount, monthCount, totalCompletions, isBackfilled, rate }` | 打卡切换（UNIQUE 防重复）；`date` 经 `validateToggleDate` 校验：非法格式或未来日期 → 400 `{ error: 'Cannot check in future dates' }`，早于前天（补记窗口 `BACKFILL_WINDOW_DAYS=3`，仅今天/昨天/前天可写）→ 400 `{ error: 'Can only backfill the last 3 days' }`；响应 `isBackfilled = completed && date !== 本地今天`，`rate` = 当月完成率（%，与 dashboard `perHabitRates` 同公式，供页面实时刷新） |
 | PATCH | `/api/habits` | `{ id, name, description }` | 200 `{ success: true }` | 更新习惯（不支持 frequency 更新） |
@@ -231,7 +231,7 @@ lifeos/
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| GET | `/api/weight` | — | 200 `{ me: WeightLog[], her: WeightLog[] }` | 按 person 分组、date 升序，空数组兜底；`Cache-Control: private, max-age=20, stale-while-revalidate=90` |
+| GET | `/api/weight` | — | 200 `{ me: WeightLog[], her: WeightLog[] }` | 按 person 分组、date 升序，空数组兜底；`Cache-Control: private, no-store` |
 | POST | `/api/weight` | `{ person, date, weight, note? }` | 200 `{ weightLog: WeightLog }` | 校验：body JSON 解析失败 400 `{ error: 'invalid body' }`；person∈`WEIGHT_PERSONS` 键、date 匹配 `YYYY-MM-DD` 且真实日期、weight 有限且 >0 且 ≤500，否则 400；同人同日 upsert 覆盖 |
 | DELETE | `/api/weight?id=<id>` | — | 200 `{ success: true }` | 删除单条，缺 id 返回 400 |
 
@@ -396,6 +396,7 @@ interface WeightLog {
 | export 静态化约束（动态段合并、条件 GET、查询参数路由） | 移动端静态导出可用性（E301、动态段缺失、Suspense 要求） | 路由形态受限，见「离线/移动端构建约束」 |
 | 附件/存储层剔除（阶段 3），attachments 表保留 | 无附件场景，减面减依赖 | 迁移 SQL 零改动，表结构残留 |
 | 宽容式打卡：never miss twice + 3 天补记窗口 + 诚实标记（isBackfilled 派生，零 Schema 变更） | "忘记打卡"≠"没完成"，惩罚式 streak 致前功尽弃感、弃用；单用户自托管无作弊动机，宽容追踪器更维持习惯（Atomic Habits）；`isBackfilled = localDateStr(created_at) > date` 直接派生，toggle 本就是 upsert | streak/bestStreak 数字变大（正向）；补记靠窗口（3 天）+ 视觉弱化标记保诚实；perHabitRates 补记自然累加 |
+| GET 写数据源一律 no-store（预算/习惯/体重/笔记；tags 无头） | perf 引入的 HTTP 缓存（79b61be1）已三次与写后读一致性冲突（tags 移除头/notes 改 no-store/预算切月读旧值），单用户数据量小、缓存收益可忽略，一致性优先；服务端 no-store 从源头杜绝任何调用方踩缓存，客户端 fetch 显式 no-store 双保险 | 放弃 stale-while-revalidate 的 Turso 往返优化 |
 
 ## 测试策略
 

@@ -72,7 +72,8 @@ export async function fetchHabitsDashboard(): Promise<HabitDashboard> {
     return getHabitsDashboard()
   }
 
-  const res = await fetch('/api/habits')
+  // 打卡/增删改后页面重挂载会重读 dashboard，禁用 HTTP 缓存避免读到旧快照（与 budgets/weight 一致）
+  const res = await fetch('/api/habits', { cache: 'no-store' })
   if (!res.ok) await throwHttpError(res)
   return res.json()
 }

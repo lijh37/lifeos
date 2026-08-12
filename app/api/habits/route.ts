@@ -9,7 +9,8 @@ import type { Habit } from '@/lib/types'
 
 const GETHandler = async function GET() {
   const dashboard = await getHabitsDashboard()
-  return NextResponse.json(dashboard, { headers: { 'Cache-Control': 'private, max-age=20, stale-while-revalidate=90' } })
+  // 写数据源 GET 一律 no-store：打卡后重挂载若命中缓存会读到旧快照（对齐 notes 先例）
+  return NextResponse.json(dashboard, { headers: { 'Cache-Control': 'private, no-store' } })
 }
 
 // export 构建（BUILD_TARGET=export）下 GET 置空（静态导出无服务端运行时，E301）。

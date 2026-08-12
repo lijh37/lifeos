@@ -5,7 +5,7 @@ import { validateBudgetInput, numOrNull, toBool } from '@/lib/services/budgets'
 const GETHandler = async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const month = searchParams.get('month')
-  const cacheHeaders = { headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=120' } }
+  const cacheHeaders = { headers: { 'Cache-Control': 'private, no-store' } }
   if (month) {
     const budget = await getBudget(month)
     return NextResponse.json({ budget }, cacheHeaders)
