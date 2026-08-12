@@ -126,11 +126,16 @@ export default function BudgetPage() {
   }
 
   function handlePrev() {
+    // 切换月份时丢弃在途保存响应与排定的 notes 防抖，避免旧月份数据覆盖新月份状态
+    budgetAbortRef.current?.abort()
+    clearTimeout(notesTimerRef.current)
     setLoading(true)
     setCurrentMonth(shiftMonth(currentMonth, -1))
   }
 
   function handleNext() {
+    budgetAbortRef.current?.abort()
+    clearTimeout(notesTimerRef.current)
     setLoading(true)
     setCurrentMonth(shiftMonth(currentMonth, 1))
   }

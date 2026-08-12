@@ -5,6 +5,8 @@ import { CheckCircle2 } from 'lucide-react'
 import type { Budget } from '@/lib/types'
 
 const BudgetCard = memo(function BudgetCard({ budget, currentMonth }: { budget: Budget; currentMonth: string }) {
+  // 本地时区构造日期：new Date('YYYY-MM-01') 按 UTC 午夜解析，西时区/极端东时区会跳月
+  const [y, m] = budget.month.split('-').map(Number)
   const tb = budget.fixedBudget + budget.variableBudget
   const ta = (budget.fixedActual ?? 0) + (budget.variableActual ?? 0)
   const over = budget.fixedActual !== null && budget.variableActual !== null && ta > tb
@@ -16,7 +18,7 @@ const BudgetCard = memo(function BudgetCard({ budget, currentMonth }: { budget: 
     >
       <div>
         <p className="font-medium">
-          {format(new Date(budget.month + '-01'), 'yyyy年M月', { locale: zhCN })}
+          {format(new Date(y, m - 1, 1), 'yyyy年M月', { locale: zhCN })}
         </p>
         <p className="text-xs text-muted-foreground">
           预算 ¥{tb.toFixed(0)}

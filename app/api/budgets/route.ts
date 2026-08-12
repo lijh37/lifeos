@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getBudget, getBudgets, upsertBudget } from '@/lib/db'
-import { validateBudgetInput, numOrNull } from '@/lib/services/budgets'
+import { validateBudgetInput, numOrNull, toBool } from '@/lib/services/budgets'
 
 const GETHandler = async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -48,8 +48,9 @@ export async function POST(req: NextRequest) {
     fixedActual: fixedActualN ?? undefined,
     variableActual: variableActualN ?? undefined,
     notes: typeof notes === 'string' ? notes : undefined,
-    isCompleted,
-    savingsCompleted,
+    // 与原生分支（saveBudget）一致：toBool 归一化，字符串 "false"/"0" 不会误存为 true
+    isCompleted: toBool(isCompleted),
+    savingsCompleted: toBool(savingsCompleted),
   })
   return NextResponse.json({ budget })
 }

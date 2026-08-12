@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test'
 
 const origin = process.env.BASE_URL || 'http://localhost:3000'
-const month = new Date().toISOString().slice(0, 7)
+// 本地时区月份：toISOString() 是 UTC 日期，跨月边界（东时区凌晨）会与页面显示月份错位
+const now = new Date()
+const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
 async function resetBudget() {
   await fetch(`${origin}/api/budgets`, {
