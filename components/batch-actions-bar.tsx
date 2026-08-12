@@ -39,7 +39,7 @@ function BatchActionsBar({
 
   return (
     <>
-      <div className="sticky bottom-0 border-t bg-background/95 backdrop-blur-sm px-4 py-3 shadow-[0_-2px_8px_rgba(0,0,0,0.04)] max-md:bottom-[calc(56px+env(safe-area-inset-bottom))]">
+      <div className="sticky bottom-0 animate-fade-in border-t bg-background/95 backdrop-blur-sm px-4 py-3 shadow-[0_-2px_8px_rgba(0,0,0,0.04)] max-md:bottom-[calc(56px+env(safe-area-inset-bottom))]">
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm text-muted-foreground">已选 {selectedIds.size} 项</span>
           <div className="flex items-center gap-1">
@@ -98,9 +98,9 @@ function BatchActionsBar({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>添加标签</AlertDialogTitle>
+            <AlertDialogTitle>设置标签</AlertDialogTitle>
             <AlertDialogDescription>
-              输入标签名称，将为选中的 {selectedIds.size} 条笔记添加该标签。
+              输入标签名称，将为选中的 {selectedIds.size} 条笔记设置该标签，原有标签将被替换。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="px-6">
@@ -118,7 +118,7 @@ function BatchActionsBar({
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction onClick={handleTagConfirm}>
-              添加
+              设置
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

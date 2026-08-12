@@ -207,7 +207,7 @@ lifeos/
 
 | 方法 | 路径 | 参数 | 响应 | 说明 |
 |------|------|------|------|------|
-| POST | `/api/notes/batch` | `{ ids: string[], action: "delete"|"tag", tag? }` | 200 `{ success: true }` / `ids` 非数组或为空 400 `{ error: 'No ids provided' }` / 事务失败 500 | 事务性批量操作（注：当前代码不校验 action 值，未知值静默返回 {success:true}） |
+| POST | `/api/notes/batch` | `{ ids: string[], action: "delete"\|"tag", tag? }` | 200 `{ success: true }` / `ids` 非数组或为空 400 `{ error: 'No ids provided' }` / 事务失败 500 | 事务性批量操作（注：当前代码不校验 action 值，未知值静默返回 {success:true}）。`action:"tag"` 为**覆盖语义**：每条笔记经 `syncNoteTags(noteId, [tag])` 先清空原有标签再写入该单个标签（UI 文案为「设置标签」，非追加） |
 
 ### /api/budgets
 

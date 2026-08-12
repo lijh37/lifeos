@@ -64,7 +64,7 @@ describe('BatchActionsBar', () => {
       />,
     )
     fireEvent.click(screen.getByText('改标签'))
-    expect(screen.getByText('添加标签')).toBeInTheDocument()
+    expect(screen.getByText('设置标签')).toBeInTheDocument()
     expect(
       screen.getByPlaceholderText('输入标签名称…'),
     ).toBeInTheDocument()

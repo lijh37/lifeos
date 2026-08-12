@@ -37,8 +37,8 @@ export async function POST(req: NextRequest) {
       await tx.commit()
     } catch (e) {
       await tx.rollback()
-      console.error('[batch] 批量打标签事务失败:', e)
-      return NextResponse.json({ error: '批量打标签失败' }, { status: 500 })
+      console.error('[batch] 批量设置标签事务失败:', e)
+      return NextResponse.json({ error: '批量设置标签失败' }, { status: 500 })
     }
   }
 

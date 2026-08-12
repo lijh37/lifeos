@@ -314,10 +314,10 @@ export function NoteList() {
       clearSelection()
       refreshAvailableTags()
       fetchNotes()
-      toast.success(`已添加标签「${tag}」`)
+      toast.success(`已设置标签「${tag}」`)
     } catch (e) {
       console.error('Batch tag failed:', e)
-      toast.error('批量打标签失败，请重试')
+      toast.error('批量设置标签失败，请重试')
     }
   }, [clearSelection, selectedIds, refreshAvailableTags, fetchNotes])
 
