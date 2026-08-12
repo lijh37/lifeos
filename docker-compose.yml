@@ -17,8 +17,8 @@ services:
       - TURSO_AUTH_TOKEN=
       # ── 认证 ──
       - APP_PASSWORD=${APP_PASSWORD:-demo}
-      # HTTPS 阶段必须为 true（Secure cookie 仅在 HTTPS 下回传）
-      - COOKIE_SECURE=true
+      # 双入口（http://IP:3000 直连 + https://域名）必须为 false；仅走 HTTPS 域名可设 true
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
       # 备案号页脚（工信部要求公网域名首页底部展示；不设则无页脚）
       - NEXT_PUBLIC_ICP_BEIAN=${NEXT_PUBLIC_ICP_BEIAN:-豫ICP备2026036606号-1}
       # ── 其他 ──
@@ -28,8 +28,9 @@ services:
     volumes:
       # SQLite 数据库持久化到命名 volume（换机器只需备份此 volume）
       - lifeos-data:/app/data
-    expose:
-      - "3000"
+    ports:
+      # http://IP:3000 直连入口（与 https://域名 双入口并存）
+      - "3000:3000"
     # 限制容器日志大小，防止 json-file 驱动无限增长把磁盘吃满
     logging:
       driver: json-file

@@ -112,7 +112,7 @@ npm run migrate && npm run build && npm run start
 
 ### 首次部署
 
-前置：服务器面板（如宝塔）+ Docker；放行端口 8888(面板)、80、443、22；3000 不对公网开放。
+前置：服务器面板（如宝塔）+ Docker；放行端口 8888(面板)、80、443、22；如需 `http://IP:3000` 直连入口，另放行 3000（可选）。
 
 ```bash
 # 1. 配置 Docker daemon（解决 EAI_AGAIN / i/o timeout）
@@ -161,11 +161,22 @@ cd /root/lifeos && ./deploy.sh     # git pull → docker build（层缓存）→
 | 变量 | 值 | 说明 |
 |------|----|------|
 | `DATABASE_URL` | `file:./data/db/lifeos.db` | 容器内路径，对应 volume 的 `/app/data` |
-| `COOKIE_SECURE` | `true`（HTTPS 阶段） | cookie Secure 标志 |
+| `COOKIE_SECURE` | `false`（默认，双入口） | cookie Secure 标志；`http://IP:3000` 直连必须为 false |
 | `APP_PASSWORD` | 自定义 | 登录密码 |
 | `NEXT_PUBLIC_ICP_BEIAN` | `豫ICP备2026036606号-1` | 备案号页脚（公网域名首页要求） |
 
 > compose 已显式清空 `TURSO_*`，确保走本地 SQLite。环境变量完整说明见 AGENTS.md「环境变量」表（单点源）。
+
+### 双入口访问
+
+`docker compose up -d` 后两种方式均可访问同一份数据：
+
+| 入口 | URL | 说明 |
+|------|-----|------|
+| 域名 HTTPS | `https://daimoli.xyz` | nginx 反代（80/443 → next:3000），正式入口 |
+| IP 直连 | `http://<公网IP>:3000` | next 容器直接映射，需安全组放行 3000；HTTP 明文，仅个人自用 |
+
+> 两入口 cookie 独立（host-only），各自登录互不影响，共享同一 SQLite volume。`COOKIE_SECURE` 必须为 `false` 才能支持 IP 直连登录。
 
 ### 数据持久化
 
@@ -195,7 +206,7 @@ docker compose up -d
 1. `docker build` 报 `EAI_AGAIN` / `getaddrinfo failed` → 配置 Docker daemon 公共 DNS（见首次部署步骤 1）；Dockerfile 已 `ENV NODE_OPTIONS=--dns-result-order=ipv4first`
 2. `docker build` 卡 `FROM node:20-slim` 报 `i/o timeout` → 配置 `registry-mirrors` 国内加速器（见步骤 1）
 3. `npm ci` 报 `Exit handler never called!` → npm 在 Node 22/24 的已知 bug，项目已用 `node:20-slim` 规避，**不要改回 Node 22+**
-4. 登录后刷新跳回登录页 → cookie 被设 `Secure` 但走 HTTP 不传 cookie：确保经 `https://daimoli.xyz` 访问；排查 `.env` 中 `COOKIE_SECURE=true`。验证：`curl -s -i -X POST https://daimoli.xyz/api/auth -H 'Content-Type: application/json' -d '{"password":"你的密码"}' | grep -i set-cookie`（正常应有 `HttpOnly; Secure; SameSite=lax`）
+4. 登录后刷新跳回登录页 → cookie 被设 `Secure` 但走 HTTP 不传 cookie：`http://IP:3000` 入口要求 `.env` 中 `COOKIE_SECURE=false`（默认）；经 `https://daimoli.xyz` 访问时可为 true。验证：`curl -s -i -X POST http://IP:3000/api/auth -H 'Content-Type: application/json' -d '{"password":"你的密码"}' | grep -i set-cookie`（false 模式下应无 `Secure` 标志，仅 `HttpOnly; SameSite=lax`）
 5. nginx 反代报 `502 Bad Gateway` → `lifeos.conf` 中 `proxy_pass http://next:3000;` 的 `next` 是容器名，确保 `docker-compose.yml` 的 service 名匹配
 
 ## 证书续期

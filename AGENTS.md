@@ -310,7 +310,7 @@ interface WeightLog {
 | `TURSO_DATABASE_URL` | Vercel 必需 | Turso 远程库地址 | **不得设置**（dev 护栏） | docker-compose.yml 置空 | `libsql://...` |
 | `TURSO_AUTH_TOKEN` | Vercel 必需 | Turso 认证 Token | **不得设置** | docker-compose.yml 置空 | Turso token |
 | `APP_PASSWORD` | 否 | 登录密码 | 不设 或 `demo` | 自定义 | 自定义 |
-| `COOKIE_SECURE` | 否 | cookie Secure 标志 | 不设 | `true`（HTTPS 阶段） | `true` |
+| `COOKIE_SECURE` | 否 | cookie Secure 标志（`http://IP:3000` 直连入口需为 false） | 不设 | `false`（默认，双入口 IP:3000 + HTTPS） | `true` |
 | `NEXT_PUBLIC_ICP_BEIAN` | 否 | 备案号页脚文案（仅公网域名部署时设置；不设则不渲染页脚，APK/桌面本地无需） | 不设 | `豫ICP备2026036606号-1` | 不设 |
 | `ANALYZE` | 否 | bundle-analyzer 构建开关 | 不设 | 不设 | 不设 |
 | `BUILD_TARGET` | 否（移动端构建） | 移动端静态导出开关：`export` 时启用 `output: 'export'`（`npm run build:mobile` 内部设置） | 不设 | 不设 | 不设 |
