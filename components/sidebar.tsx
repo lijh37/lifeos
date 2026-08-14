@@ -55,20 +55,40 @@ export function MobileNav() {
               key={item.href}
               href={item.href}
               prefetch={false}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[11px] leading-tight min-h-[56px]',
+                'relative flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[11px] leading-tight min-h-[56px] transition-colors',
                 isActive ? 'text-primary' : 'text-muted-foreground'
               )}
             >
-              <item.icon className={cn('h-5 w-5', isActive ? 'text-primary' : 'text-muted-foreground')} />
+              <span
+                className={cn(
+                  'flex h-6 items-center rounded-full px-3 transition-all',
+                  isActive && 'bg-primary/10'
+                )}
+              >
+                <item.icon
+                  className={cn(
+                    'h-5 w-5 transition-transform',
+                    isActive ? 'text-primary animate-pop' : 'text-muted-foreground'
+                  )}
+                />
+              </span>
               <span className={cn(isActive ? 'font-medium' : '')}>{item.label}</span>
+              {isActive && (
+                <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-primary" />
+              )}
             </Link>
           )
         })}
         {MORE_MOBILE_NAV.length > 0 && (
           <button
             onClick={() => setMoreOpen(true)}
-            className="flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[11px] min-h-[56px] text-muted-foreground"
+            aria-label="更多"
+            className={cn(
+              'flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[11px] min-h-[56px] transition-colors',
+              moreOpen ? 'text-primary' : 'text-muted-foreground'
+            )}
           >
             <MoreHorizontal className="h-5 w-5" />
             <span>更多</span>
@@ -77,7 +97,12 @@ export function MobileNav() {
       </nav>
 
       <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-        <SheetContent side="bottom" className="pb-[env(safe-area-inset-bottom)]">
+        <SheetContent
+          side="bottom"
+          className="rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
+          showCloseButton={false}
+        >
+          <div className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-muted" aria-hidden />
           <SheetHeader>
             <SheetTitle>所有功能</SheetTitle>
           </SheetHeader>
@@ -91,11 +116,11 @@ export function MobileNav() {
                   prefetch={false}
                   onClick={() => setMoreOpen(false)}
                   className={cn(
-                    'flex flex-col items-center justify-center gap-1 rounded-lg p-3 min-h-[56px]',
-                    isActive ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50 text-muted-foreground'
+                    'flex flex-col items-center justify-center gap-1 rounded-2xl p-3 min-h-[56px] transition-colors',
+                    isActive ? 'bg-primary/10 text-primary' : 'hover:bg-accent/50 text-muted-foreground'
                   )}
                 >
-                  <item.icon className={cn('h-5 w-5', isActive ? 'text-primary' : 'text-muted-foreground')} />
+                  <item.icon className={cn('h-5 w-5', isActive && 'text-primary')} />
                   <span className="text-xs">{item.label}</span>
                 </Link>
               )

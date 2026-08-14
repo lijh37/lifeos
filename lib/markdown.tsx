@@ -6,17 +6,17 @@ import type { Components } from 'react-markdown'
 
 const markdownComponents: Components = {
   h1: ({ children, ...props }) => (
-    <h1 className="scroll-m-20 text-2xl font-bold tracking-tight" {...props}>
+    <h1 className="mt-2 mb-3 scroll-m-20 text-2xl font-bold tracking-tight" {...props}>
       {children}
     </h1>
   ),
   h2: ({ children, ...props }) => (
-    <h2 className="scroll-m-18 text-xl font-semibold tracking-tight" {...props}>
+    <h2 className="mt-6 mb-2 scroll-m-18 text-xl font-semibold tracking-tight" {...props}>
       {children}
     </h2>
   ),
   h3: ({ children, ...props }) => (
-    <h3 className="scroll-m-16 text-lg font-semibold tracking-tight" {...props}>
+    <h3 className="mt-4 mb-1.5 scroll-m-16 text-lg font-semibold tracking-tight" {...props}>
       {children}
     </h3>
   ),
@@ -26,12 +26,12 @@ const markdownComponents: Components = {
     </p>
   ),
   ul: ({ children, ...props }) => (
-    <ul className="my-3 ml-6 list-disc [&>li]:mt-1.5" {...props}>
+    <ul className="my-3 ml-5 list-disc space-y-1 [&>li]:pl-1" {...props}>
       {children}
     </ul>
   ),
   ol: ({ children, ...props }) => (
-    <ol className="my-3 ml-6 list-decimal [&>li]:mt-1.5" {...props}>
+    <ol className="my-3 ml-5 list-decimal space-y-1 [&>li]:pl-1" {...props}>
       {children}
     </ol>
   ),
@@ -39,7 +39,7 @@ const markdownComponents: Components = {
     <li {...props}>{children}</li>
   ),
   blockquote: ({ children, ...props }) => (
-    <blockquote className="my-3 border-l-4 border-primary/30 pl-4 italic text-muted-foreground" {...props}>
+    <blockquote className="my-3 rounded-r-lg border-l-4 border-primary/40 bg-muted/40 py-1 pr-2 pl-3 italic text-muted-foreground" {...props}>
       {children}
     </blockquote>
   ),
@@ -53,7 +53,7 @@ const markdownComponents: Components = {
       )
     }
     return (
-      <pre className="my-3 overflow-x-auto break-words rounded-lg bg-muted p-4 text-sm whitespace-pre-wrap">
+      <pre className="my-3 overflow-x-auto break-words rounded-xl bg-muted p-4 text-sm leading-relaxed whitespace-pre-wrap ring-1 ring-foreground/5">
         <code className={className} {...props}>
           {children}
         </code>
@@ -75,6 +75,23 @@ const markdownComponents: Components = {
     <strong className="font-semibold" {...props}>{children}</strong>
   ),
   hr: (props) => <hr className="my-4 border-t" {...props} />,
+  // GFM 表格：移动端横向滚动 + 轻量斑马分隔
+  table: ({ children, ...props }) => (
+    <div className="my-3 overflow-x-auto rounded-lg ring-1 ring-foreground/10">
+      <table className="w-full border-collapse text-sm" {...props}>
+        {children}
+      </table>
+    </div>
+  ),
+  thead: ({ children, ...props }) => (
+    <thead className="bg-muted/60" {...props}>{children}</thead>
+  ),
+  th: ({ children, ...props }) => (
+    <th className="border-b px-3 py-2 text-left font-medium" {...props}>{children}</th>
+  ),
+  td: ({ children, ...props }) => (
+    <td className="border-b border-border/60 px-3 py-2 align-top" {...props}>{children}</td>
+  ),
 }
 
 interface MarkdownRendererProps {

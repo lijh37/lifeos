@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { Database, Download, Upload, CheckCircle, AlertCircle } from 'lucide-react'
+import { useState, useRef, useCallback } from 'react'
+import { Database, Download, Upload, CheckCircle, AlertCircle, ChevronRight, Loader2, Sun, Moon, Monitor } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { PageHeader } from '@/components/page-header'
 import {
   AlertDialogRoot,
   AlertDialogContent,
@@ -18,18 +18,49 @@ import {
 import { exportBackupData, importBackupData } from '@/lib/services/backup'
 import { saveFileToDevice } from '@/lib/services/file-share'
 import { isNativeCapacitor } from '@/lib/services/env'
+import { cn } from '@/lib/utils'
+
+type ThemeMode = 'system' | 'light' | 'dark'
+
+const THEME_OPTIONS: { key: ThemeMode; label: string; icon: typeof Sun }[] = [
+  { key: 'system', label: '跟随系统', icon: Monitor },
+  { key: 'light', label: '浅色', icon: Sun },
+  { key: 'dark', label: '深色', icon: Moon },
+]
+
+function readStoredTheme(): ThemeMode {
+  try {
+    const v = localStorage.getItem('lifeos-theme')
+    return v === 'light' || v === 'dark' ? v : 'system'
+  } catch {
+    return 'system'
+  }
+}
 
 export default function SettingsPage() {
   const [backingUp, setBackingUp] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [restoreOpen, setRestoreOpen] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [theme, setTheme] = useState<ThemeMode>(readStoredTheme)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const showMsg = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text })
     setTimeout(() => setMessage(null), 3000)
   }
+
+  const applyTheme = useCallback((t: ThemeMode) => {
+    try {
+      localStorage.setItem('lifeos-theme', t)
+    } catch {
+      /* storage unavailable, keep in-memory only */
+    }
+    const dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    document.documentElement.classList.toggle('dark', dark)
+    document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+    setTheme(t)
+  }, [])
 
   const handleBackup = async () => {
     setBackingUp(true)
@@ -80,12 +111,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Database className="h-5 w-5 text-primary" />
-          <h1 className="text-lg font-semibold">备份与恢复</h1>
-        </div>
-      </div>
+      <PageHeader icon={<Database className="h-5 w-5" />} title="备份与恢复" />
 
       {message && (
         <div className={`flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-medium ${
@@ -104,46 +130,67 @@ export default function SettingsPage() {
 
       <ScrollArea className="flex-1">
         <div className="space-y-4 p-4">
+          {/* 数据：备份/恢复列表式菜单 */}
           <Card>
-            <CardContent className="p-5">
-              <h2 className="mb-1 text-sm font-medium">一键备份与恢复</h2>
-              <p className="mb-4 text-xs text-muted-foreground">
-                备份将导出全部笔记、预算、习惯及打卡记录、体重记录为 JSON 文件。恢复将清空现有数据并导入备份文件。
-              </p>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="grow h-9"
-                  onClick={handleBackup}
-                  disabled={backingUp}
-                >
-                  {backingUp ? (
-                    <div className="mr-1.5 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  ) : (
-                    <Download className="mr-1.5 h-4 w-4" />
-                  )}
-                  导出备份
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="grow h-9"
-                  onClick={() => setRestoreOpen(true)}
-                  disabled={restoring}
-                >
-                  {restoring ? (
-                    <div className="mr-1.5 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  ) : (
-                    <Upload className="mr-1.5 h-4 w-4" />
-                  )}
-                  导入恢复
-                </Button>
+            <CardContent className="p-2">
+              <h2 className="px-3 pt-2 pb-1 text-xs font-medium text-muted-foreground">数据</h2>
+              <button
+                onClick={handleBackup}
+                disabled={backingUp}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-accent disabled:opacity-50"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  {backingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">导出备份</span>
+                  <span className="block text-xs text-muted-foreground">全部笔记、预算、习惯及打卡、体重 → JSON 文件</span>
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+              </button>
+              <button
+                onClick={() => setRestoreOpen(true)}
+                disabled={restoring}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-accent disabled:opacity-50"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  {restoring ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">导入恢复</span>
+                  <span className="block text-xs text-muted-foreground">清空现有数据并恢复备份文件内容</span>
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+              </button>
+            </CardContent>
+          </Card>
+
+          {/* 外观：主题切换（system/light/dark，localStorage 持久化，layout 内联脚本读取） */}
+          <Card>
+            <CardContent className="p-2">
+              <h2 className="px-3 pt-2 pb-1 text-xs font-medium text-muted-foreground">外观</h2>
+              <div className="flex gap-2 px-3 py-2">
+                {THEME_OPTIONS.map(({ key, label, icon: Icon }) => (
+                  <button
+                    key={key}
+                    onClick={() => applyTheme(key)}
+                    aria-pressed={theme === key}
+                    className={cn(
+                      'flex flex-1 flex-col items-center gap-1 rounded-2xl border px-2 py-3 text-xs transition-all',
+                      theme === key
+                        ? 'border-primary/40 bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:bg-accent'
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {label}
+                  </button>
+                ))}
               </div>
             </CardContent>
           </Card>
 
-
+          <p className="px-1 pb-4 text-center text-[11px] text-muted-foreground/60">LifeOS v1.0.0 · 数据本地存储</p>
         </div>
       </ScrollArea>
 

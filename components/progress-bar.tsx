@@ -18,7 +18,11 @@ const ProgressBar = memo(function ProgressBar({ label, budget: b, actual }: { la
       <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
         <div
           className={`h-full rounded-full transition-all duration-500 ${
-            over ? 'bg-red-500' : ratio > 0.85 ? 'bg-amber-500' : 'bg-green-500'
+            over
+              ? 'bg-red-500 bg-gradient-to-r from-red-500 to-rose-500'
+              : ratio > 0.85
+                ? 'bg-amber-500 bg-gradient-to-r from-amber-400 to-orange-500'
+                : 'bg-green-500 bg-gradient-to-r from-green-400 to-emerald-500'
           }`}
           style={{ width: `${Math.max(pct, 2)}%` }}
         />

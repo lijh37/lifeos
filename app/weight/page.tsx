@@ -31,6 +31,7 @@ import {
 import { WEIGHT_PERSONS, type WeightLog, type WeightPersonKey } from '@/lib/types'
 import { fetchWeightData, saveWeightLog, deleteWeightLog } from '@/lib/services/weight'
 import { WeightChart, WEIGHT_RANGES, type WeightRangeKey } from '@/components/weight-chart'
+import { PageHeader } from '@/components/page-header'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
@@ -93,7 +94,7 @@ function StatCard({
   icon?: ReactNode
 }) {
   return (
-    <div className="rounded-xl bg-card p-3 ring-1 ring-foreground/10">
+    <div className="rounded-2xl bg-gradient-to-b from-card to-muted/30 p-3 ring-1 ring-foreground/5">
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         {icon}
         <span className="truncate">{label}</span>
@@ -203,13 +204,11 @@ function WeightPageInner() {
   return (
     <div className="flex h-full flex-col">
       {/* 头部 + 「我 / 她」切换 */}
-      <div className="border-b px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Scale className="h-5 w-5 text-primary" />
-            <h1 className="text-lg font-semibold">体重</h1>
-          </div>
-          <div className="flex rounded-lg bg-muted p-0.5" role="tablist" aria-label="记录人">
+      <PageHeader
+        icon={<Scale className="h-5 w-5" />}
+        title="体重"
+        actions={
+          <div className="flex rounded-full bg-muted p-0.5" role="tablist" aria-label="记录人">
             {WEIGHT_PERSONS.map((p) => (
               <button
                 key={p.key}
@@ -217,7 +216,7 @@ function WeightPageInner() {
                 aria-selected={person === p.key}
                 onClick={() => setPerson(p.key)}
                 className={cn(
-                  'rounded-md px-4 py-1.5 text-sm transition-all',
+                  'rounded-full px-4 py-1.5 text-sm transition-all',
                   person === p.key
                     ? 'bg-background font-medium text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground'
@@ -227,8 +226,8 @@ function WeightPageInner() {
               </button>
             ))}
           </div>
-        </div>
-      </div>
+        }
+      />
 
       <ScrollArea className="flex-1">
         {loading ? (
@@ -303,7 +302,7 @@ function WeightPageInner() {
                         <TrendingUp className="h-4 w-4 text-primary" />
                         <h2 className="text-sm font-medium">趋势</h2>
                       </div>
-                      <div className="flex rounded-lg bg-muted p-0.5" role="tablist" aria-label="时间范围">
+                      <div className="flex rounded-full bg-muted p-0.5" role="tablist" aria-label="时间范围">
                         {WEIGHT_RANGES.map((r) => (
                           <button
                             key={r.key}
@@ -311,7 +310,7 @@ function WeightPageInner() {
                             aria-selected={range === r.key}
                             onClick={() => setRange(r.key)}
                             className={cn(
-                              'rounded-md px-2.5 py-1.5 text-xs transition-all',
+                              'rounded-full px-2.5 py-1.5 text-xs transition-all',
                               range === r.key
                                 ? 'bg-background font-medium text-foreground shadow-sm'
                                 : 'text-muted-foreground hover:text-foreground'

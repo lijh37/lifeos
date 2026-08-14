@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type PointerEvent } from 'react'
 import { format, parseISO, subMonths, subYears } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import type { WeightLog } from '@/lib/types'
@@ -66,6 +66,7 @@ interface WeightChartProps {
 export function WeightChart({ logs, range }: WeightChartProps) {
   const { ref, width } = useContainerWidth()
   const gid = useId().replace(/[^a-zA-Z0-9]/g, '')
+  const [tip, setTip] = useState<{ x: number; y: number; weight: number; date: string } | null>(null)
 
   const filtered = useMemo(() => {
     const cutoff = rangeCutoffDate(range, new Date())
@@ -129,6 +130,24 @@ export function WeightChart({ logs, range }: WeightChartProps) {
     return { plotW, plotH, points, ticks, labelIdx, longLabels }
   }, [filtered, width])
 
+  /** 触摸/悬停 tooltip：定位最近数据点（纯客户端，无新依赖） */
+  function showTip(e: PointerEvent<SVGSVGElement>) {
+    if (!geometry || !ref.current) return
+    const rect = ref.current.getBoundingClientRect()
+    const px = e.clientX - rect.left
+    let best = 0
+    let bestD = Infinity
+    for (let i = 0; i < geometry.points.length; i++) {
+      const d = Math.abs(geometry.points[i].x - px)
+      if (d < bestD) {
+        bestD = d
+        best = i
+      }
+    }
+    const p = geometry.points[best]
+    setTip({ x: p.x, y: p.y, weight: p.weight, date: p.date })
+  }
+
   if (filtered.length === 0) {
     return (
       <div
@@ -156,12 +175,26 @@ export function WeightChart({ logs, range }: WeightChartProps) {
   const showValueLabels = n <= 8
 
   return (
-    <div ref={ref}>
-      <svg width={width} height={CHART_HEIGHT} role="img" aria-label="体重趋势折线图">
+    <div ref={ref} className="relative">
+      <svg
+        width={width}
+        height={CHART_HEIGHT}
+        role="img"
+        aria-label="体重趋势折线图"
+        className="touch-pan-y"
+        onPointerMove={(e) => { if (e.pointerType === 'mouse') showTip(e) }}
+        onPointerDown={showTip}
+        onPointerLeave={() => setTip(null)}
+      >
         <defs>
           <linearGradient id={`area-${gid}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.16" />
             <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
+          </linearGradient>
+          {/* 折线描边渐变：主色 → 青绿，随趋势由冷转暖 */}
+          <linearGradient id={`line-${gid}`} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="var(--primary)" />
+            <stop offset="100%" stopColor="var(--color-emerald-500)" />
           </linearGradient>
         </defs>
 
@@ -194,7 +227,7 @@ export function WeightChart({ logs, range }: WeightChartProps) {
         <path
           d={linePath}
           fill="none"
-          stroke="var(--primary)"
+          stroke={`url(#line-${gid})`}
           strokeWidth={2}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -253,6 +286,16 @@ export function WeightChart({ logs, range }: WeightChartProps) {
           </text>
         ))}
       </svg>
+
+      {/* 触摸/悬停 tooltip */}
+      {tip && (
+        <div
+          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full animate-fade-in rounded-lg bg-foreground px-2 py-1 text-xs font-medium whitespace-nowrap text-background shadow-md"
+          style={{ left: Math.min(Math.max(tip.x, 44), width - 44), top: tip.y - 12 }}
+        >
+          {fmtAxis(tip.weight)} kg · {tip.date}
+        </div>
+      )}
     </div>
   )
 }

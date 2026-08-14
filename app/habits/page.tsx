@@ -30,6 +30,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog'
+import { PageHeader } from '@/components/page-header'
 
 function HabitsPageInner() {
   const [habits, setHabits] = useState<Habit[]>([])
@@ -193,32 +194,30 @@ function HabitsPageInner() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-primary" />
-            <h1 className="text-lg font-semibold">习惯</h1>
-          </div>
+      <PageHeader
+        icon={<Trophy className="h-5 w-5" />}
+        title="习惯"
+        actions={
           <Button variant="outline" size="sm" onClick={() => setShowInput(!showInput)} className="gap-2 max-md:h-8">
             <Plus className="h-4 w-4" />
             新建
           </Button>
-        </div>
+        }
+      />
 
-        {showInput && (
-          <div className="mt-2 flex gap-2">
-            <input
-              autoFocus
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-              placeholder="习惯名称…"
-              className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm outline-ring"
-            />
-            <Button size="sm" onClick={handleCreate} disabled={!newName.trim()} className="max-md:h-8">添加</Button>
-          </div>
-        )}
-      </div>
+      {showInput && (
+        <div className="flex gap-2 border-b px-4 pt-2 pb-3">
+          <input
+            autoFocus
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+            placeholder="习惯名称…"
+            className="flex-1 rounded-full border bg-background px-3 py-1.5 text-base outline-ring sm:text-sm"
+          />
+          <Button size="sm" onClick={handleCreate} disabled={!newName.trim()} className="max-md:h-8">添加</Button>
+        </div>
+      )}
 
       <ScrollArea className="flex-1">
         {loading ? (

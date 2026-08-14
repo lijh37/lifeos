@@ -237,7 +237,7 @@ export function NoteDetailClient({ initialNote }: { initialNote: Note }) {
             if (tag) handleAddTag(tag)
           }}
           placeholder={note.tags.length === 0 ? '添加标签...' : ''}
-          className="h-8 min-w-[80px] flex-1 bg-transparent text-sm focus:outline-none placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring/20 focus:rounded-sm"
+          className="h-8 min-w-[80px] flex-1 bg-transparent text-base focus:outline-none placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring/20 focus:rounded-sm sm:text-sm"
         />
       </div>
 

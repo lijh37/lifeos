@@ -35,6 +35,7 @@ import {
 } from '@/lib/services/notes'
 import { listTags } from '@/lib/services/tags'
 import { saveFileToDevice } from '@/lib/services/file-share'
+import { PageHeader } from '@/components/page-header'
 
 const TagManagerSheet = dynamic(() => import('@/components/tag-manager-sheet').then(mod => ({ default: mod.TagManagerSheet })), {
   loading: () => null,
@@ -367,13 +368,11 @@ export function NoteList() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" />
-            <h1 className="text-lg font-semibold">笔记</h1>
-          </div>
-          <div className="flex items-center gap-1">
+      <PageHeader
+        icon={<FileText className="h-5 w-5" />}
+        title="笔记"
+        actions={
+          <>
             <Button variant="default" size="sm" onClick={handleCreateNote} className="gap-1 text-xs max-md:h-8">
               <Plus className="h-3.5 w-3.5" />
               新建
@@ -387,19 +386,21 @@ export function NoteList() {
               <Download className="h-3.5 w-3.5" />
               导出
             </Button>
-          </div>
-        </div>
-        <div className="relative mt-2">
+          </>
+        }
+      />
+      <div className="border-b px-4 py-3">
+        <div className="relative">
           {searchLoading && searchQuery.trim() ? (
-            <Loader2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground animate-spin" />
+            <Loader2 className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground animate-spin" />
           ) : (
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           )}
           <Input
             placeholder="搜索笔记…"
             value={searchQuery}
             onChange={(e) => handleSearchInput(e.target.value)}
-            className="pl-9 text-base sm:text-sm"
+            className="rounded-full pl-9 text-base sm:text-sm"
             aria-label="搜索笔记"
           />
         </div>
@@ -409,7 +410,7 @@ export function NoteList() {
       <div className="flex items-center gap-1.5 overflow-x-auto border-b px-4 py-2 scrollbar-hide">
         <Badge
           variant={!activeTag ? 'default' : 'outline'}
-          className="cursor-pointer shrink-0 text-[13px] h-6"
+          className="cursor-pointer shrink-0 text-[13px] h-7 transition-all"
           onClick={() => handleTagSelect(null)}
         >
           全部
@@ -418,11 +419,11 @@ export function NoteList() {
           <Badge
             key={t.name}
             variant={activeTag === t.name ? 'default' : 'secondary'}
-            className="cursor-pointer shrink-0 text-[13px] h-6 gap-1"
+            className="cursor-pointer shrink-0 text-[13px] h-7 gap-1 transition-all"
             onClick={() => handleTagSelect(t.name)}
           >
             {t.name === UNTAGGED ? '未分类' : t.name}
-            <span className="text-xs opacity-70">({t.count})</span>
+            <span className="text-[10px] opacity-80">({t.count})</span>
           </Badge>
         ))}
         <button
@@ -456,7 +457,10 @@ export function NoteList() {
             ) : activeTag ? (
               <>{activeTag === UNTAGGED ? '没有未分类的笔记' : <>没有标记「<span className="font-medium">{activeTag}</span>」的笔记</>}</>
             ) : (
-              '还没有任何记录，点击上方 + 新建笔记'
+              <div className="flex flex-col items-center gap-3">
+                <FileText className="h-10 w-10 text-muted-foreground/40" strokeWidth={1.5} />
+                <p>还没有任何记录，点击上方 + 新建笔记</p>
+              </div>
             )}
           </div>
         ) : (
@@ -507,17 +511,30 @@ export function NoteList() {
               </div>
             </div>
             <div className="space-y-1">
-              {displayNotes.map((note) => <NoteCard
-                key={note.id}
-                note={note}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onTogglePin={handleTogglePin}
-                selectedIds={selectedIds}
-                onToggleSelect={toggleSelect}
-                onSelectTag={handleTagSelect}
-                dense={view === 'compact'}
-              />)}
+              {displayNotes.map((note, i) => {
+                const card = (
+                  <NoteCard
+                    note={note}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onTogglePin={handleTogglePin}
+                    selectedIds={selectedIds}
+                    onToggleSelect={toggleSelect}
+                    onSelectTag={handleTagSelect}
+                    dense={view === 'compact'}
+                  />
+                )
+                // 首屏前 12 项 stagger 入场，其余无动画（500 条全量不逐条动画，保性能）
+                return (
+                  <div
+                    key={note.id}
+                    className={i < 12 ? 'animate-fade-in' : undefined}
+                    style={i < 12 ? { animationDelay: `${i * 25}ms` } : undefined}
+                  >
+                    {card}
+                  </div>
+                )
+              })}
             </div>
 
           </>

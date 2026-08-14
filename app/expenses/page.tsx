@@ -11,10 +11,11 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { ChevronLeft, ChevronRight, PiggyBank, CheckCircle2, AlertCircle, Sparkles, Loader2 } from 'lucide-react'
 import type { Budget } from '@/lib/types'
 import { fetchBudget, fetchAllBudgets, saveBudget } from '@/lib/services/budgets'
-import { localMonthStr } from '@/lib/utils'
+import { localMonthStr, cn } from '@/lib/utils'
 import { ProgressBar } from '@/components/progress-bar'
 import { BudgetCard } from '@/components/budget-card'
 import { BudgetForm } from '@/components/budget-form'
+import { PageHeader } from '@/components/page-header'
 
 export default function BudgetPage() {
   const now = new Date()
@@ -145,34 +146,31 @@ export default function BudgetPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b px-4 py-3">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <PiggyBank className="h-5 w-5 text-primary" />
-            <h1 className="text-lg font-semibold">预算</h1>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={handlePrev}>
+      <PageHeader
+        icon={<PiggyBank className="h-5 w-5" />}
+        title="预算"
+        actions={
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={handlePrev}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="min-w-[100px] text-center text-base font-medium">{monthLabel}</span>
+            <span className="min-w-[100px] text-center text-base font-medium tabular-nums">{monthLabel}</span>
             <Button
               variant="outline"
               size="icon"
-              className="h-8 w-8"
+              className="h-8 w-8 rounded-full"
               onClick={handleNext}
               disabled={isFutureMonth}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-        </div>
+        }
+      />
 
-        {isFutureMonth && (
-          <p className="mt-2 text-center text-xs text-amber-500">未来月份，可提前设置预算</p>
-        )}
-      </div>
+      {isFutureMonth && (
+        <p className="border-b px-4 py-1.5 text-center text-xs text-amber-500">未来月份，可提前设置预算</p>
+      )}
 
       <ScrollArea className="flex-1">
         {loading ? (
@@ -232,7 +230,7 @@ export default function BudgetPage() {
             </Card>
 
             {hasActuals && (
-              <Card>
+              <Card className={cn(isOverBudget && 'border-l-4 border-l-red-500')}>
                 <CardContent className="p-4">
                   <div className="mb-3 flex items-center gap-2">
                     {isOverBudget ? (
@@ -290,7 +288,12 @@ export default function BudgetPage() {
                         <h2 className="text-sm font-medium">月度结算</h2>
                       </div>
                       <p className="mb-3 text-xs text-muted-foreground">恭喜！本月预算未超支，给自己点个赞吧 ✨</p>
-                      <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-accent transition-colors">
+                      <label
+                        className={cn(
+                          'flex items-center gap-3 rounded-2xl border p-3 cursor-pointer transition-all hover:bg-accent',
+                          budget?.isCompleted && 'animate-pop border-primary/40 bg-primary/5'
+                        )}
+                      >
                         <Checkbox
                           checked={budget?.isCompleted ?? false}
                           onCheckedChange={(checked) => saveBudgetData({ isCompleted: checked })}
@@ -303,7 +306,7 @@ export default function BudgetPage() {
                     </>
                   )}
                   <div className="mt-3 space-y-3">
-                    <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-accent transition-colors">
+                    <label className="flex items-center gap-3 rounded-2xl border p-3 cursor-pointer transition-all hover:bg-accent">
                       <Checkbox
                         checked={budget?.savingsCompleted ?? false}
                         onCheckedChange={(checked) => saveBudgetData({ savingsCompleted: checked })}

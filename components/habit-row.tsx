@@ -119,7 +119,7 @@ export const HabitRow = memo(function HabitRow({
             ) : (
               <>
                 <div className="flex items-center gap-2">
-                  <p className={`text-sm font-medium ${done ? 'line-through text-muted-foreground' : ''}`}>
+                  <p className={`min-w-0 truncate text-sm font-medium ${done ? 'line-through text-muted-foreground' : ''}`}>
                     {habit.name}
                   </p>
                   {streak > 0 && (
@@ -175,7 +175,7 @@ export const HabitRow = memo(function HabitRow({
                   <div className="mt-1.5 flex items-center gap-2">
                     <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
                       <div
-                        className="h-full rounded-full bg-primary transition-[width] duration-500 ease-out"
+                        className="h-full rounded-full bg-gradient-to-r from-primary to-emerald-500 transition-[width] duration-500 ease-out"
                         style={{ width: `${Math.min(100, Math.max(0, rate))}%` }}
                       />
                     </div>

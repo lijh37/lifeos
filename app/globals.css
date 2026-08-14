@@ -122,7 +122,8 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  /* 品牌主色（teal 青）：全局 primary/ring 跟随，按钮/图表/激活态/进度条统一换装 */
+  --primary: oklch(0.45 0.11 195);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -133,7 +134,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: oklch(0.62 0.11 195);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -157,8 +158,8 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: oklch(0.75 0.12 195);
+  --primary-foreground: oklch(0.145 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -168,7 +169,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: oklch(0.7 0.11 195);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -176,7 +177,7 @@
   --chart-5: oklch(0.269 0 0);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary: oklch(0.62 0.12 195);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
@@ -213,4 +214,65 @@
   background: linear-gradient(90deg, var(--muted) 25%, color-mix(in oklch, var(--muted) 60%, var(--muted-foreground)) 50%, var(--muted) 75%);
   background-size: 200% 100%;
   animation: pulse-soft 1.8s ease-in-out infinite;
+}
+
+/* ── UI 美化：动效与触摸反馈（docs/ui-mobile-plan.md）── */
+
+/* 弹跳：底部导航激活、结算对勾、面板弹出 */
+@keyframes pop {
+  0% { transform: scale(0.9); }
+  60% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+.animate-pop {
+  animation: pop 0.2s ease-out both;
+}
+
+/* 底部面板/抽屉上滑 */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slide-up 0.25s ease-out both;
+}
+
+/* 触摸设备：清除点击高亮 + 全局按压缩放反馈（transform 与 Tailwind translate 属性独立，不冲突） */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+@media (hover: none) {
+  button:not(:disabled):active,
+  [role="button"]:not(:disabled):active,
+  a:active {
+    transform: scale(0.97);
+  }
+  /* 触摸设备隐藏滚动条（WebView 观感） */
+  [data-slot="scroll-area-viewport"] {
+    scrollbar-width: none;
+  }
+  [data-slot="scroll-area-viewport"]::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* 尊重系统减弱动效偏好 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Toast（sonner）：手机上贴底居中，拇指可及；桌面保持顶部 */
+@media (max-width: 767px) {
+  [data-sonner-toaster] {
+    top: auto !important;
+    bottom: calc(64px + env(safe-area-inset-bottom)) !important;
+  }
+  [data-sonner-toaster] [data-sonner-toast] {
+    border-radius: 14px;
+  }
 }

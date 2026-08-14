@@ -28,9 +28,9 @@ const NoteCard = memo(function NoteCard({
       <div
         onClick={() => onEdit(note)}
         className={cn(
-          'flex items-center gap-1.5 rounded-xl bg-card py-1.5 pl-2 pr-2 text-sm ring-1 ring-foreground/10 transition-colors',
-          note.done && 'opacity-50',
-          isSelected && 'ring-2 ring-primary/50',
+          'flex items-center gap-1.5 rounded-2xl bg-card py-1.5 pl-2 pr-2 text-sm shadow-sm ring-1 ring-foreground/5 transition-all duration-200',
+          note.done && 'opacity-60',
+          isSelected && 'bg-primary/5 ring-2 ring-primary/60',
         )}
       >
         <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -70,8 +70,10 @@ const NoteCard = memo(function NoteCard({
     <Card
       size="sm"
       className={cn(
-        note.done && 'opacity-50',
-        isSelected && 'ring-2 ring-primary/50',
+        'rounded-2xl shadow-sm ring-1 ring-foreground/5 transition-all duration-200',
+        note.done && 'opacity-60',
+        note.pinned && 'border-l-[3px] border-l-primary',
+        isSelected && 'bg-primary/5 ring-2 ring-primary/60',
       )}
     >
       <CardHeader className="p-2 pb-0.5">
@@ -100,7 +102,13 @@ const NoteCard = memo(function NoteCard({
                 <PinOff className="h-4 w-4" />
               )}
             </button>
-            <CardTitle className="truncate text-sm font-medium" onClick={() => onEdit(note)}>
+            <CardTitle
+              className={cn(
+                'truncate text-sm font-medium transition-colors',
+                note.done && 'line-through text-muted-foreground',
+              )}
+              onClick={() => onEdit(note)}
+            >
               {note.title || '无标题'}
             </CardTitle>
           </div>

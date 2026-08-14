@@ -39,8 +39,11 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex h-dvh items-center justify-center bg-gradient-to-br from-background to-muted p-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-6">
+    <div className="relative flex h-dvh items-center justify-center overflow-hidden bg-gradient-to-br from-background to-muted p-4">
+      {/* 主色光斑装饰（纯 CSS，无外部资源） */}
+      <div aria-hidden className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-28 -left-20 h-80 w-80 rounded-full bg-emerald-500/10 blur-3xl" />
+      <form onSubmit={handleSubmit} className="relative w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
             <Lock className="h-6 w-6 text-primary" />
@@ -56,7 +59,7 @@ function LoginForm() {
             onChange={e => setPassword(e.target.value)}
             placeholder="密码"
             autoFocus
-            className="w-full rounded-lg border bg-background px-4 py-2.5 pr-10 text-sm outline-ring"
+            className="w-full rounded-xl border bg-background px-4 py-2.5 pr-10 text-base outline-ring sm:text-sm"
           />
           <button
             type="button"

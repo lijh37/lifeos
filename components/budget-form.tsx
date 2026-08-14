@@ -68,8 +68,8 @@ const BudgetForm = memo(function BudgetForm({ budget, onSave }: { budget: Budget
             </div>
           </div>
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <span className="rounded-lg bg-muted px-3 py-1.5 text-sm">
-              总预算：<span className="font-bold">
+            <span className="rounded-full bg-muted px-3 py-1.5 text-sm">
+              总预算：<span className="text-xl font-bold tabular-nums">
                 ¥{((fixedBudgetInput ? parseFloat(fixedBudgetInput) : 0) + (variableBudgetInput ? parseFloat(variableBudgetInput) : 0)).toFixed(0)}
               </span>
             </span>
