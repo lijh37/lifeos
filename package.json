@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "tsx scripts/migrate.ts && next dev --webpack",
     "build": "next build",
-    "build:mobile": "BUILD_TARGET=export next build",
+    "build:mobile": "BUILD_TARGET=export next build && tsx scripts/inject-theme-init.ts",
     "cap:add": "npx cap add android",
     "cap:sync": "npm run build:mobile && npx cap sync android",
     "build:apk": "cd android && ./gradlew assembleDebug",

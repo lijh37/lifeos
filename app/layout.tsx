@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import Script from "next/script"
 import "./globals.css"
 import { Sidebar, MobileNav } from "@/components/sidebar"
 import { PageAnimation } from "@/components/page-animation"
@@ -31,6 +32,7 @@ export default function RootLayout({
     <html
       lang="zh-CN"
       className="h-full antialiased"
+      suppressHydrationWarning
     >
       <body className="h-full overflow-x-hidden">
         {/* 旧 PWA 清理：sw.js 已移除，但浏览器已注册的 Service Worker 不会因 404 自动注销，
@@ -40,6 +42,18 @@ export default function RootLayout({
             __html: `(function(){try{if('serviceWorker'in navigator){navigator.serviceWorker.getRegistrations().then(function(rs){for(var i=0;i<rs.length;i++){rs[i].unregister()}})}if('caches'in window){caches.keys().then(function(ks){for(var i=0;i<ks.length;i++){caches.delete(ks[i])}})}}catch(e){}})();`,
           }}
         />
+        {/* 主题应用：localStorage('lifeos-theme') ∈ system|light|dark，缺省跟随系统。
+            必须用 next/script beforeInteractive —— 静态导出（APK）下服务端组件的
+            dangerouslySetInnerHTML <script> 只进 RSC 载荷、不产出真实标签（曾导致
+            APK 内主题完全不生效，真机复现确认）；beforeInteractive 会在 <head> 输出
+            真实内联脚本，首帧执行避免闪烁。设置页可切换（app/settings/page.tsx）。
+            visibilitychange 兜底 WebView 后台切系统深色时 change 事件不触发。 */}
+        <Script
+          id="lifeos-theme-init"
+          strategy="beforeInteractive"
+        >
+          {`(function(){function apply(){try{var s=localStorage.getItem('lifeos-theme');var dark=s==='dark'||(!s&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',dark);document.documentElement.style.colorScheme=dark?'dark':'light'}catch(e){}}apply();try{window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',apply)}catch(e){}try{document.addEventListener('visibilitychange',function(){if(!document.hidden)apply()})}catch(e){}})();`}
+        </Script>
         <Toaster
           position="top-center"
           toastOptions={{
