@@ -19,6 +19,9 @@
  *             - 8 张表必须全部出现在 Schema 表（`| **name** |` 行），防 Schema 章节丢表
  *   断言组 7：AGENTS.md 命令 vs package.json scripts
  *             - AGENTS.md 中所有 `npm run <name>` 必须真实存在（新增命令须同步 scripts）
+ *   断言组 8：AGENTS.md 散文尺寸红线（docgen 生成区块不计入；防单文件膨胀）
+ *   断言组 9：AGENTS.md 散文可派生数字防回潮（计数以生成区块 / npm test 实际输出为准）
+ *   断言组 10：AGENTS.md 决策记录状态化（编号唯一 + 状态列 ∈ accepted|superseded）
  *
  * 任一断言失败 → 退出码 1。无第三方依赖（node:fs / node:child_process / node:path）。
  *
@@ -283,6 +286,63 @@ if (undocumented.length === 0) {
     '（新命令需同步 AGENTS.md 运行命令表）'
   )
 }
+
+// ─── 断言组 8：AGENTS.md 散文尺寸红线 ────────────────────────────────────────
+// 生成区块（docgen 自动维护）不计入；散文必须有硬上限，防单文件膨胀回旧 38KB
+console.log('\n[断言组 8] AGENTS.md 散文尺寸红线')
+
+// 从 AGENTS.md 中剔除 docgen 生成区块后计算散文字节数
+function stripGeneratedBlocks(src: string): string {
+  let s = src
+  for (const name of ['docgen:tree', 'docgen:tests', 'docgen:commands']) {
+    const re = new RegExp(`<!-- ${name} -->[\\s\\S]*?<!-- /${name} -->`, 'g')
+    s = s.replace(re, '')
+  }
+  return s
+}
+
+const PROSE_LIMIT = 12 * 1024 // 12KB
+const proseBytes = Buffer.byteLength(stripGeneratedBlocks(agents), 'utf-8')
+assert(
+  proseBytes <= PROSE_LIMIT,
+  `AGENTS.md 散文 ${proseBytes} 字节 ≤ ${PROSE_LIMIT}（生成区块除外；超限需压缩替换旧内容）`
+)
+
+// ─── 断言组 9：AGENTS.md 散文可派生数字防回潮 ────────────────────────────────
+// 测试数等计数由 docgen 生成区块与 npm test 实际输出提供，散文写死必然漂移
+console.log('\n[断言组 9] AGENTS.md 散文可派生数字防回潮')
+
+const prose = stripGeneratedBlocks(agents)
+const hardcodedCount = prose.match(/约\s*\d+\s*(个|测试|套件)/)
+assert(
+  !hardcodedCount,
+  `AGENTS.md 散文不含「约 N 个/测试/套件」手写近似数字${hardcodedCount ? `（发现：${hardcodedCount[0]}）` : ''}` +
+  '（计数以生成区块与 npm test 实际输出为准）'
+)
+
+// ─── 断言组 10：AGENTS.md 决策记录状态化 ─────────────────────────────────────
+console.log('\n[断言组 10] AGENTS.md 决策记录状态化')
+
+// 决策表头必须含 状态 列
+const decisionHeaderRe = /^\|\s*编号\s*\|\s*决策\s*\|[\s\S]*?\|\s*状态\s*\|/m
+assert(decisionHeaderRe.test(prose), '决策记录表头包含「编号 | 决策 | ... | 状态」列')
+
+// 每一行决策：编号唯一 + 状态合法
+const decisionRows = [...prose.matchAll(/^\|\s*(AD-\d{2})\s*\|[^|]*\|[^|]*\|[^|]*\|\s*(\w+)\s*\|$/gm)]
+  .map(m => ({ id: m[1], status: m[2] }))
+const decisionIds = decisionRows.map(r => r.id)
+const uniqueIds = new Set(decisionIds)
+assert(decisionIds.length > 0, '决策记录存在数据行')
+assert(
+  uniqueIds.size === decisionIds.length,
+  `决策编号唯一（发现 ${decisionIds.length - uniqueIds.size} 个重复）`
+)
+const invalidStatus = decisionRows.filter(r => !/^(accepted|superseded)$/.test(r.status))
+assert(
+  invalidStatus.length === 0,
+  `决策状态 ∈ {accepted, superseded}（非法：${[...new Set(invalidStatus.map(r => r.status))].join(', ') || '无'}）`
+)
+for (const r of decisionRows) ok(`决策 ${r.id} 状态 ${r.status}`)
 
 // ─── 汇总与退出码 ───────────────────────────────────────────────────────────
 console.log(`\n—— 结果：${passes} 项通过，${failures} 项失败 ——`)

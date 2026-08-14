@@ -225,6 +225,45 @@ function generateTestsBlock(files: string[]): string {
   ].join('\n')
 }
 
+// ─── 区块 3：命令表（package.json scripts 派生）────────────────────────────────
+
+// 命令说明（唯一真相在 package.json scripts；说明在此登记，随 docgen 生成）
+const COMMAND_DESCRIPTIONS: Record<string, string> = {
+  dev: '自动建表 + 启动开发服务器（--webpack）',
+  build: '生产构建',
+  'build:mobile': '移动端静态导出 + 注入主题初始化脚本（输出 .next-export）',
+  'cap:add': '添加 Capacitor Android 平台（首次构建执行一次）',
+  'cap:sync': 'build:mobile 后同步 web 产物到 Android 工程（APK 构建核心步骤）',
+  'build:apk': 'Gradle 构建 APK（先 cap:sync）',
+  'deploy:mobile': '一键 APK 构建（build:mobile → cap sync → gradlew assembleDebug）',
+  start: '生产启动',
+  lint: 'ESLint',
+  migrate: '幂等初始化数据库 schema（终态 DDL 重放）',
+  test: 'vitest 单元测试',
+  'test:watch': '测试 watch 模式',
+  'test:e2e': 'Playwright E2E（自动起 dev server，隔离库自动清理）',
+  analyze: '构建产物体积分析（@next/bundle-analyzer）',
+  'docs:check': '文档契约断言（API/环境变量/Schema/命令/尺寸红线）',
+  'docs:gen': '重新生成 AGENTS.md 生成区块（目录树/测试清单/命令表）',
+}
+
+function generateCommandsBlock(pkg: { scripts?: Record<string, string> }): string {
+  const scripts = Object.entries(pkg.scripts ?? {})
+    .filter(([name]) => !/^(pre|post)/.test(name))
+    .sort((a, b) => a[0].localeCompare(b[0]))
+  const header = ['命令', '说明']
+  const rows = scripts.map(([name]) => [
+    '`npm run ' + name + '`',
+    COMMAND_DESCRIPTIONS[name] ?? '—（见 package.json）',
+  ])
+  const table = buildTable([header, ...rows])
+  return [
+    '> 本命令表由 npm run docs:gen 自动生成（package.json scripts 派生）；新增命令须在 package.json 登记。',
+    '',
+    table,
+  ].join('\n')
+}
+
 // ─── 主流程 ──────────────────────────────────────────────────────────────────
 
 function main() {
@@ -235,10 +274,12 @@ function main() {
 
   const files = getTrackedFiles()
   const agents = readFile('AGENTS.md')
+  const pkg = JSON.parse(readFile('package.json')) as { scripts?: Record<string, string> }
 
   const blocks: Array<{ name: string; generated: string }> = [
     { name: 'docgen:tree', generated: generateTreeBlock(files) },
     { name: 'docgen:tests', generated: generateTestsBlock(files) },
+    { name: 'docgen:commands', generated: generateCommandsBlock(pkg) },
   ]
 
   let src = agents

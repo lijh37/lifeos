@@ -15,21 +15,9 @@
 
 ## 架构一览
 
-单体应用：Next.js 16 App Router（SSR + API Routes 同仓），数据层按运行环境自动切换适配器，无外部服务依赖。
+单体应用：Next.js 16 App Router（SSR + API Routes 同仓），数据层按运行环境自动切换适配器，无外部服务依赖。客户端统一经 `lib/services/` 访问（手机原生直查本地 SQLite；web 走同仓 API）；认证为无状态 HMAC；数据库为终态幂等迁移自愈。
 
-```
-┌──────────────┐  ┌──────────────┐  ┌───────────────┐  ┌──────────────────┐
-│  Android APK │  │    桌面 web   │  │ Docker 服务器  │  │  Vercel + Turso  │
-│  原生 SQLite  │  │  本地 SQLite  │  │ volume SQLite  │  │  Turso 远程库    │
-└──────┬───────┘  └──────┬───────┘  └───────┬───────┘  └────────┬─────────┘
-       │                 │                  │                   │
-       └───「设置 → 备份/恢复」JSON 导出/导入互通（同一时间只允许一端写库）───┘
-```
-
-- **数据层**：客户端统一经 `lib/services/` 访问——Capacitor 原生直查本地 SQLite；web/桌面走同仓 API 透传。底层双适配器：`@libsql/client`（本地/远程 Turso）与 `@capacitor-community/sqlite`（移动端）
-- **认证**：无状态 HMAC（`app_auth` cookie，30 天）。`APP_PASSWORD` 留空则免登录；手机端原生离线恒免登录
-- **数据库**：8 张表，终态幂等迁移自愈（`lib/db/migrations.ts` 唯一真相），无版本簿记，启动自动建表
-- **互通**：各端数据独立存储，经 JSON 备份导出/导入迁移，不直接拷贝 .db 文件
+> 技术真相（架构细节 / API 契约 / Schema / 环境变量 / 决策记录 / 构建约束）见 [AGENTS.md](AGENTS.md)——面向 AI 与协作者的压缩技术参考，本文件只讲使用与部署。
 
 ## 桌面快速开始
 
@@ -280,21 +268,53 @@ df -h /                                # 确认磁盘恢复
 ```bash
 npm install
 npm run dev          # 开发模式（自动建表，--webpack 编译）
-npm test             # 单元测试（vitest，约 148 个）
+npm test             # 单元测试（vitest，计数以实际输出为准）
 npm run test:e2e     # Playwright E2E（自动起 dev server + 自动清理测试库）
 npm run lint         # ESLint
 ```
 
-文档纪律（`AGENTS.md` 是唯一技术真相，README 只讲使用与部署）：
+**人机协作约定**（本项目的协作方式）：
+
+- **人维护**：README 的使用/部署内容、产品定位、`docs/` 不存在的（历史内容看 git log）
+- **AI 维护**：AGENTS.md 的技术真相（架构/API/Schema/环境变量/构建约束）；AI 起草架构决策（决策/动机/代价），**状态由人批准**（accepted/superseded）
+- **机器验证**：一切可脚本验证的事实由脚本守护，不靠人/AI 自觉（见下）
+
+文档纪律（`AGENTS.md` 是 AI 技术真相，README 只讲使用与部署）：
 
 - 改 API 契约 / 环境变量 / Schema → 同步 `AGENTS.md` 对应章节
 - 新增环境变量 → 同步 `AGENTS.md` 环境变量表 + `.env.example` / `.env.prod.example`
-- 增删文件/测试 → 重跑 `npm run docs:gen`（自动重写目录树与测试清单区块）
+- 增删文件/测试/命令 → 重跑 `npm run docs:gen`（自动重写目录树/测试清单/命令表生成区块）
 - 升级依赖 → 核对 `README.md` 中出现的版本号
-- 提交前验证：`npm run docs:check`，且 `npm run docs:gen` 后 `git diff --exit-code -- AGENTS.md` 无输出（CI 同样强制）
+- **提交前验证**：`npm run docs:gen` 后 `git diff --exit-code -- AGENTS.md` 无输出 → `npm run docs:check`（含散文 12KB 尺寸红线与决策状态断言）→ `npm test`（CI 强制前三项）
+
+## 附录：发版自测清单（手机 APK）
+
+> 每次发版（`npm run deploy:mobile` + `adb install -r`）后真机走查；**浅色 + 深色各一遍**。
+
+**全局与主题**
+- [ ] 底部导航：当前页图标有青色胶囊背景 + 底部圆点，切换有弹跳动画
+- [ ] 「更多」抽屉圆角 + 顶部拖拽把手
+- [ ] 页面标题栏滚动时悬浮（毛玻璃）
+- [ ] 系统切深色 → App 自动跟随；设置 → 外观三态切换即时生效；**重启 App 主题保持**
+- [ ] 深色下逐页无白底残留/看不清（笔记/习惯/预算/体重/设置/登录/弹窗）
+- [ ] 删除一条笔记 → Toast 提示在屏幕底部
+
+**模块**
+- [ ] 笔记：搜索胶囊圆角、图标垂直居中；标签 chips 激活青色；置顶卡片左侧青条；完成标题划线
+- [ ] 笔记：Markdown 工具栏/预览正常；表格横向滚动；空状态插画
+- [ ] 习惯：新建/打卡/补记/删除正常；完成率渐变条
+- [ ] 预算：月份切换、总预算大字、进度条渐变（绿/橙/红）、结算对勾弹跳、超支红边
+- [ ] 体重：统计卡渐变、折线青绿渐变、**触摸图表显示数值标签**、范围切换
+- [ ] 弹窗（删除确认/标签管理）手机上为底部圆角抽屉
+- [ ] 设置：列表式菜单、导出/导入备份、版本号显示
+
+**主流程回归**
+- [ ] 笔记 新建→编辑→搜索→标签→置顶→删除；习惯 打卡→补记→删除；预算 设→录→结算；体重 录入→删除；备份导出→导入（浅 + 深各一遍）
+
+**已知噪音**：真机控制台 `favicon.ico 404` 属已知无害。
 
 ## 技术参考
 
-- [AGENTS.md](AGENTS.md)：面向 AI Agent 的完整技术文档（架构 / Schema / API / 环境变量单点源）
+- [AGENTS.md](AGENTS.md)：面向 AI 与协作者的压缩技术真相（架构 / API / Schema / 环境变量 / 决策记录 / 构建约束）
 
 **版本**: 1.0.0 | **License**: 私有
